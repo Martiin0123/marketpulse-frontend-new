@@ -42,7 +42,7 @@ export const getSignals = cache(async (supabase: SupabaseClient) => {
   const { data: signals, error } = await supabase
     .from('signals')
     .select('*')
-    .order('created_at', { ascending: false })
+    .order('timestamp', { ascending: false })
     .limit(50);
 
   if (error) {

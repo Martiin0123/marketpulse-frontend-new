@@ -79,8 +79,15 @@ export default function SignalsPage({
   const sellSignals = signals.filter((signal) => signal.typ === 'sell');
   const totalSignals = signals.length;
 
-  const formatTime = (timestamp: string) => {
-    const date = new Date(timestamp);
+  const formatTime = (timestamp: string | number) => {
+    let date: Date;
+    if (typeof timestamp === 'number') {
+      // Unix timestamp
+      date = new Date(timestamp * 1000);
+    } else {
+      // ISO string
+      date = new Date(timestamp);
+    }
     const now = new Date();
     const diffInMinutes = Math.floor(
       (now.getTime() - date.getTime()) / (1000 * 60)
