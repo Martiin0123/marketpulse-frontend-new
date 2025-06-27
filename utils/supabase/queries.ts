@@ -122,17 +122,17 @@ export const getUserReferralCode = cache(async (supabase: SupabaseClient) => {
 });
 
 export const getReferrals = cache(async (supabase: SupabaseClient) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    return [];
+  }
+
+  // First get the referrals
   const { data: referrals, error } = await supabase
     .from('referrals')
-    .select(`
-      *,
-      referee:referee_id (
-        id,
-        full_name,
-        email
-      )
-    `)
-    .eq('referrer_id', (await supabase.auth.getUser()).data.user?.id)
+    .select('*')
+    .eq('referrer_id', user.id)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -140,28 +140,45 @@ export const getReferrals = cache(async (supabase: SupabaseClient) => {
     return [];
   }
 
-  return referrals;
-});
-
-export const getReferralRewards = cache(async (supabase: SupabaseClient) => {
-  const { data: user } = await supabase.auth.getUser();
-  
-  if (!user.user?.id) {
+  if (!referrals || referrals.length === 0) {
     return [];
   }
 
+  // Get referee user details separately
+  const refereeIds = referrals.map(r => r.referee_id);
+  const { data: users, error: usersError } = await supabase
+    .from('users')
+    .select('id, full_name, email')
+    .in('id', refereeIds);
+
+  if (usersError) {
+    console.error('Error fetching referee users:', usersError);
+    // Return referrals without user details
+    return referrals.map(referral => ({
+      ...referral,
+      referee: null
+    }));
+  }
+
+  // Combine the data
+  return referrals.map(referral => ({
+    ...referral,
+    referee: users?.find(u => u.id === referral.referee_id) || null
+  }));
+});
+
+export const getReferralRewards = cache(async (supabase: SupabaseClient) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    return [];
+  }
+
+  // First get the rewards
   const { data: rewards, error } = await supabase
     .from('referral_rewards')
-    .select(`
-      *,
-      referral:referral_id (
-        referral_code,
-        referee:referee_id (
-          full_name
-        )
-      )
-    `)
-    .eq('user_id', user.user.id)
+    .select('*')
+    .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -169,7 +186,51 @@ export const getReferralRewards = cache(async (supabase: SupabaseClient) => {
     return [];
   }
 
-  return rewards;
+  if (!rewards || rewards.length === 0) {
+    return [];
+  }
+
+  // Get referral details separately
+  const referralIds = rewards.map(r => r.referral_id);
+  const { data: referrals, error: referralsError } = await supabase
+    .from('referrals')
+    .select('id, referral_code, referee_id')
+    .in('id', referralIds);
+
+  if (referralsError) {
+    console.error('Error fetching referrals for rewards:', referralsError);
+    return rewards.map(reward => ({
+      ...reward,
+      referral: null
+    }));
+  }
+
+  // Get referee user details if we have referrals
+  let users: any[] = [];
+  if (referrals && referrals.length > 0) {
+    const refereeIds = referrals.map(r => r.referee_id);
+    const { data: usersData } = await supabase
+      .from('users')
+      .select('id, full_name')
+      .in('id', refereeIds);
+    users = usersData || [];
+  }
+
+  // Combine the data
+  return rewards.map(reward => {
+    const referral = referrals?.find(r => r.id === reward.referral_id);
+    const referee = referral ? users.find(u => u.id === referral.referee_id) : null;
+    
+    return {
+      ...reward,
+      referral: referral ? {
+        referral_code: referral.referral_code,
+        referee: referee ? {
+          full_name: referee.full_name
+        } : null
+      } : null
+    };
+  });
 });
 
 export const validateReferralCode = async (supabase: SupabaseClient, code: string) => {
