@@ -22,7 +22,29 @@ export async function POST(request) {
   }
 
   const symbolUpper = symbol.toUpperCase()
-  const currentTimestamp = timestamp ? timestamp : Math.floor(Date.now() / 1000)
+  
+  // Safely handle timestamp - ensure it's a valid number
+  let validTimestamp = Math.floor(Date.now() / 1000) // Default to current time
+  if (timestamp) {
+    const parsedTimestamp = Number(timestamp)
+    if (!isNaN(parsedTimestamp) && parsedTimestamp > 0) {
+      validTimestamp = parsedTimestamp
+    }
+  }
+  
+  // Helper function to safely create ISO timestamp
+  const createISOTimestamp = (ts) => {
+    try {
+      const date = new Date(ts * 1000)
+      if (isNaN(date.getTime())) {
+        return new Date().toISOString()
+      }
+      return date.toISOString()
+    } catch (error) {
+      console.error('Error creating timestamp:', error)
+      return new Date().toISOString()
+    }
+  }
 
   // Check for existing open positions for this symbol
   const { data: existingPositions, error: fetchError } = await supabase
@@ -72,7 +94,7 @@ export async function POST(request) {
       .update({
         status: 'closed',
         exit_price: exitPrice,
-        exit_time: new Date(currentTimestamp * 1000).toISOString(),
+        exit_time: createISOTimestamp(validTimestamp),
         pnl: pnlPercentage
       })
       .eq('id', oppositePosition.id)
@@ -101,7 +123,7 @@ export async function POST(request) {
       symbol: symbolUpper,
       side: side,
       entry_price: price,
-      entry_time: timestamp ? new Date(timestamp * 1000).toISOString() : new Date().toISOString(),
+      entry_time: createISOTimestamp(validTimestamp),
       status: 'open',
       pnl: 0
     }
