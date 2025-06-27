@@ -11,7 +11,7 @@ interface HeroProps {
 
 export default function Hero({ user }: HeroProps) {
   return (
-    <section className="relative min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 overflow-hidden">
+    <section className="relative min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 overflow-hidden">
       {/* Background Effects */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-pink-600/20"></div>
@@ -100,7 +100,7 @@ export default function Hero({ user }: HeroProps) {
           {/* Right Column - Visual */}
           <div className="relative">
             {/* Trading Dashboard Preview */}
-            <div className="relative bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-purple-500/20 p-6 shadow-2xl">
+            <div className="relative bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-purple-500/20 p-6 shadow-2xl">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 bg-red-400 rounded-full"></div>
@@ -132,7 +132,7 @@ export default function Hero({ user }: HeroProps) {
                 </div>
 
                 {/* Chart placeholder */}
-                <div className="bg-slate-700/50 rounded-lg p-4 h-32 flex items-center justify-center">
+                <div className="bg-gray-700/50 rounded-lg p-4 h-32 flex items-center justify-center">
                   <TrendingUp className="w-8 h-8 text-purple-400" />
                   <span className="ml-2 text-gray-400">Live Market Chart</span>
                 </div>

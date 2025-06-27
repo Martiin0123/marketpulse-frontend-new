@@ -10,13 +10,13 @@ import { User } from '@supabase/supabase-js';
 import cn from 'classnames';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { 
-  Check, 
-  Star, 
-  TrendingUp, 
-  Shield, 
-  Zap, 
-  BarChart3, 
+import {
+  Check,
+  Star,
+  TrendingUp,
+  Shield,
+  Zap,
+  BarChart3,
   Bell,
   Eye,
   Clock,
@@ -111,28 +111,43 @@ export default function Pricing({ user, products, subscription }: Props) {
   // Feature lists for different plans
   const getFeatures = (productName: string) => {
     const baseFeatures = [
-      { icon: <TrendingUp className="w-5 h-5" />, text: "Real-time trading signals" },
-      { icon: <BarChart3 className="w-5 h-5" />, text: "Technical analysis (RSI, MACD)" },
-      { icon: <Eye className="w-5 h-5" />, text: "Market trend insights" },
+      {
+        icon: <TrendingUp className="w-5 h-5" />,
+        text: 'Real-time trading signals'
+      },
+      {
+        icon: <BarChart3 className="w-5 h-5" />,
+        text: 'Technical analysis (RSI, MACD)'
+      },
+      { icon: <Eye className="w-5 h-5" />, text: 'Market trend insights' }
     ];
 
     const proFeatures = [
       ...baseFeatures,
-      { icon: <Bell className="w-5 h-5" />, text: "Instant notifications" },
-      { icon: <Target className="w-5 h-5" />, text: "Advanced risk management" },
-      { icon: <Clock className="w-5 h-5" />, text: "24/7 market monitoring" },
+      { icon: <Bell className="w-5 h-5" />, text: 'Instant notifications' },
+      {
+        icon: <Target className="w-5 h-5" />,
+        text: 'Advanced risk management'
+      },
+      { icon: <Clock className="w-5 h-5" />, text: '24/7 market monitoring' }
     ];
 
     const premiumFeatures = [
       ...proFeatures,
-      { icon: <Shield className="w-5 h-5" />, text: "Priority support" },
-      { icon: <Zap className="w-5 h-5" />, text: "Custom signal alerts" },
-      { icon: <Star className="w-5 h-5" />, text: "Exclusive market insights" },
+      { icon: <Shield className="w-5 h-5" />, text: 'Priority support' },
+      { icon: <Zap className="w-5 h-5" />, text: 'Custom signal alerts' },
+      { icon: <Star className="w-5 h-5" />, text: 'Exclusive market insights' }
     ];
 
-    if (productName?.toLowerCase().includes('premium') || productName?.toLowerCase().includes('pro')) {
+    if (
+      productName?.toLowerCase().includes('premium') ||
+      productName?.toLowerCase().includes('pro')
+    ) {
       return premiumFeatures;
-    } else if (productName?.toLowerCase().includes('professional') || productName?.toLowerCase().includes('standard')) {
+    } else if (
+      productName?.toLowerCase().includes('professional') ||
+      productName?.toLowerCase().includes('standard')
+    ) {
       return proFeatures;
     }
     return baseFeatures;
@@ -140,11 +155,11 @@ export default function Pricing({ user, products, subscription }: Props) {
 
   if (!products.length) {
     return (
-      <section className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <section className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
         <div className="max-w-6xl px-4 py-8 mx-auto sm:py-24 sm:px-6 lg:px-8">
           <div className="text-center">
             <AlertTriangle className="mx-auto h-16 w-16 text-orange-400 mb-6" />
-            <h1 className="text-4xl font-extrabold text-white sm:text-6xl mb-6">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-6 sm:text-6xl">
               No Pricing Plans Available
             </h1>
             <p className="text-xl text-gray-300 mb-8">
@@ -167,7 +182,7 @@ export default function Pricing({ user, products, subscription }: Props) {
   }
 
   return (
-    <section className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <section className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       {/* Subscription Required Message */}
       {showMessage && (
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-pulse">
@@ -181,19 +196,17 @@ export default function Pricing({ user, products, subscription }: Props) {
       )}
 
       <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-pink-600/20"></div>
         <div className="relative max-w-7xl px-4 py-16 mx-auto sm:py-24 sm:px-6 lg:px-8">
-          
           {/* Header Section */}
           <div className="text-center mb-16">
-            <h1 className="text-5xl font-bold text-white sm:text-7xl mb-6">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-4 sm:text-6xl">
               Market<span className="text-purple-400">Pulse</span> Plans
             </h1>
-            <p className="max-w-3xl mx-auto text-xl text-gray-300 sm:text-2xl mb-8">
-              Get real-time trading signals, technical analysis, and market insights 
-              to make informed trading decisions
+            <p className="max-w-3xl mx-auto text-lg text-gray-300 sm:text-xl mb-8">
+              Get real-time trading signals, technical analysis, and market
+              insights to make informed trading decisions
             </p>
-            
+
             {/* Current Subscription Status */}
             {subscription && (
               <div className="inline-flex items-center px-6 py-3 bg-green-500/20 backdrop-blur-sm rounded-full border border-green-500/50 mb-8">
@@ -252,15 +265,17 @@ export default function Pricing({ user, products, subscription }: Props) {
                 (price) => price.interval === billingInterval
               );
               if (!price) return null;
-              
+
               const priceString = new Intl.NumberFormat('en-US', {
                 style: 'currency',
                 currency: price.currency!,
                 minimumFractionDigits: 0
               }).format((price?.unit_amount || 0) / 100);
 
-              const isPopular = index === 1 || product.name?.toLowerCase().includes('pro');
-              const isCurrentPlan = subscription?.prices?.products?.name === product.name;
+              const isPopular =
+                index === 1 || product.name?.toLowerCase().includes('pro');
+              const isCurrentPlan =
+                subscription?.prices?.products?.name === product.name;
               const features = getFeatures(product.name || '');
 
               return (
@@ -269,9 +284,12 @@ export default function Pricing({ user, products, subscription }: Props) {
                   className={cn(
                     'relative bg-gray-800/50 backdrop-blur-sm rounded-2xl border p-8 transition-all duration-300 hover:scale-105',
                     {
-                      'border-purple-500 shadow-2xl shadow-purple-500/25': isPopular,
-                      'border-green-500 shadow-2xl shadow-green-500/25': isCurrentPlan,
-                      'border-gray-700 hover:border-gray-600': !isPopular && !isCurrentPlan
+                      'border-purple-500 shadow-2xl shadow-purple-500/25':
+                        isPopular,
+                      'border-green-500 shadow-2xl shadow-green-500/25':
+                        isCurrentPlan,
+                      'border-gray-700 hover:border-gray-600':
+                        !isPopular && !isCurrentPlan
                     }
                   )}
                 >
@@ -300,10 +318,8 @@ export default function Pricing({ user, products, subscription }: Props) {
                     <h3 className="text-2xl font-bold text-white mb-2">
                       {product.name}
                     </h3>
-                    <p className="text-gray-400 mb-6">
-                      {product.description}
-                    </p>
-                    
+                    <p className="text-gray-400 mb-6">{product.description}</p>
+
                     {/* Price */}
                     <div className="mb-6">
                       <span className="text-5xl font-bold text-white">
@@ -330,10 +346,10 @@ export default function Pricing({ user, products, subscription }: Props) {
                         loading={priceIdLoading === price.id}
                         onClick={() => handleStripeCheckout(price)}
                         className={cn(
-                          "w-full py-3 text-lg font-semibold rounded-xl transition-all",
-                          isPopular 
-                            ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white" 
-                            : "bg-gray-700 hover:bg-gray-600 text-white"
+                          'w-full py-3 text-lg font-semibold rounded-xl transition-all',
+                          isPopular
+                            ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white'
+                            : 'bg-gray-700 hover:bg-gray-600 text-white'
                         )}
                       >
                         {subscription ? 'Change Plan' : 'Get Started'}
@@ -347,13 +363,14 @@ export default function Pricing({ user, products, subscription }: Props) {
                       What's included:
                     </h4>
                     {features.map((feature, featureIndex) => (
-                      <div key={featureIndex} className="flex items-center space-x-3">
+                      <div
+                        key={featureIndex}
+                        className="flex items-center space-x-3"
+                      >
                         <div className="flex-shrink-0 text-purple-400">
                           {feature.icon}
                         </div>
-                        <span className="text-gray-300">
-                          {feature.text}
-                        </span>
+                        <span className="text-gray-300">{feature.text}</span>
                       </div>
                     ))}
                   </div>
@@ -368,9 +385,10 @@ export default function Pricing({ user, products, subscription }: Props) {
               Why Choose MarketPulse?
             </h2>
             <p className="text-xl text-gray-300 mb-12 max-w-3xl mx-auto">
-              Advanced trading signals and market analysis to help you make profitable decisions
+              Advanced trading signals and market analysis to help you make
+              profitable decisions
             </p>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
               <div className="text-center">
                 <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -380,10 +398,11 @@ export default function Pricing({ user, products, subscription }: Props) {
                   Real-Time Signals
                 </h3>
                 <p className="text-gray-400">
-                  Get instant buy/sell signals based on advanced technical analysis
+                  Get instant buy/sell signals based on advanced technical
+                  analysis
                 </p>
               </div>
-              
+
               <div className="text-center">
                 <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                   <BarChart3 className="w-8 h-8 text-green-400" />
@@ -392,10 +411,11 @@ export default function Pricing({ user, products, subscription }: Props) {
                   Technical Analysis
                 </h3>
                 <p className="text-gray-400">
-                  RSI, MACD, and other indicators to validate trading opportunities
+                  RSI, MACD, and other indicators to validate trading
+                  opportunities
                 </p>
               </div>
-              
+
               <div className="text-center">
                 <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Shield className="w-8 h-8 text-blue-400" />
@@ -411,7 +431,7 @@ export default function Pricing({ user, products, subscription }: Props) {
           </div>
         </div>
       </div>
-      
+
       <LogoCloud />
     </section>
   );
