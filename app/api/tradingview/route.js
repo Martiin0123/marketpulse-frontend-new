@@ -65,7 +65,7 @@ export async function POST(request) {
       symbol: symbolUpper,
       typ: side,
       price: price,
-      timestamp: validTimestamp,
+      timestamp: createISOTimestamp(validTimestamp),
       reason: reason || null,
       rsi: rsi ? Number(rsi) : null,
       macd: macd ? Number(macd) : null,
@@ -155,10 +155,7 @@ export async function POST(request) {
       entry_price: price,
       entry_time: createISOTimestamp(validTimestamp),
       status: 'open',
-      pnl: 0,
-      reason: reason || null,
-      rsi: rsi ? Number(rsi) : null,
-      macd: macd ? Number(macd) : null
+      pnl: 0
     }
   ])
 
