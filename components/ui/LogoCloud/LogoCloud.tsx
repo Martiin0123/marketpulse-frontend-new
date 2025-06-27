@@ -1,12 +1,16 @@
 export default function LogoCloud() {
   return (
     <div>
-      <p className="mt-24 text-xs uppercase text-zinc-400 text-center font-bold tracking-[0.3em]">
-        Brought to you by
+      <p className="mt-24 text-xs uppercase text-gray-400 text-center font-bold tracking-[0.3em]">
+        Powered by industry leaders
       </p>
-      <div className="grid grid-cols-1 place-items-center	my-12 space-y-4 sm:mt-8 sm:space-y-0 md:mx-auto md:max-w-2xl sm:grid sm:gap-6 sm:grid-cols-5">
+      <div className="grid grid-cols-1 place-items-center my-12 space-y-4 sm:mt-8 sm:space-y-0 md:mx-auto md:max-w-2xl sm:grid sm:gap-6 sm:grid-cols-5">
         <div className="flex items-center justify-start h-12">
-          <a href="https://nextjs.org" aria-label="Next.js Link">
+          <a
+            href="https://nextjs.org"
+            aria-label="Next.js Link"
+            className="transition-opacity hover:opacity-75"
+          >
             <img
               src="/nextjs.svg"
               alt="Next.js Logo"
@@ -15,7 +19,11 @@ export default function LogoCloud() {
           </a>
         </div>
         <div className="flex items-center justify-start h-12">
-          <a href="https://vercel.com" aria-label="Vercel.com Link">
+          <a
+            href="https://vercel.com"
+            aria-label="Vercel.com Link"
+            className="transition-opacity hover:opacity-75"
+          >
             <img
               src="/vercel.svg"
               alt="Vercel.com Logo"
@@ -24,7 +32,11 @@ export default function LogoCloud() {
           </a>
         </div>
         <div className="flex items-center justify-start h-12">
-          <a href="https://stripe.com" aria-label="stripe.com Link">
+          <a
+            href="https://stripe.com"
+            aria-label="stripe.com Link"
+            className="transition-opacity hover:opacity-75"
+          >
             <img
               src="/stripe.svg"
               alt="stripe.com Logo"
@@ -33,7 +45,11 @@ export default function LogoCloud() {
           </a>
         </div>
         <div className="flex items-center justify-start h-12">
-          <a href="https://supabase.io" aria-label="supabase.io Link">
+          <a
+            href="https://supabase.io"
+            aria-label="supabase.io Link"
+            className="transition-opacity hover:opacity-75"
+          >
             <img
               src="/supabase.svg"
               alt="supabase.io Logo"
@@ -42,7 +58,11 @@ export default function LogoCloud() {
           </a>
         </div>
         <div className="flex items-center justify-start h-12">
-          <a href="https://github.com" aria-label="github.com Link">
+          <a
+            href="https://github.com"
+            aria-label="github.com Link"
+            className="transition-opacity hover:opacity-75"
+          >
             <img
               src="/github.svg"
               alt="github.com Logo"

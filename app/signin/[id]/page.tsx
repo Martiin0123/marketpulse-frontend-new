@@ -11,8 +11,6 @@ import {
 import Card from '@/components/ui/Card';
 import PasswordSignIn from '@/components/ui/AuthForms/PasswordSignIn';
 import EmailSignIn from '@/components/ui/AuthForms/EmailSignIn';
-import Separator from '@/components/ui/AuthForms/Separator';
-import OauthSignIn from '@/components/ui/AuthForms/OauthSignIn';
 import ForgotPassword from '@/components/ui/AuthForms/ForgotPassword';
 import UpdatePassword from '@/components/ui/AuthForms/UpdatePassword';
 import SignUp from '@/components/ui/AuthForms/Signup';
@@ -24,7 +22,7 @@ export default async function SignIn({
   params: { id: string };
   searchParams: { disable_button: boolean };
 }) {
-  const { allowOauth, allowEmail, allowPassword } = getAuthTypes();
+  const { allowEmail, allowPassword } = getAuthTypes();
   const viewTypes = getViewTypes();
   const redirectMethod = getRedirectMethod();
 
@@ -55,11 +53,22 @@ export default async function SignIn({
   }
 
   return (
-    <div className="flex justify-center height-screen-helper">
-      <div className="flex flex-col justify-between max-w-lg p-3 m-auto w-80 ">
-        <div className="flex justify-center pb-12 ">
-          <Logo width="64px" height="64px" />
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl mb-4">
+            <Logo width="32px" height="32px" />
+          </div>
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+            MarketPulse
+          </h1>
+          <p className="text-gray-400 text-sm mt-2">
+            AI-Powered Trading Platform
+          </p>
         </div>
+
+        {/* Auth Card */}
         <Card
           title={
             viewProp === 'forgot_password'
@@ -97,14 +106,6 @@ export default async function SignIn({
           {viewProp === 'signup' && (
             <SignUp allowEmail={allowEmail} redirectMethod={redirectMethod} />
           )}
-          {viewProp !== 'update_password' &&
-            viewProp !== 'signup' &&
-            allowOauth && (
-              <>
-                <Separator text="Third-party sign-in" />
-                <OauthSignIn />
-              </>
-            )}
         </Card>
       </div>
     </div>
