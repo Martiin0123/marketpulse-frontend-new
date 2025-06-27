@@ -1,0 +1,12 @@
+{
+  "routes": [
+    {
+      "src": "/api/webhook",
+      "methods": ["POST"],
+      "headers": {
+        "Access-Control-Allow-Origin": "*"
+      },
+      "dest": "/api/webhook"
+    }
+  ]
+}
