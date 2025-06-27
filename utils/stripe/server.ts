@@ -120,6 +120,7 @@ export async function checkoutWithStripe(
 }
 
 export async function createStripePortal(currentPath: string) {
+  
   try {
     const supabase = createClient();
     const {
@@ -144,6 +145,8 @@ export async function createStripePortal(currentPath: string) {
       console.error(err);
       throw new Error('Unable to access customer record.');
     }
+
+    console.log('Stripe Customer ID:', customer);
 
     if (!customer) {
       throw new Error('Could not get customer.');
