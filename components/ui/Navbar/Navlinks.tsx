@@ -16,7 +16,8 @@ import {
   X,
   TrendingUp,
   BarChart3,
-  Home
+  Home,
+  Users
 } from 'lucide-react';
 
 interface NavlinksProps {
@@ -74,6 +75,11 @@ export default function Navlinks({ user }: NavlinksProps) {
             href: '/signals',
             label: 'Signals',
             icon: <BarChart3 className="w-4 h-4" />
+          },
+          {
+            href: '/referrals',
+            label: 'Referrals',
+            icon: <Users className="w-4 h-4" />
           }
         ]
       : [])
@@ -163,6 +169,15 @@ export default function Navlinks({ user }: NavlinksProps) {
                   >
                     <User className="w-4 h-4" />
                     <span>Account Settings</span>
+                  </Link>
+
+                  <Link
+                    href="/referrals"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="flex items-center space-x-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
+                  >
+                    <Users className="w-4 h-4" />
+                    <span>Referral Program</span>
                   </Link>
 
                   <form

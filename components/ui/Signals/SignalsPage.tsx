@@ -13,7 +13,9 @@ import {
   Clock,
   Filter,
   Search,
-  X
+  X,
+  BarChart3,
+  ArrowRight
 } from 'lucide-react';
 
 type Signal = Tables<'signals'>;
@@ -25,6 +27,14 @@ interface Props {
   signals: Signal[];
 }
 
+interface SignalGroup {
+  symbol: string;
+  signals: Signal[];
+  openSignal?: Signal;
+  closeSignal?: Signal;
+  isComplete: boolean;
+}
+
 export default function SignalsPage({
   user,
   subscription,
@@ -34,6 +44,7 @@ export default function SignalsPage({
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'buy' | 'sell' | 'close'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<'grouped' | 'individual'>('grouped');
   const supabase = createClient();
 
   useEffect(() => {
@@ -49,7 +60,12 @@ export default function SignalsPage({
         },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            setSignals((current) => [payload.new as Signal, ...current]);
+            setSignals((current) => {
+              const newSignal = payload.new as Signal;
+              // Insert the new signal in the correct position to maintain ID-based sorting (descending)
+              const newSignals = [...current, newSignal];
+              return newSignals.sort((a, b) => Number(b.id) - Number(a.id));
+            });
           } else if (payload.eventType === 'UPDATE') {
             setSignals((current) =>
               current.map((signal) =>
@@ -66,6 +82,98 @@ export default function SignalsPage({
     };
   }, [supabase]);
 
+  // Group signals by symbol and pair opening/closing signals
+  const groupSignals = (signals: Signal[]): SignalGroup[] => {
+    const grouped = new Map<string, Signal[]>();
+
+    // Group by symbol
+    signals.forEach((signal) => {
+      if (!grouped.has(signal.symbol)) {
+        grouped.set(signal.symbol, []);
+      }
+      grouped.get(signal.symbol)!.push(signal);
+    });
+
+    // Create signal groups with pairing logic
+    const signalGroups: SignalGroup[] = [];
+
+    grouped.forEach((symbolSignals, symbol) => {
+      // Sort signals by ID (newest first)
+      symbolSignals.sort((a, b) => Number(b.id) - Number(a.id));
+
+      // Find pairs of open/close signals
+      const openSignals = symbolSignals.filter(
+        (s) => s.typ === 'buy' || s.typ === 'sell'
+      );
+      const closeSignals = symbolSignals.filter((s) => s.typ === 'close');
+
+      // If we have both open and close signals, try to pair them
+      if (openSignals.length > 0 && closeSignals.length > 0) {
+        const pairs: SignalGroup[] = [];
+        const usedCloseSignals = new Set<string>();
+
+        openSignals.forEach((openSignal) => {
+          // Find the most recent close signal after this open signal
+          const closeSignal = closeSignals.find(
+            (close) =>
+              Number(close.id) > Number(openSignal.id) &&
+              !usedCloseSignals.has(close.id.toString())
+          );
+
+          if (closeSignal) {
+            usedCloseSignals.add(closeSignal.id.toString());
+            pairs.push({
+              symbol,
+              signals: [openSignal, closeSignal],
+              openSignal,
+              closeSignal,
+              isComplete: true
+            });
+          } else {
+            // Open signal without close
+            pairs.push({
+              symbol,
+              signals: [openSignal],
+              openSignal,
+              isComplete: false
+            });
+          }
+        });
+
+        // Add any unpaired close signals
+        closeSignals.forEach((closeSignal) => {
+          if (!usedCloseSignals.has(closeSignal.id.toString())) {
+            pairs.push({
+              symbol,
+              signals: [closeSignal],
+              closeSignal,
+              isComplete: false
+            });
+          }
+        });
+
+        signalGroups.push(...pairs);
+      } else {
+        // No pairing possible, add individual signals
+        symbolSignals.forEach((signal) => {
+          signalGroups.push({
+            symbol,
+            signals: [signal],
+            openSignal: signal.typ !== 'close' ? signal : undefined,
+            closeSignal: signal.typ === 'close' ? signal : undefined,
+            isComplete: false
+          });
+        });
+      }
+    });
+
+    return signalGroups.sort((a, b) => {
+      const aMaxId = Math.max(...a.signals.map((s) => Number(s.id)));
+      const bMaxId = Math.max(...b.signals.map((s) => Number(s.id)));
+      return bMaxId - aMaxId;
+    });
+  };
+
   // Filter signals based on type and search term
   const filteredSignals = signals.filter((signal) => {
     const matchesFilter = filter === 'all' || signal.typ === filter;
@@ -75,6 +183,8 @@ export default function SignalsPage({
         signal.reason.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesFilter && matchesSearch;
   });
+
+  const signalGroups = groupSignals(filteredSignals);
 
   const buySignals = signals.filter((signal) => signal.typ === 'buy');
   const sellSignals = signals.filter((signal) => signal.typ === 'sell');
@@ -102,6 +212,245 @@ export default function SignalsPage({
     } else {
       return date.toLocaleDateString();
     }
+  };
+
+  const SignalGroupCard = ({ group }: { group: SignalGroup }) => {
+    const { openSignal, closeSignal, isComplete } = group;
+
+    if (!isComplete || !openSignal || !closeSignal) {
+      // Show individual signal for unclosed trades with special highlighting
+      const signal = openSignal || closeSignal!;
+      const isUnclosed = signal.typ !== 'close' && !closeSignal;
+
+      return (
+        <div
+          className={`backdrop-blur-sm rounded-xl border p-6 hover:border-gray-600 transition-all duration-200 ${
+            isUnclosed
+              ? 'bg-yellow-500/10 border-yellow-500/30 ring-2 ring-yellow-500/20'
+              : 'bg-gray-800/50 border-gray-700'
+          }`}
+        >
+          {isUnclosed && (
+            <div className="flex items-center space-x-2 mb-3">
+              <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+              <span className="text-yellow-400 text-sm font-medium">
+                OPEN POSITION
+              </span>
+            </div>
+          )}
+
+          {/* Header */}
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <div
+                className={`p-2 rounded-lg ${
+                  signal.typ === 'close'
+                    ? 'bg-purple-500/20 text-purple-400'
+                    : signal.typ === 'buy'
+                      ? 'bg-green-500/20 text-green-400'
+                      : 'bg-red-500/20 text-red-400'
+                }`}
+              >
+                {signal.typ === 'close' ? (
+                  <X className="w-5 h-5" />
+                ) : signal.typ === 'buy' ? (
+                  <TrendingUp className="w-5 h-5" />
+                ) : (
+                  <TrendingDown className="w-5 h-5" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">
+                  {signal.symbol}
+                </h3>
+                <span
+                  className={`text-sm font-medium ${
+                    signal.typ === 'close'
+                      ? 'text-purple-400'
+                      : signal.typ === 'buy'
+                        ? 'text-green-400'
+                        : 'text-red-400'
+                  }`}
+                >
+                  {signal.typ.toUpperCase()}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Price and Details */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-400 text-sm">
+                {signal.typ === 'close' ? 'Exit Price' : 'Entry Price'}
+              </span>
+              <span className="text-white font-mono text-lg">
+                ${Number(signal.price).toFixed(2)}
+              </span>
+            </div>
+
+            {signal.rsi && (
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 text-sm">RSI</span>
+                <span className="text-white font-mono">
+                  {Number(signal.rsi).toFixed(2)}
+                </span>
+              </div>
+            )}
+
+            {signal.macd && (
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 text-sm">MACD</span>
+                <span className="text-white font-mono">
+                  {Number(signal.macd).toFixed(4)}
+                </span>
+              </div>
+            )}
+
+            {signal.reason && (
+              <div className="pt-2 border-t border-gray-700">
+                <div className="flex items-start space-x-2">
+                  <Target className="w-4 h-4 text-gray-400 mt-0.5" />
+                  <span className="text-gray-300 text-sm">{signal.reason}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-700">
+              <div className="flex items-center space-x-1">
+                <Clock className="w-3 h-3" />
+                <span>{formatTime(signal.timestamp)}</span>
+              </div>
+              <span>ID: {signal.id}</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Calculate PnL if both signals exist
+    const entryPrice = Number(openSignal.price);
+    const exitPrice = Number(closeSignal.price);
+    let pnlPercentage = 0;
+
+    if (openSignal.typ === 'buy') {
+      pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
+    } else {
+      pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100;
+    }
+
+    return (
+      <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6 hover:border-gray-600 transition-all duration-200">
+        {/* Header with symbol and PnL */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-blue-500/20 rounded-lg">
+              <BarChart3 className="w-5 h-5 text-blue-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-white">
+                {group.symbol}
+              </h3>
+              <span className="text-sm text-gray-400">Complete Trade</span>
+            </div>
+          </div>
+          <div
+            className={`px-3 py-1 rounded-full text-xs font-medium ${
+              pnlPercentage >= 0
+                ? 'text-green-400 bg-green-400/10'
+                : 'text-red-400 bg-red-400/10'
+            }`}
+          >
+            {pnlPercentage >= 0 ? '+' : ''}
+            {pnlPercentage.toFixed(2)}% PnL
+          </div>
+        </div>
+
+        {/* Signal Flow */}
+        <div className="space-y-4">
+          {/* Open Signal */}
+          <div className="flex items-center space-x-3 p-3 bg-gray-700/30 rounded-lg">
+            <div
+              className={`p-2 rounded-lg ${openSignal.typ === 'buy' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}
+            >
+              {openSignal.typ === 'buy' ? (
+                <TrendingUp className="w-4 h-4" />
+              ) : (
+                <TrendingDown className="w-4 h-4" />
+              )}
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <span
+                  className={`font-medium ${openSignal.typ === 'buy' ? 'text-green-400' : 'text-red-400'}`}
+                >
+                  {openSignal.typ.toUpperCase()} ENTRY
+                </span>
+                <span className="text-white font-mono">
+                  ${entryPrice.toFixed(2)}
+                </span>
+              </div>
+              <div className="text-xs text-gray-400">
+                {formatTime(openSignal.timestamp)}
+              </div>
+            </div>
+          </div>
+
+          {/* Arrow */}
+          <div className="flex justify-center">
+            <ArrowRight className="w-5 h-5 text-gray-400" />
+          </div>
+
+          {/* Close Signal */}
+          <div className="flex items-center space-x-3 p-3 bg-gray-700/30 rounded-lg">
+            <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400">
+              <X className="w-4 h-4" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-purple-400">CLOSE EXIT</span>
+                <span className="text-white font-mono">
+                  ${exitPrice.toFixed(2)}
+                </span>
+              </div>
+              <div className="text-xs text-gray-400">
+                {formatTime(closeSignal.timestamp)}
+              </div>
+            </div>
+          </div>
+
+          {/* Additional Info */}
+          {openSignal.reason && (
+            <div className="pt-2 border-t border-gray-700">
+              <div className="flex items-start space-x-2">
+                <Target className="w-4 h-4 text-gray-400 mt-0.5" />
+                <span className="text-gray-300 text-sm">
+                  {openSignal.reason}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-700">
+            <div className="flex items-center space-x-1">
+              <Clock className="w-3 h-3" />
+              <span>
+                Trade Duration:{' '}
+                {Math.floor(
+                  (Number(closeSignal.timestamp) -
+                    Number(openSignal.timestamp)) /
+                    60
+                )}
+                m
+              </span>
+            </div>
+            <span>
+              IDs: {openSignal.id} → {closeSignal.id}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -247,25 +596,58 @@ export default function SignalsPage({
               </div>
             </div>
 
-            <div className="relative">
-              <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search symbols or reasons..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="bg-gray-700 border border-gray-600 rounded-lg pl-10 pr-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
+            <div className="flex items-center space-x-4">
+              {/* View Mode Toggle */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setViewMode('grouped')}
+                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                    viewMode === 'grouped'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  Grouped
+                </button>
+                <button
+                  onClick={() => setViewMode('individual')}
+                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                    viewMode === 'individual'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  Individual
+                </button>
+              </div>
+
+              <div className="relative">
+                <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search symbols or reasons..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="bg-gray-700 border border-gray-600 rounded-lg pl-10 pr-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Signals Grid */}
+        {/* Signals Display */}
         {filteredSignals.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredSignals.map((signal) => (
-              <SignalCard key={signal.id} signal={signal} />
-            ))}
+            {viewMode === 'grouped'
+              ? signalGroups.map((group, index) => (
+                  <SignalGroupCard
+                    key={`${group.symbol}-${index}`}
+                    group={group}
+                  />
+                ))
+              : filteredSignals.map((signal) => (
+                  <SignalCard key={signal.id} signal={signal} />
+                ))}
           </div>
         ) : (
           <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-12 text-center">

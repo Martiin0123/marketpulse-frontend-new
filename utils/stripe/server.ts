@@ -157,6 +157,12 @@ export async function createStripePortal(currentPath: string) {
     try {
       // Check if customer exists in Stripe before creating portal session
       const stripeCustomer = await stripe.customers.retrieve(customer);
+      
+      // Type guard to ensure we have a non-deleted customer
+      if (stripeCustomer.deleted) {
+        throw new Error('Customer has been deleted in Stripe');
+      }
+      
       console.log('Stripe customer details:', {
         id: stripeCustomer.id,
         email: stripeCustomer.email,

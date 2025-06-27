@@ -341,8 +341,10 @@ export default function Dashboard({
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                          {position.entry_time
-                            ? new Date(position.entry_time).toLocaleDateString()
+                          {position.entry_timestamp
+                            ? new Date(
+                                position.entry_timestamp * 1000
+                              ).toLocaleDateString()
                             : position.created_at
                               ? new Date(
                                   position.created_at

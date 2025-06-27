@@ -5,9 +5,9 @@ import React from 'react';
 import Link from 'next/link';
 import { signUp } from '@/utils/auth-helpers/server';
 import { handleRequest } from '@/utils/auth-helpers/client';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { Mail, Lock, Eye, EyeOff, UserPlus } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { Mail, Lock, Eye, EyeOff, UserPlus, Gift } from 'lucide-react';
 
 // Define prop type with allowEmail boolean
 interface SignUpProps {
@@ -17,11 +17,71 @@ interface SignUpProps {
 
 export default function SignUp({ allowEmail, redirectMethod }: SignUpProps) {
   const router = redirectMethod === 'client' ? useRouter() : null;
+  const searchParams = useSearchParams();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [referralCode, setReferralCode] = useState('');
+  const [referralValid, setReferralValid] = useState<boolean | null>(null);
+  const [referralMessage, setReferralMessage] = useState('');
+
+  // Get referral code from URL params
+  useEffect(() => {
+    const refParam = searchParams?.get('ref');
+    if (refParam) {
+      setReferralCode(refParam);
+      validateReferralCode(refParam);
+    }
+  }, [searchParams]);
+
+  const validateReferralCode = async (code: string) => {
+    if (!code.trim()) {
+      setReferralValid(null);
+      setReferralMessage('');
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/referrals/track?code=${encodeURIComponent(code)}`
+      );
+      const data = await response.json();
+
+      if (data.valid) {
+        setReferralValid(true);
+        setReferralMessage(
+          "Valid referral code! You'll receive special benefits."
+        );
+        // Track the referral click
+        await fetch('/api/referrals/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ referralCode: code })
+        });
+      } else {
+        setReferralValid(false);
+        setReferralMessage('Invalid referral code');
+      }
+    } catch (error) {
+      setReferralValid(false);
+      setReferralMessage('Error validating referral code');
+    }
+  };
+
+  const handleReferralCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const code = e.target.value;
+    setReferralCode(code);
+    validateReferralCode(code);
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     setIsSubmitting(true);
+
+    // Add referral code to form data if valid
+    if (referralValid && referralCode) {
+      const formData = new FormData(e.currentTarget);
+      formData.append('referralCode', referralCode);
+    }
+
     await handleRequest(e, signUp, router);
     setIsSubmitting(false);
   };
@@ -35,6 +95,13 @@ export default function SignUp({ allowEmail, redirectMethod }: SignUpProps) {
         <p className="text-gray-400 text-sm">
           Create your account to start trading with AI-powered signals
         </p>
+        {referralValid && (
+          <div className="mt-3 p-2 bg-green-500/10 border border-green-500/30 rounded-lg">
+            <p className="text-green-400 text-xs">
+              🎉 You're signing up with a referral! Get exclusive benefits.
+            </p>
+          </div>
+        )}
       </div>
 
       <form
@@ -99,6 +166,44 @@ export default function SignUp({ allowEmail, redirectMethod }: SignUpProps) {
               )}
             </button>
           </div>
+        </div>
+
+        {/* Referral Code Input */}
+        <div>
+          <label
+            htmlFor="referralCode"
+            className="block text-sm font-medium text-gray-300 mb-2"
+          >
+            Referral Code (Optional)
+          </label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Gift className="h-5 w-5 text-gray-400" />
+            </div>
+            <input
+              id="referralCode"
+              placeholder="Enter referral code"
+              type="text"
+              value={referralCode}
+              onChange={handleReferralCodeChange}
+              className={`w-full pl-10 pr-4 py-3 bg-gray-700/50 border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-all duration-200 ${
+                referralValid === true
+                  ? 'border-green-500 focus:ring-green-500'
+                  : referralValid === false
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-gray-600 focus:ring-purple-500'
+              }`}
+            />
+          </div>
+          {referralMessage && (
+            <p
+              className={`text-xs mt-1 ${
+                referralValid ? 'text-green-400' : 'text-red-400'
+              }`}
+            >
+              {referralMessage}
+            </p>
+          )}
         </div>
 
         <Button

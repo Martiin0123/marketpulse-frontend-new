@@ -168,6 +168,7 @@ export async function signUp(formData: FormData) {
 
   const email = String(formData.get('email')).trim();
   const password = String(formData.get('password')).trim();
+  const referralCode = String(formData.get('referralCode') || '').trim();
   let redirectPath: string;
 
   if (!isValidEmail(email)) {
@@ -179,11 +180,19 @@ export async function signUp(formData: FormData) {
   }
 
   const supabase = createClient();
+  
+  // Prepare user metadata
+  const userMetadata: any = {};
+  if (referralCode) {
+    userMetadata.referred_by = referralCode;
+  }
+
   const { error, data } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo: callbackURL
+      emailRedirectTo: callbackURL,
+      data: userMetadata
     }
   });
 
@@ -194,6 +203,10 @@ export async function signUp(formData: FormData) {
       error.message
     );
   } else if (data.session) {
+    // User is immediately signed in, handle referral if present
+    if (referralCode && data.user) {
+      await handleReferralSignup(supabase, data.user.id, referralCode);
+    }
     redirectPath = getStatusRedirect('/', 'Success!', 'You are now signed in.');
   } else if (
     data.user &&
@@ -206,6 +219,10 @@ export async function signUp(formData: FormData) {
       'There is already an account associated with this email address. Try resetting your password.'
     );
   } else if (data.user) {
+    // User needs email confirmation, but we can still handle referral
+    if (referralCode) {
+      await handleReferralSignup(supabase, data.user.id, referralCode);
+    }
     redirectPath = getStatusRedirect(
       '/',
       'Success!',
@@ -220,6 +237,54 @@ export async function signUp(formData: FormData) {
   }
 
   return redirectPath;
+}
+
+// Helper function to handle referral signup
+async function handleReferralSignup(supabase: any, userId: string, referralCode: string) {
+  try {
+    // First, validate the referral code and get the referrer
+    const { data: referralCodeData, error: codeError } = await supabase
+      .from('referral_codes')
+      .select('user_id, is_active')
+      .eq('code', referralCode)
+      .eq('is_active', true)
+      .single();
+
+    if (codeError || !referralCodeData) {
+      console.error('Invalid referral code during signup:', referralCode);
+      return;
+    }
+
+    // Create the referral relationship
+    const { error: referralError } = await supabase
+      .from('referrals')
+      .insert({
+        referrer_id: referralCodeData.user_id,
+        referee_id: userId,
+        referral_code: referralCode,
+        status: 'pending'
+      });
+
+    if (referralError) {
+      console.error('Error creating referral during signup:', referralError);
+      return;
+    }
+
+    // Update the user's referred_by field
+    const { error: userError } = await supabase
+      .from('users')
+      .update({ referred_by: referralCode })
+      .eq('id', userId);
+
+    if (userError) {
+      console.error('Error updating user referral info:', userError);
+    }
+
+    console.log(`Referral created successfully: ${userId} referred by ${referralCode}`);
+
+  } catch (error) {
+    console.error('Unexpected error handling referral signup:', error);
+  }
 }
 
 export async function updatePassword(formData: FormData) {
