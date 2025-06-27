@@ -59,7 +59,7 @@ export default function Testimonials() {
   ];
 
   return (
-    <section className="relative py-20 bg-slate-800/50">
+    <section className="relative py-20 bg-gray-800/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center mb-20">
@@ -89,7 +89,7 @@ export default function Testimonials() {
           {testimonials.map((testimonial, index) => (
             <div
               key={index}
-              className="group relative bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-purple-500/20 p-8 hover:border-purple-500/40 transition-all duration-300 hover:transform hover:scale-105"
+              className="group relative bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-700 p-8 hover:border-purple-500/40 transition-all duration-300 hover:transform hover:scale-105"
             >
               {/* Background Glow */}
               <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-emerald-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>

@@ -58,7 +58,7 @@ export default function Features() {
   ];
 
   return (
-    <section className="relative py-20 bg-gradient-to-b from-slate-900 to-slate-800">
+    <section className="relative py-20 bg-gradient-to-b from-gray-900 to-gray-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center mb-20">
@@ -88,7 +88,7 @@ export default function Features() {
           {features.map((feature, index) => (
             <div
               key={index}
-              className="group relative bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-purple-500/20 p-8 hover:border-purple-500/40 transition-all duration-300 hover:transform hover:scale-105"
+              className="group relative bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-700 p-8 hover:border-purple-500/40 transition-all duration-300 hover:transform hover:scale-105"
             >
               {/* Background Glow Effect */}
               <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -128,7 +128,7 @@ export default function Features() {
         <div className="mt-20 text-center">
           <div className="relative inline-block">
             <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg blur opacity-30"></div>
-            <div className="relative bg-slate-800 border border-purple-500/20 rounded-lg px-8 py-6">
+            <div className="relative bg-gray-800/50 border border-purple-500/20 rounded-lg px-8 py-6">
               <div className="flex items-center justify-center gap-3 mb-4">
                 <Eye className="w-6 h-6 text-purple-400" />
                 <Target className="w-6 h-6 text-pink-400" />

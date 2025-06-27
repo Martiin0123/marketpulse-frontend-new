@@ -29,7 +29,7 @@ export default function Stats() {
   ];
 
   return (
-    <section className="relative py-20 bg-slate-900/50">
+    <section className="relative py-20 bg-gray-900/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center mb-16">
@@ -51,7 +51,7 @@ export default function Stats() {
           {stats.map((stat, index) => (
             <div
               key={index}
-              className="group relative bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-purple-500/20 p-8 hover:border-purple-500/40 transition-all duration-300 hover:transform hover:scale-105"
+              className="group relative bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-700 p-8 hover:border-purple-500/40 transition-all duration-300 hover:transform hover:scale-105"
             >
               {/* Background Glow */}
               <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
