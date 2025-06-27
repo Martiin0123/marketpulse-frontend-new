@@ -1,7 +1,7 @@
 'use client';
 
 import { Tables } from '@/types_db';
-import { TrendingUp, TrendingDown, Clock, Target } from 'lucide-react';
+import { TrendingUp, TrendingDown, Clock, Target, X } from 'lucide-react';
 
 type Signal = Tables<'signals'>;
 
@@ -11,12 +11,37 @@ interface Props {
 
 export default function SignalCard({ signal }: Props) {
   const isBuy = signal.typ === 'buy';
+  const isSell = signal.typ === 'sell';
+  const isClose = signal.typ === 'close';
   const riskLevel = signal.risk || 1;
 
   const getRiskColor = (risk: number) => {
     if (risk <= 0.3) return 'text-green-400 bg-green-400/10';
     if (risk <= 0.7) return 'text-yellow-400 bg-yellow-400/10';
     return 'text-red-400 bg-red-400/10';
+  };
+
+  const getSignalColor = () => {
+    if (isClose) return 'bg-purple-500/20 text-purple-400';
+    if (isBuy) return 'bg-green-500/20 text-green-400';
+    return 'bg-red-500/20 text-red-400';
+  };
+
+  const getSignalTextColor = () => {
+    if (isClose) return 'text-purple-400';
+    if (isBuy) return 'text-green-400';
+    return 'text-red-400';
+  };
+
+  const getSignalIcon = () => {
+    if (isClose) return <X className="w-5 h-5" />;
+    if (isBuy) return <TrendingUp className="w-5 h-5" />;
+    return <TrendingDown className="w-5 h-5" />;
+  };
+
+  const getPriceLabel = () => {
+    if (isClose) return 'Exit Price';
+    return 'Entry Price';
   };
 
   const formatTime = (timestamp: string | number) => {
@@ -47,28 +72,14 @@ export default function SignalCard({ signal }: Props) {
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center space-x-3">
-          <div
-            className={`p-2 rounded-lg ${
-              isBuy
-                ? 'bg-green-500/20 text-green-400'
-                : 'bg-red-500/20 text-red-400'
-            }`}
-          >
-            {isBuy ? (
-              <TrendingUp className="w-5 h-5" />
-            ) : (
-              <TrendingDown className="w-5 h-5" />
-            )}
+          <div className={`p-2 rounded-lg ${getSignalColor()}`}>
+            {getSignalIcon()}
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white">
               {signal.symbol}
             </h3>
-            <span
-              className={`text-sm font-medium ${
-                isBuy ? 'text-green-400' : 'text-red-400'
-              }`}
-            >
+            <span className={`text-sm font-medium ${getSignalTextColor()}`}>
               {signal.typ.toUpperCase()}
             </span>
           </div>
@@ -76,14 +87,14 @@ export default function SignalCard({ signal }: Props) {
         <div
           className={`px-3 py-1 rounded-full text-xs font-medium ${getRiskColor(riskLevel)}`}
         >
-          {(riskLevel * 100).toFixed(0)}% Risk
+          {isClose ? 'CLOSED' : `${(riskLevel * 100).toFixed(0)}% Risk`}
         </div>
       </div>
 
       {/* Price and Details */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <span className="text-gray-400 text-sm">Entry Price</span>
+          <span className="text-gray-400 text-sm">{getPriceLabel()}</span>
           <span className="text-white font-mono text-lg">
             ${Number(signal.price).toFixed(2)}
           </span>

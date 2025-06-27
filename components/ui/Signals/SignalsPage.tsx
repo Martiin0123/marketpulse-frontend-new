@@ -12,7 +12,8 @@ import {
   Target,
   Clock,
   Filter,
-  Search
+  Search,
+  X
 } from 'lucide-react';
 
 type Signal = Tables<'signals'>;
@@ -31,7 +32,7 @@ export default function SignalsPage({
 }: Props) {
   const [signals, setSignals] = useState<Signal[]>(initialSignals);
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'buy' | 'sell'>('all');
+  const [filter, setFilter] = useState<'all' | 'buy' | 'sell' | 'close'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const supabase = createClient();
 
@@ -77,6 +78,7 @@ export default function SignalsPage({
 
   const buySignals = signals.filter((signal) => signal.typ === 'buy');
   const sellSignals = signals.filter((signal) => signal.typ === 'sell');
+  const closeSignals = signals.filter((signal) => signal.typ === 'close');
   const totalSignals = signals.length;
 
   const formatTime = (timestamp: string | number) => {
@@ -176,14 +178,21 @@ export default function SignalsPage({
           <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
             <div className="flex items-center">
               <div className="p-2 bg-purple-500/20 rounded-lg">
-                <Target className="w-6 h-6 text-purple-400" />
+                <X className="w-6 h-6 text-purple-400" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-400">
-                  Success Rate
+                  Closed Positions
                 </p>
-                <p className="text-2xl font-bold text-white">94.2%</p>
-                <p className="text-xs text-purple-400">Last 30 days</p>
+                <p className="text-2xl font-bold text-white">
+                  {closeSignals.length}
+                </p>
+                <p className="text-xs text-purple-400">
+                  {totalSignals > 0
+                    ? ((closeSignals.length / totalSignals) * 100).toFixed(1)
+                    : 0}
+                  %
+                </p>
               </div>
             </div>
           </div>
@@ -224,6 +233,16 @@ export default function SignalsPage({
                   }`}
                 >
                   Sell
+                </button>
+                <button
+                  onClick={() => setFilter('close')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    filter === 'close'
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  Close
                 </button>
               </div>
             </div>

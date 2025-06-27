@@ -59,36 +59,18 @@ export async function POST(request) {
     return new Response(JSON.stringify({ error: 'Database query failed', details: fetchError.message }), { status: 500 })
   }
 
-  // Always insert the signal first - this is what users will see
-  const { error: signalError } = await supabase.from('signals').insert([
-    {
-      symbol: symbolUpper,
-      typ: side,
-      price: price,
-      timestamp: createISOTimestamp(validTimestamp),
-      reason: reason || null,
-      rsi: rsi ? Number(rsi) : null,
-      macd: macd ? Number(macd) : null,
-      risk: Math.random() * 0.8 + 0.2 // Random risk between 0.2-1.0
-    }
-  ])
-
-  if (signalError) {
-    console.error('Supabase signal insert error:', signalError)
-    return new Response(JSON.stringify({ error: 'Signal insert failed', details: signalError.message }), { status: 500 })
-  }
-
-  // Position management logic (same as before)
+  // Position management logic
   const sideUpper = side.toUpperCase() // For positions table compatibility
   
   // Check if there's already a position in the same direction
   const sameDirectionPosition = existingPositions?.find(pos => pos.side === sideUpper)
   if (sameDirectionPosition) {
+    // Don't create a signal if position already exists in same direction
     return new Response(JSON.stringify({ 
-      message: 'Signal created and position already exists in same direction',
+      message: 'Position already exists in same direction, no signal created',
       symbol: symbolUpper,
       side: side,
-      signal_created: true,
+      signal_created: false,
       existing_position_id: sameDirectionPosition.id
     }), { status: 200 })
   }
@@ -125,18 +107,76 @@ export async function POST(request) {
     if (updateError) {
       console.error('Error closing opposite position:', updateError)
       return new Response(JSON.stringify({ 
-        message: 'Signal created but failed to close opposite position',
-        signal_created: true,
         error: 'Failed to close opposite position', 
         details: updateError.message 
-      }), { status: 200 }) // Still return 200 because signal was created
+      }), { status: 500 })
+    }
+
+    // Create a "close" signal to show the position closure
+    const { error: closeSignalError } = await supabase.from('signals').insert([
+      {
+        symbol: symbolUpper,
+        typ: 'close',
+        price: exitPrice,
+        timestamp: createISOTimestamp(validTimestamp),
+        reason: `Closed ${oppositePosition.side} position with ${pnlPercentage >= 0 ? '+' : ''}${pnlPercentage.toFixed(2)}% PnL`,
+        rsi: rsi ? Number(rsi) : null,
+        macd: macd ? Number(macd) : null,
+        risk: Math.abs(pnlPercentage) / 100 // Risk based on PnL magnitude
+      }
+    ])
+
+    if (closeSignalError) {
+      console.error('Error creating close signal:', closeSignalError)
+    }
+
+    // Now create the new position
+    const { error: positionError } = await supabase.from('positions').insert([
+      {
+        symbol: symbolUpper,
+        side: sideUpper,
+        entry_price: price,
+        entry_time: createISOTimestamp(validTimestamp),
+        status: 'open',
+        pnl: 0
+      }
+    ])
+
+    if (positionError) {
+      console.error('Supabase position insert error:', positionError)
+      return new Response(JSON.stringify({ 
+        message: 'Position closed but failed to create new position',
+        closed_signal_created: !closeSignalError,
+        error: 'New position creation failed', 
+        details: positionError.message 
+      }), { status: 500 })
+    }
+
+    // Create the new entry signal
+    const { error: entrySignalError } = await supabase.from('signals').insert([
+      {
+        symbol: symbolUpper,
+        typ: side,
+        price: price,
+        timestamp: createISOTimestamp(validTimestamp),
+        reason: reason || `New ${side.toUpperCase()} position opened`,
+        rsi: rsi ? Number(rsi) : null,
+        macd: macd ? Number(macd) : null,
+        risk: Math.random() * 0.8 + 0.2 // Random risk between 0.2-1.0
+      }
+    ])
+
+    if (entrySignalError) {
+      console.error('Error creating entry signal:', entrySignalError)
     }
 
     return new Response(JSON.stringify({ 
-      message: 'Signal created and opposite position closed',
+      message: 'Position closed and new position created',
       symbol: symbolUpper,
       side: side,
-      signal_created: true,
+      closed_signal_created: !closeSignalError,
+      entry_signal_created: !entrySignalError,
+      new_position_created: true,
       closed_position: {
         id: oppositePosition.id,
         side: oppositePosition.side,
@@ -147,7 +187,7 @@ export async function POST(request) {
     }), { status: 200 })
   }
 
-  // Create new position (no existing positions found)
+  // Create new position (no existing positions found) - also create entry signal
   const { error: positionError } = await supabase.from('positions').insert([
     {
       symbol: symbolUpper,
@@ -162,15 +202,38 @@ export async function POST(request) {
   if (positionError) {
     console.error('Supabase position insert error:', positionError)
     return new Response(JSON.stringify({ 
-      message: 'Signal created but position creation failed',
-      signal_created: true,
-      error: 'Position insert failed', 
+      error: 'Position creation failed', 
       details: positionError.message 
-    }), { status: 200 }) // Still return 200 because signal was created
+    }), { status: 500 })
+  }
+
+  // Create the entry signal
+  const { error: signalError } = await supabase.from('signals').insert([
+    {
+      symbol: symbolUpper,
+      typ: side,
+      price: price,
+      timestamp: createISOTimestamp(validTimestamp),
+      reason: reason || `New ${side.toUpperCase()} position opened`,
+      rsi: rsi ? Number(rsi) : null,
+      macd: macd ? Number(macd) : null,
+      risk: Math.random() * 0.8 + 0.2 // Random risk between 0.2-1.0
+    }
+  ])
+
+  if (signalError) {
+    console.error('Supabase signal insert error:', signalError)
+    return new Response(JSON.stringify({ 
+      message: 'Position created but signal creation failed',
+      position_created: true,
+      signal_created: false,
+      error: 'Signal insert failed', 
+      details: signalError.message 
+    }), { status: 200 })
   }
 
   return new Response(JSON.stringify({ 
-    message: 'Signal and position created successfully',
+    message: 'New position and signal created successfully',
     symbol: symbolUpper,
     side: side,
     signal_created: true,
