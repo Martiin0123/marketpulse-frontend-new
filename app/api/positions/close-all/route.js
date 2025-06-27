@@ -30,11 +30,13 @@ export async function POST() {
         ? (exitPrice - position.entry_price) / position.entry_price
         : (position.entry_price - exitPrice) / position.entry_price
 
+      const exitTimestamp = Math.floor(Date.now() / 1000) // Unix timestamp
+
       return {
         id: position.id,
         status: 'closed',
         exit_price: Math.round(exitPrice * 100) / 100,
-        exit_time: new Date().toISOString(),
+        exit_timestamp: exitTimestamp,
         pnl: Math.round(pnlPercentage * 10000) / 100, // Store as percentage
         rr: Math.round(Math.abs(pnlPercentage) * 100) / 100
       }
@@ -47,7 +49,7 @@ export async function POST() {
         .update({
           status: update.status,
           exit_price: update.exit_price,
-          exit_time: update.exit_time,
+          exit_timestamp: update.exit_timestamp,
           pnl: update.pnl,
           rr: update.rr
         })

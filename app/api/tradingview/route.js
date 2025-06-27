@@ -99,7 +99,7 @@ export async function POST(request) {
       .update({
         status: 'closed',
         exit_price: exitPrice,
-        exit_time: createISOTimestamp(validTimestamp),
+        exit_timestamp: validTimestamp,
         pnl: pnlPercentage
       })
       .eq('id', oppositePosition.id)
@@ -136,7 +136,7 @@ export async function POST(request) {
         symbol: symbolUpper,
         side: sideUpper,
         entry_price: price,
-        entry_time: createISOTimestamp(validTimestamp),
+        entry_timestamp: validTimestamp,
         status: 'open',
         pnl: 0
       }
@@ -193,7 +193,7 @@ export async function POST(request) {
       symbol: symbolUpper,
       side: sideUpper,
       entry_price: price,
-      entry_time: createISOTimestamp(validTimestamp),
+      entry_timestamp: validTimestamp,
       status: 'open',
       pnl: 0
     }

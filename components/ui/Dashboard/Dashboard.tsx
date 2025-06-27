@@ -7,13 +7,18 @@ import { createClient } from '@/utils/supabase/client';
 import SignalCard from './SignalCard';
 import StatsOverview from './StatsOverview';
 import {
+  Activity,
   TrendingUp,
   TrendingDown,
-  Activity,
   DollarSign,
-  Settings,
-  X
+  Clock,
+  Calendar,
+  ArrowRight,
+  X,
+  Settings
 } from 'lucide-react';
+import { Database } from '@/types_db';
+import BalanceChart from '@/components/ui/Charts/BalanceChart';
 
 type Position = Tables<'positions'>;
 type Subscription = Tables<'subscriptions'>;
@@ -216,6 +221,47 @@ export default function Dashboard({
           </div>
         </div>
 
+        {/* Account Settings */}
+        <div className="mt-12 bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center space-x-3 mb-4 sm:mb-0">
+              <div className="p-2 bg-yellow-500/20 rounded-lg">
+                <Settings className="w-6 h-6 text-yellow-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">
+                  Account Settings
+                </h3>
+                <p className="text-gray-400 text-sm">
+                  Configure your trading account parameters
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <label className="text-gray-400 text-sm font-medium">
+                Account Size:
+              </label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="number"
+                  value={accountSize}
+                  onChange={(e) => setAccountSize(Number(e.target.value))}
+                  className="bg-gray-700 border border-gray-600 rounded-lg pl-10 pr-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent w-32"
+                  min="1000"
+                  max="1000000"
+                  step="1000"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Balance Chart */}
+        <div className="mt-8">
+          <BalanceChart positions={positions} accountSize={accountSize} />
+        </div>
+
         {/* Recent Positions */}
         <div className="mt-12">
           <div className="flex items-center justify-between mb-8">
@@ -345,11 +391,15 @@ export default function Dashboard({
                             ? new Date(
                                 position.entry_timestamp * 1000
                               ).toLocaleDateString()
-                            : position.created_at
+                            : (position as any).entry_time
                               ? new Date(
-                                  position.created_at
+                                  (position as any).entry_time
                                 ).toLocaleDateString()
-                              : 'N/A'}
+                              : position.created_at
+                                ? new Date(
+                                    position.created_at
+                                  ).toLocaleDateString()
+                                : 'N/A'}
                         </td>
                       </tr>
                     ))}

@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { cache } from 'react';
+import { unstable_cache as cache } from 'next/cache';
 
 export const getUser = cache(async (supabase: SupabaseClient) => {
   const {
