@@ -33,6 +33,9 @@ export default function Navlinks({ user }: NavlinksProps) {
               <Link href="/dashboard" className={s.link}>
                 Dashboard
               </Link>
+              <Link href="/signals" className={s.link}>
+                Signals
+              </Link>
               <Link href="/account" className={s.link}>
                 Account
               </Link>

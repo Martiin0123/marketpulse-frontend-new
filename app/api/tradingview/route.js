@@ -7,17 +7,17 @@ const supabase = createClient(
 
 export async function POST(request) {
   const body = await request.json()
-  const { symbol, action, price, timestamp } = body
+  const { symbol, action, price, timestamp, reason, rsi, macd } = body
 
   if (!symbol || !action || !price) {
     return new Response(JSON.stringify({ error: 'Missing required fields: symbol, action, price' }), { status: 400 })
   }
 
-  // Convert action to uppercase to match database constraint
-  const side = action.toUpperCase() // 'BUY' or 'SELL'
+  // Convert action to lowercase to match signals table constraint
+  const side = action.toLowerCase() // 'buy' or 'sell'
   
   // Validate side
-  if (!['BUY', 'SELL'].includes(side)) {
+  if (!['buy', 'sell'].includes(side)) {
     return new Response(JSON.stringify({ error: 'Invalid action. Must be buy or sell' }), { status: 400 })
   }
 
@@ -46,7 +46,7 @@ export async function POST(request) {
     }
   }
 
-  // Check for existing open positions for this symbol
+  // Check for existing open positions for this symbol (for position management)
   const { data: existingPositions, error: fetchError } = await supabase
     .from('positions')
     .select('*')
@@ -59,19 +59,42 @@ export async function POST(request) {
     return new Response(JSON.stringify({ error: 'Database query failed', details: fetchError.message }), { status: 500 })
   }
 
+  // Always insert the signal first - this is what users will see
+  const { error: signalError } = await supabase.from('signals').insert([
+    {
+      symbol: symbolUpper,
+      typ: side,
+      price: price,
+      timestamp: validTimestamp,
+      reason: reason || null,
+      rsi: rsi ? Number(rsi) : null,
+      macd: macd ? Number(macd) : null,
+      risk: Math.random() * 0.8 + 0.2 // Random risk between 0.2-1.0
+    }
+  ])
+
+  if (signalError) {
+    console.error('Supabase signal insert error:', signalError)
+    return new Response(JSON.stringify({ error: 'Signal insert failed', details: signalError.message }), { status: 500 })
+  }
+
+  // Position management logic (same as before)
+  const sideUpper = side.toUpperCase() // For positions table compatibility
+  
   // Check if there's already a position in the same direction
-  const sameDirectionPosition = existingPositions?.find(pos => pos.side === side)
+  const sameDirectionPosition = existingPositions?.find(pos => pos.side === sideUpper)
   if (sameDirectionPosition) {
     return new Response(JSON.stringify({ 
-      message: 'Position already exists in same direction',
+      message: 'Signal created and position already exists in same direction',
       symbol: symbolUpper,
       side: side,
+      signal_created: true,
       existing_position_id: sameDirectionPosition.id
     }), { status: 200 })
   }
 
   // Check if there's an opposite direction position to close
-  const oppositeDirection = side === 'BUY' ? 'SELL' : 'BUY'
+  const oppositeDirection = sideUpper === 'BUY' ? 'SELL' : 'BUY'
   const oppositePosition = existingPositions?.find(pos => pos.side === oppositeDirection)
   
   if (oppositePosition) {
@@ -101,12 +124,19 @@ export async function POST(request) {
 
     if (updateError) {
       console.error('Error closing opposite position:', updateError)
-      return new Response(JSON.stringify({ error: 'Failed to close opposite position', details: updateError.message }), { status: 500 })
+      return new Response(JSON.stringify({ 
+        message: 'Signal created but failed to close opposite position',
+        signal_created: true,
+        error: 'Failed to close opposite position', 
+        details: updateError.message 
+      }), { status: 200 }) // Still return 200 because signal was created
     }
 
     return new Response(JSON.stringify({ 
-      message: 'Opposite position closed',
+      message: 'Signal created and opposite position closed',
       symbol: symbolUpper,
+      side: side,
+      signal_created: true,
       closed_position: {
         id: oppositePosition.id,
         side: oppositePosition.side,
@@ -118,26 +148,36 @@ export async function POST(request) {
   }
 
   // Create new position (no existing positions found)
-  const { error } = await supabase.from('positions').insert([
+  const { error: positionError } = await supabase.from('positions').insert([
     {
       symbol: symbolUpper,
-      side: side,
+      side: sideUpper,
       entry_price: price,
       entry_time: createISOTimestamp(validTimestamp),
       status: 'open',
-      pnl: 0
+      pnl: 0,
+      reason: reason || null,
+      rsi: rsi ? Number(rsi) : null,
+      macd: macd ? Number(macd) : null
     }
   ])
 
-  if (error) {
-    console.error('Supabase insert error:', error)
-    return new Response(JSON.stringify({ error: 'Supabase insert failed', details: error.message }), { status: 500 })
+  if (positionError) {
+    console.error('Supabase position insert error:', positionError)
+    return new Response(JSON.stringify({ 
+      message: 'Signal created but position creation failed',
+      signal_created: true,
+      error: 'Position insert failed', 
+      details: positionError.message 
+    }), { status: 200 }) // Still return 200 because signal was created
   }
 
   return new Response(JSON.stringify({ 
-    message: 'Position created successfully',
+    message: 'Signal and position created successfully',
     symbol: symbolUpper,
     side: side,
+    signal_created: true,
+    position_created: true,
     entry_price: price
   }), { status: 200 })
 }
