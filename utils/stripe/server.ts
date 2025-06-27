@@ -130,10 +130,12 @@ export async function createStripePortal(currentPath: string) {
 
     if (!user) {
       if (error) {
-        console.error(error);
+        console.error('Supabase auth error:', error);
       }
       throw new Error('Could not get user session.');
     }
+
+    console.log('User found:', user.id, user.email);
 
     let customer;
     try {
@@ -142,7 +144,7 @@ export async function createStripePortal(currentPath: string) {
         email: user.email || ''
       });
     } catch (err) {
-      console.error(err);
+      console.error('Customer creation/retrieval error:', err);
       throw new Error('Unable to access customer record.');
     }
 
@@ -153,27 +155,51 @@ export async function createStripePortal(currentPath: string) {
     }
 
     try {
+      // Check if customer exists in Stripe before creating portal session
+      const stripeCustomer = await stripe.customers.retrieve(customer);
+      console.log('Stripe customer details:', {
+        id: stripeCustomer.id,
+        email: stripeCustomer.email,
+        created: stripeCustomer.created
+      });
+
       const { url } = await stripe.billingPortal.sessions.create({
         customer,
         return_url: getURL('/account')
       });
+      
       if (!url) {
-        throw new Error('Could not create billing portal');
+        throw new Error('Could not create billing portal - no URL returned');
       }
+      
+      console.log('Billing portal URL created successfully');
       return url;
     } catch (err) {
-      console.error(err);
+      console.error('Stripe billing portal error:', err);
+      
+      // More specific error handling
+      if (err instanceof Error) {
+        if (err.message.includes('customer')) {
+          throw new Error('Customer not found in Stripe. Please ensure you have a valid subscription or payment method.');
+        } else if (err.message.includes('billing_portal')) {
+          throw new Error('Billing portal not configured. Please configure the customer portal in your Stripe Dashboard.');
+        } else {
+          throw new Error(`Stripe error: ${err.message}`);
+        }
+      }
+      
       throw new Error('Could not create billing portal');
     }
   } catch (error) {
     if (error instanceof Error) {
-      console.error(error);
+      console.error('createStripePortal error:', error.message);
       return getErrorRedirect(
         currentPath,
         error.message,
         'Please try again later or contact a system administrator.'
       );
     } else {
+      console.error('Unknown error in createStripePortal:', error);
       return getErrorRedirect(
         currentPath,
         'An unknown error occurred.',

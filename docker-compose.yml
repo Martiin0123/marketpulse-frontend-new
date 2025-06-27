@@ -1,0 +1,60 @@
+# docker-compose.yml
+services:
+  # Development service
+  marketpulse-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3001:3000"
+    environment:
+      # Supabase Configuration
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-https://cxvawvkrxvxhxwgacghu.supabase.co}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+
+      # Site Configuration
+      NEXT_PUBLIC_SITE_URL: http://localhost:3001
+
+      # Stripe Configuration
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+
+      # Development Settings
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: 1
+    volumes:
+      # Mount source code for hot reloading
+      - .:/app
+      # Prevent node_modules from being overwritten
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - marketpulse-network
+    restart: unless-stopped
+  # Production service (commented out by default)
+  # marketpulse-prod:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "3002:3000"
+  #   environment:
+  #     # Environment variables loaded from .env files
+  #     NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-https://cxvawvkrxvxhxwgacghu.supabase.co}
+  #     NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+  #     SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+  #     NEXT_PUBLIC_SITE_URL: http://localhost:3002
+  #     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
+  #     STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+  #     STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+  #     NODE_ENV: production
+  #     NEXT_TELEMETRY_DISABLED: 1
+  #   networks:
+  #     - marketpulse-network
+  #   restart: unless-stopped
+
+networks:
+  marketpulse-network:
+    driver: bridge

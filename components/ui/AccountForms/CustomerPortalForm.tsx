@@ -28,6 +28,7 @@ export default function CustomerPortalForm({ subscription }: Props) {
   const router = useRouter();
   const currentPath = usePathname();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const subscriptionPrice =
     subscription &&
@@ -39,9 +40,27 @@ export default function CustomerPortalForm({ subscription }: Props) {
 
   const handleStripePortalRequest = async () => {
     setIsSubmitting(true);
-    const redirectUrl = await createStripePortal(currentPath);
-    setIsSubmitting(false);
-    return router.push(redirectUrl);
+    setError(null);
+    
+    try {
+      const redirectUrl = await createStripePortal(currentPath);
+      
+      // Check if redirectUrl is an error redirect
+      if (redirectUrl.includes('error=')) {
+        const urlParams = new URLSearchParams(redirectUrl.split('?')[1]);
+        const errorMessage = urlParams.get('error') || 'Unknown error occurred';
+        setError(errorMessage);
+        setIsSubmitting(false);
+        return;
+      }
+      
+      setIsSubmitting(false);
+      return router.push(redirectUrl);
+    } catch (err) {
+      console.error('Portal creation error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create billing portal');
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -55,6 +74,12 @@ export default function CustomerPortalForm({ subscription }: Props) {
       footer={
         <div className="flex flex-col items-start justify-between sm:flex-row sm:items-center">
           <p className="pb-4 sm:pb-0">Manage your subscription on Stripe.</p>
+          {error && (
+            <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+              <p className="font-semibold">Error:</p>
+              <p>{error}</p>
+            </div>
+          )}
           <Button
             variant="slim"
             onClick={handleStripePortalRequest}
