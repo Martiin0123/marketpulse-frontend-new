@@ -22,9 +22,10 @@ import {
 
 interface NavlinksProps {
   user?: any;
+  subscription?: any;
 }
 
-export default function Navlinks({ user }: NavlinksProps) {
+export default function Navlinks({ user, subscription }: NavlinksProps) {
   const router = getRedirectMethod() === 'client' ? useRouter() : null;
   const pathname = usePathname();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -57,6 +58,27 @@ export default function Navlinks({ user }: NavlinksProps) {
     return pathname.startsWith(href);
   };
 
+  // Check if user has active subscription
+  const hasActiveSubscription = false; // TEMPORARY: Force no subscription for testing
+  // const hasActiveSubscription = Boolean(
+  //   subscription &&
+  //   subscription.status &&
+  //   ['trialing', 'active'].includes(subscription.status as string)
+  // );
+
+  // Debug logging
+  console.log('🔍 Navigation Debug:', {
+    user: user?.email || 'No user',
+    subscription: subscription
+      ? {
+          status: subscription.status,
+          product: subscription.prices?.products?.name,
+          id: subscription.id
+        }
+      : 'No subscription',
+    hasActiveSubscription
+  });
+
   const navLinks = [
     { href: '/', label: 'Home', icon: <Home className="w-4 h-4" /> },
     {
@@ -64,7 +86,7 @@ export default function Navlinks({ user }: NavlinksProps) {
       label: 'Pricing',
       icon: <BarChart3 className="w-4 h-4" />
     },
-    ...(user
+    ...(user && hasActiveSubscription
       ? [
           {
             href: '/dashboard',
@@ -171,14 +193,16 @@ export default function Navlinks({ user }: NavlinksProps) {
                     <span>Account Settings</span>
                   </Link>
 
-                  <Link
-                    href="/referrals"
-                    onClick={() => setIsDropdownOpen(false)}
-                    className="flex items-center space-x-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
-                  >
-                    <Users className="w-4 h-4" />
-                    <span>Referral Program</span>
-                  </Link>
+                  {hasActiveSubscription && (
+                    <Link
+                      href="/referrals"
+                      onClick={() => setIsDropdownOpen(false)}
+                      className="flex items-center space-x-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
+                    >
+                      <Users className="w-4 h-4" />
+                      <span>Referral Program</span>
+                    </Link>
+                  )}
 
                   <form
                     onSubmit={(e) => {
