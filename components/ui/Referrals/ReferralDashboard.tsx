@@ -100,7 +100,7 @@ export default function ReferralDashboard({
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
   const referralUrl = referralCode
-    ? `${baseUrl}/signup?ref=${referralCode.code}`
+    ? `${baseUrl}/signin/signup?ref=${referralCode.code}`
     : '';
 
   const totalEarnings = rewards.reduce(

@@ -27,14 +27,25 @@ export const getProducts = cache(async (supabase: SupabaseClient) => {
     .order('metadata->index')
     .order('unit_amount', { referencedTable: 'prices' });
 
+  if (error) {
+    console.error('Error fetching products:', error);
+    return [];
+  }
+
   return products;
 });
 
 export const getUserDetails = cache(async (supabase: SupabaseClient) => {
-  const { data: userDetails } = await supabase
+  const { data: userDetails, error } = await supabase
     .from('users')
     .select('*')
     .single();
+    
+  if (error) {
+    console.error('Error fetching user details:', error);
+    return null;
+  }
+    
   return userDetails;
 });
 
