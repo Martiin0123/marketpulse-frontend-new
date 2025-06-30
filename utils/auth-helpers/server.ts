@@ -181,13 +181,36 @@ export async function signUp(formData: FormData) {
 
   const supabase = createClient();
   
+  // Validate referral code if provided
+  let validReferralCode = false;
+  let referrerId = null;
+  if (referralCode) {
+    try {
+      const { data: referralData, error: referralError } = await supabase
+        .from('referral_codes')
+        .select('user_id, is_active')
+        .eq('code', referralCode)
+        .eq('is_active', true)
+        .single();
+
+      if (!referralError && referralData) {
+        validReferralCode = true;
+        referrerId = referralData.user_id;
+      } else {
+        console.error('Invalid referral code during signup:', referralError);
+      }
+    } catch (err) {
+      console.error('Error validating referral code:', err);
+    }
+  }
+  
   // Prepare user metadata
   const userMetadata: any = {
     email,
     full_name: email.split('@')[0] // Default name from email
   };
   
-  if (referralCode) {
+  if (validReferralCode) {
     userMetadata.referred_by = referralCode;
   }
 
@@ -217,15 +240,15 @@ export async function signUp(formData: FormData) {
             id: data.user.id,
             full_name: userMetadata.full_name,
             email: email,
-            referred_by: referralCode
+            referred_by: validReferralCode ? referralCode : null
           });
 
         if (profileError) {
           console.error('Error creating user profile:', profileError);
         }
 
-        // Handle referral if present
-        if (referralCode) {
+        // Handle referral if valid
+        if (validReferralCode && referrerId) {
           await handleReferralSignup(supabase, data.user.id, referralCode);
         }
       } catch (err) {
@@ -253,15 +276,15 @@ export async function signUp(formData: FormData) {
           id: data.user.id,
           full_name: userMetadata.full_name,
           email: email,
-          referred_by: referralCode
+          referred_by: validReferralCode ? referralCode : null
         });
 
       if (profileError) {
         console.error('Error creating user profile:', profileError);
       }
 
-      // Handle referral if present
-      if (referralCode) {
+      // Handle referral if valid
+      if (validReferralCode && referrerId) {
         await handleReferralSignup(supabase, data.user.id, referralCode);
       }
     } catch (err) {
