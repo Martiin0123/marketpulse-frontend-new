@@ -6,7 +6,8 @@ import { createClient } from '@/utils/supabase/client';
 import {
   getUserReferralCode,
   getReferrals,
-  getReferralRewards
+  getReferralRewards,
+  ensureUserReferralCode
 } from '@/utils/supabase/queries';
 import {
   Share2,
@@ -111,6 +112,25 @@ export default function ReferralDashboard({
   const pendingReferrals = referrals.filter(
     (r) => r.status === 'pending'
   ).length;
+
+  const createReferralCode = async () => {
+    setLoading(true);
+    try {
+      const newCode = await ensureUserReferralCode(supabase);
+      if (newCode) {
+        setReferralCode(newCode);
+        setToastMessage('Referral code created successfully!');
+      } else {
+        setToastMessage('Failed to create referral code');
+      }
+    } catch (error) {
+      console.error('Error creating referral code:', error);
+      setToastMessage('Failed to create referral code');
+    } finally {
+      setLoading(false);
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -258,7 +278,7 @@ MarketPulse provides real-time trading signals backed by advanced AI and technic
               </div>
             </div>
 
-            {referralCode && (
+            {referralCode ? (
               <>
                 {/* Referral Code */}
                 <div className="mb-6">
@@ -326,6 +346,28 @@ MarketPulse provides real-time trading signals backed by advanced AI and technic
                   </div>
                 </div>
               </>
+            ) : (
+              /* No Referral Code Yet */
+              <div className="text-center py-8">
+                <div className="mb-4">
+                  <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Share2 className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-white mb-2">
+                    No Referral Code Yet
+                  </h3>
+                  <p className="text-gray-400 mb-6">
+                    Create your unique referral code to start earning rewards
+                  </p>
+                </div>
+                <button
+                  onClick={createReferralCode}
+                  disabled={loading}
+                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all duration-200"
+                >
+                  {loading ? 'Creating...' : 'Create Referral Code'}
+                </button>
+              </div>
             )}
           </div>
 

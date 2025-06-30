@@ -120,7 +120,6 @@ export async function checkoutWithStripe(
 }
 
 export async function createStripePortal(currentPath: string) {
-  
   try {
     const supabase = createClient();
     const {
@@ -197,20 +196,7 @@ export async function createStripePortal(currentPath: string) {
       throw new Error('Could not create billing portal');
     }
   } catch (error) {
-    if (error instanceof Error) {
-      console.error('createStripePortal error:', error.message);
-      return getErrorRedirect(
-        currentPath,
-        error.message,
-        'Please try again later or contact a system administrator.'
-      );
-    } else {
-      console.error('Unknown error in createStripePortal:', error);
-      return getErrorRedirect(
-        currentPath,
-        'An unknown error occurred.',
-        'Please try again later or contact a system administrator.'
-      );
-    }
+    console.error('createStripePortal error:', error);
+    throw error;
   }
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { User } from '@supabase/supabase-js';
-import { Tables } from '@/types_db';
+import { Tables, Database } from '@/types_db';
 import { useState } from 'react';
 import {
   User as UserIcon,
@@ -16,19 +16,32 @@ import {
   X,
   Star,
   Calendar,
-  Activity
+  Activity,
+  Users,
+  LogOut
 } from 'lucide-react';
 import { updateName } from '@/utils/auth-helpers/server';
 import { handleRequest } from '@/utils/auth-helpers/client';
 import { useRouter } from 'next/navigation';
+import CustomerPortalForm from '@/components/ui/AccountForms/CustomerPortalForm';
 
 type UserDetails = Tables<'users'>;
 type Subscription = Tables<'subscriptions'>;
+type Price = Database['public']['Tables']['prices']['Row'];
+type Product = Database['public']['Tables']['products']['Row'];
+
+type SubscriptionWithPriceAndProduct = Subscription & {
+  prices:
+    | (Price & {
+        products: Product | null;
+      })
+    | null;
+};
 
 interface Props {
   user: User | null;
   userDetails: UserDetails | null;
-  subscription: Subscription | null;
+  subscription: SubscriptionWithPriceAndProduct | null;
 }
 
 export default function AccountPage({
@@ -297,19 +310,7 @@ export default function AccountPage({
                   </div>
                 </div>
 
-                <div className="flex space-x-4">
-                  <button
-                    onClick={() => router.push('/pricing')}
-                    className="flex-1 bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
-                  >
-                    {subscription ? 'Manage Subscription' : 'Upgrade Plan'}
-                  </button>
-                  {subscription && (
-                    <button className="px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors">
-                      Billing History
-                    </button>
-                  )}
-                </div>
+                <CustomerPortalForm subscription={subscription} />
               </div>
             </div>
 

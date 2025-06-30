@@ -74,11 +74,13 @@ export default function SignUp({ allowEmail, redirectMethod }: SignUpProps) {
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setIsSubmitting(true);
 
-    // Add referral code to form data if valid
+    const formData = new FormData(e.currentTarget);
+
+    // Always add referral code to form data if it exists and is valid
     if (referralValid && referralCode) {
-      const formData = new FormData(e.currentTarget);
       formData.append('referralCode', referralCode);
     }
 

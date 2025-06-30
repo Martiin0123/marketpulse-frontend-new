@@ -59,25 +59,11 @@ export default function Navlinks({ user, subscription }: NavlinksProps) {
   };
 
   // Check if user has active subscription
-  const hasActiveSubscription = false; // TEMPORARY: Force no subscription for testing
-  // const hasActiveSubscription = Boolean(
-  //   subscription &&
-  //   subscription.status &&
-  //   ['trialing', 'active'].includes(subscription.status as string)
-  // );
-
-  // Debug logging
-  console.log('🔍 Navigation Debug:', {
-    user: user?.email || 'No user',
-    subscription: subscription
-      ? {
-          status: subscription.status,
-          product: subscription.prices?.products?.name,
-          id: subscription.id
-        }
-      : 'No subscription',
-    hasActiveSubscription
-  });
+  const hasActiveSubscription = Boolean(
+    subscription &&
+      subscription.status &&
+      ['trialing', 'active'].includes(subscription.status as string)
+  );
 
   const navLinks = [
     { href: '/', label: 'Home', icon: <Home className="w-4 h-4" /> },

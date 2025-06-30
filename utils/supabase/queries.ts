@@ -305,3 +305,39 @@ export const updateReferralCodeClicks = async (supabase: SupabaseClient, code: s
     console.error('Error updating referral code clicks:', error);
   }
 };
+
+// Function to ensure user has a referral code
+export const ensureUserReferralCode = async (supabase: SupabaseClient) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    return null;
+  }
+
+  // Check if user already has a referral code
+  const existingCode = await getUserReferralCode(supabase);
+  if (existingCode) {
+    return existingCode;
+  }
+
+  // Get user profile to get full name
+  const { data: userProfile } = await supabase
+    .from('users')
+    .select('full_name')
+    .eq('id', user.id)
+    .single();
+
+  // Call the database function to create referral code
+  const { data, error } = await supabase.rpc('create_user_referral_code', {
+    user_id: user.id,
+    user_name: userProfile?.full_name || null
+  });
+
+  if (error) {
+    console.error('Error creating referral code:', error);
+    return null;
+  }
+
+  // Fetch the newly created referral code
+  return await getUserReferralCode(supabase);
+};

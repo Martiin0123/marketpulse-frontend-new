@@ -182,7 +182,11 @@ export async function signUp(formData: FormData) {
   const supabase = createClient();
   
   // Prepare user metadata
-  const userMetadata: any = {};
+  const userMetadata: any = {
+    email,
+    full_name: email.split('@')[0] // Default name from email
+  };
+  
   if (referralCode) {
     userMetadata.referred_by = referralCode;
   }
@@ -203,9 +207,30 @@ export async function signUp(formData: FormData) {
       error.message
     );
   } else if (data.session) {
-    // User is immediately signed in, handle referral if present
-    if (referralCode && data.user) {
-      await handleReferralSignup(supabase, data.user.id, referralCode);
+    // User is immediately signed in
+    if (data.user) {
+      try {
+        // Create user profile using raw query instead of RPC
+        const { error: profileError } = await supabase
+          .from('users')
+          .insert({
+            id: data.user.id,
+            full_name: userMetadata.full_name,
+            email: email,
+            referred_by: referralCode
+          });
+
+        if (profileError) {
+          console.error('Error creating user profile:', profileError);
+        }
+
+        // Handle referral if present
+        if (referralCode) {
+          await handleReferralSignup(supabase, data.user.id, referralCode);
+        }
+      } catch (err) {
+        console.error('Error creating user profile:', err);
+      }
     }
     redirectPath = getStatusRedirect('/', 'Success!', 'You are now signed in.');
   } else if (
@@ -219,10 +244,30 @@ export async function signUp(formData: FormData) {
       'There is already an account associated with this email address. Try resetting your password.'
     );
   } else if (data.user) {
-    // User needs email confirmation, but we can still handle referral
-    if (referralCode) {
-      await handleReferralSignup(supabase, data.user.id, referralCode);
+    // User needs email confirmation
+    try {
+      // Create user profile using raw query instead of RPC
+      const { error: profileError } = await supabase
+        .from('users')
+        .insert({
+          id: data.user.id,
+          full_name: userMetadata.full_name,
+          email: email,
+          referred_by: referralCode
+        });
+
+      if (profileError) {
+        console.error('Error creating user profile:', profileError);
+      }
+
+      // Handle referral if present
+      if (referralCode) {
+        await handleReferralSignup(supabase, data.user.id, referralCode);
+      }
+    } catch (err) {
+      console.error('Error creating user profile:', err);
     }
+    
     redirectPath = getStatusRedirect(
       '/',
       'Success!',
@@ -256,31 +301,32 @@ async function handleReferralSignup(supabase: any, userId: string, referralCode:
     }
 
     // Create the referral relationship
-    const { error: referralError } = await supabase
+    const { data: referral, error: referralError } = await supabase
       .from('referrals')
       .insert({
         referrer_id: referralCodeData.user_id,
         referee_id: userId,
         referral_code: referralCode,
-        status: 'pending'
-      });
+        status: 'pending',
+        reward_amount: 25.00,
+        reward_currency: 'USD'
+      })
+      .select()
+      .single();
 
     if (referralError) {
       console.error('Error creating referral during signup:', referralError);
       return;
     }
 
-    // Update the user's referred_by field
-    const { error: userError } = await supabase
-      .from('users')
-      .update({ referred_by: referralCode })
-      .eq('id', userId);
-
-    if (userError) {
-      console.error('Error updating user referral info:', userError);
-    }
+    // Update click count for the referral code
+    await supabase
+      .from('referral_codes')
+      .update({ clicks: supabase.sql`clicks + 1` })
+      .eq('code', referralCode);
 
     console.log(`Referral created successfully: ${userId} referred by ${referralCode}`);
+    return referral;
 
   } catch (error) {
     console.error('Unexpected error handling referral signup:', error);

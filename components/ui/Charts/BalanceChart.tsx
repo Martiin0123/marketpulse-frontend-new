@@ -130,23 +130,6 @@ export default function BalanceChart({
       (pos) => pos.status === 'open'
     );
 
-    // Debug logging
-    console.log('BalanceChart Debug:', {
-      totalPositions: positions.length,
-      relevantPositions: relevantPositions.length,
-      closedPositions: closedPositions.length,
-      openPositions: openPositions.length,
-      timeframe,
-      sampleClosedPosition: closedPositions[0],
-      sampleOpenPosition: openPositions[0],
-      sampleEntryTimestamp: closedPositions[0]
-        ? getEntryTimestamp(closedPositions[0])
-        : null,
-      sampleExitTimestamp: closedPositions[0]
-        ? getExitTimestamp(closedPositions[0])
-        : null
-    });
-
     // Build comprehensive balance progression
     const balanceData: BalanceDataPoint[] = [];
     let runningBalance = accountSize;
