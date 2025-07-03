@@ -10,6 +10,7 @@ import {
   calculateTrialEndUnixTimestamp
 } from '@/utils/helpers';
 import { Tables } from '@/types_db';
+import { cookies } from 'next/headers';
 
 type Price = Tables<'prices'>;
 
@@ -22,8 +23,11 @@ export async function checkoutWithStripe(
   price: Price,
   redirectPath: string = '/account'
 ): Promise<CheckoutResponse> {
+  console.log('[SERVER] Starting checkout process');
+  
   try {
     // Get the user from Supabase auth
+    const cookieStore = cookies();
     const supabase = createClient();
     const {
       error,
@@ -31,9 +35,11 @@ export async function checkoutWithStripe(
     } = await supabase.auth.getUser();
 
     if (error || !user) {
-      console.error(error);
+      console.error('[SERVER] Auth error:', error);
       throw new Error('Could not get user session.');
     }
+
+    console.log('[SERVER] User authenticated:', user.id);
 
     // Retrieve or create the customer in Stripe
     let customer: string;
@@ -42,8 +48,9 @@ export async function checkoutWithStripe(
         uuid: user?.id || '',
         email: user?.email || ''
       });
+      console.log('[SERVER] Customer retrieved/created:', customer);
     } catch (err) {
-      console.error(err);
+      console.error('[SERVER] Customer error:', err);
       throw new Error('Unable to access customer record.');
     }
 
@@ -64,10 +71,7 @@ export async function checkoutWithStripe(
       success_url: getURL(redirectPath)
     };
 
-    console.log(
-      'Trial end:',
-      calculateTrialEndUnixTimestamp(price.trial_period_days)
-    );
+    console.log('[SERVER] Trial period:', price.trial_period_days);
     if (price.type === 'recurring') {
       params = {
         ...params,
@@ -87,8 +91,9 @@ export async function checkoutWithStripe(
     let session;
     try {
       session = await stripe.checkout.sessions.create(params);
+      console.log('[SERVER] Checkout session created:', session.id);
     } catch (err) {
-      console.error(err);
+      console.error('[SERVER] Stripe session error:', err);
       throw new Error('Unable to create checkout session.');
     }
 
@@ -99,6 +104,7 @@ export async function checkoutWithStripe(
       throw new Error('Unable to create checkout session.');
     }
   } catch (error) {
+    console.error('[SERVER] Checkout error:', error);
     if (error instanceof Error) {
       return {
         errorRedirect: getErrorRedirect(

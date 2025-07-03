@@ -49,17 +49,11 @@ alter table customers enable row level security;
 * Note: products are created and managed in Stripe and synced to our DB via Stripe webhooks.
 */
 create table products (
-  -- Product ID from Stripe, e.g. prod_1234.
   id text primary key,
-  -- Whether the product is currently available for purchase.
   active boolean,
-  -- The product's name, meant to be displayable to the customer. Whenever this product is sold via a subscription, name will show up on associated invoice line item descriptions.
   name text,
-  -- The product's description, meant to be displayable to the customer. Use this field to optionally store a long form explanation of the product being sold for your own rendering purposes.
   description text,
-  -- A URL of the product image in Stripe, meant to be displayable to the customer.
   image text,
-  -- Set of key-value pairs, used to store additional information about the object in a structured format.
   metadata jsonb
 );
 alter table products enable row level security;
@@ -72,31 +66,36 @@ create policy "Allow public read-only access." on products for select using (tru
 create type pricing_type as enum ('one_time', 'recurring');
 create type pricing_plan_interval as enum ('day', 'week', 'month', 'year');
 create table prices (
-  -- Price ID from Stripe, e.g. price_1234.
   id text primary key,
-  -- The ID of the prduct that this price belongs to.
-  product_id text references products, 
-  -- Whether the price can be used for new purchases.
+  product_id text references products,
   active boolean,
-  -- A brief description of the price.
   description text,
-  -- The unit amount as a positive integer in the smallest currency unit (e.g., 100 cents for US$1.00 or 100 for ¥100, a zero-decimal currency).
   unit_amount bigint,
-  -- Three-letter ISO currency code, in lowercase.
   currency text check (char_length(currency) = 3),
-  -- One of `one_time` or `recurring` depending on whether the price is for a one-time purchase or a recurring (subscription) purchase.
   type pricing_type,
-  -- The frequency at which a subscription is billed. One of `day`, `week`, `month` or `year`.
   interval pricing_plan_interval,
-  -- The number of intervals (specified in the `interval` attribute) between subscription billings. For example, `interval=month` and `interval_count=3` bills every 3 months.
   interval_count integer,
-  -- Default number of trial days when subscribing a customer to this price using [`trial_from_plan=true`](https://stripe.com/docs/api#create_subscription-trial_from_plan).
   trial_period_days integer,
-  -- Set of key-value pairs, used to store additional information about the object in a structured format.
   metadata jsonb
 );
 alter table prices enable row level security;
 create policy "Allow public read-only access." on prices for select using (true);
+
+-- Add indexes to improve query performance
+CREATE INDEX IF NOT EXISTS idx_prices_product_id ON prices(product_id);
+CREATE INDEX IF NOT EXISTS idx_products_active ON products(active);
+CREATE INDEX IF NOT EXISTS idx_prices_active ON prices(active);
+
+-- Sample data for testing (optional, remove in production)
+INSERT INTO products (id, active, name, description, metadata) VALUES
+('prod_example1', true, 'Basic Plan', 'Basic trading signals', '{"index": 1}'),
+('prod_example2', true, 'Pro Plan', 'Advanced trading features', '{"index": 2}'),
+('prod_example3', true, 'Premium Plan', 'Full access to all features', '{"index": 3}');
+
+INSERT INTO prices (id, product_id, active, unit_amount, currency, type, interval, interval_count) VALUES
+('price_example1_monthly', 'prod_example1', true, 1999, 'usd', 'recurring', 'month', 1),
+('price_example2_monthly', 'prod_example2', true, 4999, 'usd', 'recurring', 'month', 1),
+('price_example3_monthly', 'prod_example3', true, 9999, 'usd', 'recurring', 'month', 1);
 
 /**
 * SUBSCRIPTIONS

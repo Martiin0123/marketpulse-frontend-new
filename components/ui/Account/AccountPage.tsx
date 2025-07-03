@@ -23,7 +23,13 @@ import { handleRequest } from '@/utils/auth-helpers/client';
 import { useRouter } from 'next/navigation';
 
 type UserDetails = Tables<'users'>;
-type Subscription = Tables<'subscriptions'>;
+type Price = Tables<'prices'> & {
+  products: Tables<'products'> | null;
+};
+
+type Subscription = Tables<'subscriptions'> & {
+  prices: Price | null;
+};
 
 interface Props {
   user: User | null;
@@ -100,11 +106,35 @@ export default function AccountPage({
       };
     }
 
-    if (subscription.status === 'active') {
+    if (
+      subscription.status === 'active' ||
+      subscription.status === 'trialing'
+    ) {
+      const planName = subscription.prices?.products?.name || 'Pro';
+      const isTrialing = subscription.status === 'trialing';
       return {
-        status: 'Pro',
+        status: isTrialing ? `${planName} (Trial)` : planName,
         color: 'text-green-400',
         bgColor: 'bg-green-500/20'
+      };
+    }
+
+    if (
+      subscription.status === 'canceled' ||
+      subscription.status === 'incomplete_expired'
+    ) {
+      return {
+        status: 'Canceled',
+        color: 'text-red-400',
+        bgColor: 'bg-red-500/20'
+      };
+    }
+
+    if (subscription.status === 'past_due') {
+      return {
+        status: 'Past Due',
+        color: 'text-yellow-400',
+        bgColor: 'bg-yellow-500/20'
       };
     }
 
@@ -208,14 +238,28 @@ export default function AccountPage({
                   <div className="flex items-center justify-between">
                     <span className="text-gray-400">Member since</span>
                     <span className="text-white">
-                      {new Date(user?.created_at || '').toLocaleDateString()}
+                      {new Date(user?.created_at || '').toLocaleDateString(
+                        'en-US',
+                        {
+                          year: 'numeric',
+                          month: 'numeric',
+                          day: 'numeric'
+                        }
+                      )}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-gray-400">Last sign in</span>
                     <span className="text-white">
                       {user?.last_sign_in_at
-                        ? new Date(user.last_sign_in_at).toLocaleDateString()
+                        ? new Date(user.last_sign_in_at).toLocaleDateString(
+                            'en-US',
+                            {
+                              year: 'numeric',
+                              month: 'numeric',
+                              day: 'numeric'
+                            }
+                          )
                         : 'Never'}
                     </span>
                   </div>

@@ -9,24 +9,175 @@ export const getUser = cache(async (supabase: SupabaseClient) => {
 });
 
 export const getSubscription = cache(async (supabase: SupabaseClient) => {
+  console.log("[SERVER] Starting subscription fetch");
+  const { data: user } = await supabase.auth.getUser();
+  console.log("[SERVER] Auth user data:", user);
+  
+  if (!user.user?.id) {
+    console.log("[SERVER] No user found");
+    return null;
+  }
+
+  // Check if user exists in users table
+  const { data: dbUser, error: userError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', user.user.id)
+    .single();
+
+  console.log('[SERVER] Database user check:', {
+    userId: user.user.id,
+    dbUser,
+    error: userError
+  });
+
+  // Check if user has a customer record
+  const { data: customer, error: customerError } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('id', user.user.id)
+    .single();
+
+  console.log('[SERVER] Customer record check:', {
+    userId: user.user.id,
+    customer,
+    error: customerError
+  });
+
+  // Check all subscriptions regardless of status
+  const { data: allSubscriptions, error: listError } = await supabase
+    .from('subscriptions')
+    .select(`
+      id,
+      status,
+      price_id,
+      cancel_at,
+      cancel_at_period_end,
+      canceled_at,
+      created,
+      current_period_start,
+      current_period_end,
+      ended_at,
+      trial_end,
+      trial_start,
+      user_id,
+      metadata,
+      quantity
+    `)
+    .eq('user_id', user.user.id);
+
+  console.log('[SERVER] All subscriptions check:', {
+    userId: user.user.id,
+    subscriptions: allSubscriptions,
+    error: listError
+  });
+
+  if (listError) {
+    console.error('[SERVER] Error checking subscriptions:', listError);
+    return null;
+  }
+
+  // If no subscriptions found at all
+  if (!allSubscriptions || allSubscriptions.length === 0) {
+    console.log('[SERVER] No subscriptions found for user');
+    return null;
+  }
+
+  // Now try to get the active subscription with all relations
+  console.log('[SERVER] Found subscriptions, fetching active one with relations');
   const { data: subscription, error } = await supabase
     .from('subscriptions')
-    .select('*, prices(*, products(*))')
-    .in('status', ['trialing', 'active'])
-    .maybeSingle();
+    .select(`
+      id,
+      status,
+      price_id,
+      cancel_at,
+      cancel_at_period_end,
+      canceled_at,
+      created,
+      current_period_start,
+      current_period_end,
+      ended_at,
+      trial_end,
+      trial_start,
+      user_id,
+      metadata,
+      quantity,
+      prices:price_id (
+        id,
+        unit_amount,
+        currency,
+        interval,
+        interval_count,
+        trial_period_days,
+        type,
+        active,
+        description,
+        metadata,
+        products:product_id (
+          id,
+          name,
+          description,
+          active,
+          image,
+          metadata
+        )
+      )
+    `)
+    .eq('user_id', user.user.id)
+    .in('status', ['trialing', 'active', 'past_due', 'incomplete'])
+    .order('created', { ascending: false })
+    .limit(1)
+    .single();
 
+  if (error) {
+    console.error('[SERVER] Error fetching subscription with relations:', error);
+    return null;
+  }
+
+  console.log('[SERVER] Final subscription result:', {
+    subscription,
+    error
+  });
+  
   return subscription;
 });
 
 export const getProducts = cache(async (supabase: SupabaseClient) => {
+  console.log('Fetching products...');
   const { data: products, error } = await supabase
     .from('products')
-    .select('*, prices(*)')
+    .select(`
+      id,
+      name,
+      description,
+      active,
+      image,
+      metadata,
+      prices!prices_product_id_fkey (
+        id,
+        active,
+        currency,
+        description,
+        interval,
+        interval_count,
+        metadata,
+        product_id,
+        trial_period_days,
+        type,
+        unit_amount
+      )
+    `)
     .eq('active', true)
     .eq('prices.active', true)
-    .order('metadata->index')
-    .order('unit_amount', { referencedTable: 'prices' });
+    .order('metadata->index');
 
+  if (error) {
+    console.error('Error fetching products:', error);
+    return [];
+  }
+
+  console.log('Raw products data:', products);
   return products;
 });
 

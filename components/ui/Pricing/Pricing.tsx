@@ -43,26 +43,47 @@ interface Props {
   subscription: SubscriptionWithProduct | null;
 }
 
-type BillingInterval = 'lifetime' | 'year' | 'month';
+type BillingInterval = 'day' | 'week' | 'month' | 'year';
 
 export default function Pricing({ user, products, subscription }: Props) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [billingInterval, setBillingInterval] =
+    useState<BillingInterval>('month');
+  const [priceIdLoading, setPriceIdLoading] = useState<string>();
+  const [showMessage, setShowMessage] = useState(false);
+
+  useEffect(() => {
+    console.log('[CLIENT] Component mounted with:', {
+      isUserAuthenticated: !!user,
+      userId: user?.id,
+      hasProducts: products.length > 0,
+      hasSubscription: !!subscription
+    });
+  }, [user, products, subscription]);
+
+  useEffect(() => {
+    console.log('[CLIENT] Subscription data received:', subscription);
+  }, [subscription]);
+
+  // Get unique intervals from products
   const intervals = Array.from(
     new Set(
       products.flatMap((product) =>
         product?.prices?.map((price) => price?.interval)
       )
     )
-  );
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [billingInterval, setBillingInterval] =
-    useState<BillingInterval>('month');
-  const [priceIdLoading, setPriceIdLoading] = useState<string>();
-  const currentPath = usePathname();
-  const [showMessage, setShowMessage] = useState(false);
+  ).filter(Boolean) as BillingInterval[];
 
   useEffect(() => {
-    const message = searchParams.get('message');
+    if (intervals.length > 0 && !intervals.includes(billingInterval)) {
+      setBillingInterval(intervals[0]);
+    }
+  }, [intervals, billingInterval]);
+
+  useEffect(() => {
+    const message = searchParams?.get('message');
     if (message === 'subscription_required') {
       setShowMessage(true);
       setTimeout(() => setShowMessage(false), 8000);
@@ -77,31 +98,42 @@ export default function Pricing({ user, products, subscription }: Props) {
       return router.push('/signin/signup');
     }
 
-    const { errorRedirect, sessionId } = await checkoutWithStripe(
-      price,
-      currentPath
-    );
+    try {
+      const { errorRedirect, sessionId } = await checkoutWithStripe(
+        price,
+        pathname || '/'
+      );
 
-    if (errorRedirect) {
-      setPriceIdLoading(undefined);
-      return router.push(errorRedirect);
-    }
+      if (errorRedirect) {
+        setPriceIdLoading(undefined);
+        return router.push(errorRedirect);
+      }
 
-    if (!sessionId) {
-      setPriceIdLoading(undefined);
-      return router.push(
+      if (!sessionId) {
+        setPriceIdLoading(undefined);
+        return router.push(
+          getErrorRedirect(
+            pathname || '/',
+            'An unknown error occurred.',
+            'Please try again later or contact a system administrator.'
+          )
+        );
+      }
+
+      const stripe = await getStripe();
+      await stripe?.redirectToCheckout({ sessionId });
+    } catch (error) {
+      console.error('[CLIENT] Checkout error:', error);
+      router.push(
         getErrorRedirect(
-          currentPath,
-          'An unknown error occurred.',
-          'Please try again later or contact a system administrator.'
+          pathname || '/',
+          'An error occurred during checkout.',
+          'Please try again later.'
         )
       );
+    } finally {
+      setPriceIdLoading(undefined);
     }
-
-    const stripe = await getStripe();
-    stripe?.redirectToCheckout({ sessionId });
-
-    setPriceIdLoading(undefined);
   };
 
   const handleViewDashboard = () => {

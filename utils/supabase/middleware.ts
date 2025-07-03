@@ -1,6 +1,8 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
 
+const PROTECTED_ROUTES = ['/dashboard', '/signals'];
+
 export const createClient = (request: NextRequest) => {
   // Create an unmodified response
   let response = NextResponse.next({
@@ -62,19 +64,43 @@ export const createClient = (request: NextRequest) => {
 
 export const updateSession = async (request: NextRequest) => {
   try {
-    // This `try/catch` block is only here for the interactive tutorial.
-    // Feel free to remove once you have Supabase connected.
     const { supabase, response } = createClient(request);
+    const pathname = request.nextUrl.pathname;
+
+    // Check if this is a protected route
+    if (PROTECTED_ROUTES.some(route => pathname.startsWith(route))) {
+      // Get the user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        // If no user, redirect to sign in
+        const redirectUrl = new URL('/signin', request.url);
+        redirectUrl.searchParams.set('next', pathname);
+        return NextResponse.redirect(redirectUrl);
+      }
+
+      // Check subscription status
+      const { data: subscription } = await supabase
+        .from('subscriptions')
+        .select('status')
+        .eq('user_id', user.id)
+        .in('status', ['trialing', 'active'])
+        .maybeSingle();
+
+      if (!subscription) {
+        // If no active subscription, redirect to pricing with message
+        const redirectUrl = new URL('/pricing', request.url);
+        redirectUrl.searchParams.set('message', 'subscription_required');
+        return NextResponse.redirect(redirectUrl);
+      }
+    }
 
     // This will refresh session if expired - required for Server Components
-    // https://supabase.com/docs/guides/auth/server-side/nextjs
     await supabase.auth.getUser();
 
     return response;
   } catch (e) {
-    // If you are here, a Supabase client could not be created!
-    // This is likely because you have not set up environment variables.
-    // Check out http://localhost:3000 for Next Steps.
+    console.error('Middleware error:', e);
     return NextResponse.next({
       request: {
         headers: request.headers
