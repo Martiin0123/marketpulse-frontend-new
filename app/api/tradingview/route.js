@@ -46,7 +46,7 @@ export async function POST(request) {
     }
   }
 
-  // Check for existing open positions for this symbol (for position management)
+  // Check for existing open positions for this symbol
   const { data: existingPositions, error: fetchError } = await supabase
     .from('positions')
     .select('*')
@@ -59,41 +59,22 @@ export async function POST(request) {
     return new Response(JSON.stringify({ error: 'Database query failed', details: fetchError.message }), { status: 500 })
   }
 
-  // Position management logic
-  const sideUpper = side.toUpperCase() // For positions table compatibility
-  
-  // Check if there's already a position in the same direction
-  const sameDirectionPosition = existingPositions?.find(pos => pos.side === sideUpper)
-  if (sameDirectionPosition) {
-    // Don't create a signal if position already exists in same direction
-    return new Response(JSON.stringify({ 
-      message: 'Position already exists in same direction, no signal created',
-      symbol: symbolUpper,
-      side: side,
-      signal_created: false,
-      existing_position_id: sameDirectionPosition.id
-    }), { status: 200 })
-  }
-
-  // Check if there's an opposite direction position to close
-  const oppositeDirection = sideUpper === 'BUY' ? 'SELL' : 'BUY'
-  const oppositePosition = existingPositions?.find(pos => pos.side === oppositeDirection)
-  
-  if (oppositePosition) {
-    // Calculate PnL
-    const entryPrice = Number(oppositePosition.entry_price)
-    const exitPrice = Number(price)
-    let pnlPercentage = 0
-    
-    if (oppositePosition.side === 'BUY') {
-      // For BUY positions, profit when exit price > entry price
-      pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100
-    } else {
-      // For SELL positions, profit when exit price < entry price
-      pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100
+  // If it's a sell signal, we only want to close existing buy positions
+  if (side === 'sell') {
+    const buyPosition = existingPositions?.find(pos => pos.side === 'BUY')
+    if (!buyPosition) {
+      return new Response(JSON.stringify({ 
+        message: 'No open buy position to close',
+        signal_created: false
+      }), { status: 200 })
     }
 
-    // Close the opposite position
+    // Calculate PnL
+    const entryPrice = Number(buyPosition.entry_price)
+    const exitPrice = Number(price)
+    const pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100
+
+    // Close the buy position
     const { error: updateError } = await supabase
       .from('positions')
       .update({
@@ -102,27 +83,27 @@ export async function POST(request) {
         exit_time: createISOTimestamp(validTimestamp),
         pnl: pnlPercentage
       })
-      .eq('id', oppositePosition.id)
+      .eq('id', buyPosition.id)
 
     if (updateError) {
-      console.error('Error closing opposite position:', updateError)
+      console.error('Error closing buy position:', updateError)
       return new Response(JSON.stringify({ 
-        error: 'Failed to close opposite position', 
+        error: 'Failed to close buy position', 
         details: updateError.message 
       }), { status: 500 })
     }
 
-    // Create a "close" signal to show the position closure
+    // Create a "close" signal
     const { error: closeSignalError } = await supabase.from('signals').insert([
       {
         symbol: symbolUpper,
         typ: 'close',
         price: exitPrice,
         timestamp: createISOTimestamp(validTimestamp),
-        reason: `Closed ${oppositePosition.side} position with ${pnlPercentage >= 0 ? '+' : ''}${pnlPercentage.toFixed(2)}% PnL`,
+        reason: reason || `Closed BUY position with ${pnlPercentage >= 0 ? '+' : ''}${pnlPercentage.toFixed(2)}% PnL`,
         rsi: rsi ? Number(rsi) : null,
         macd: macd ? Number(macd) : null,
-        risk: Math.abs(pnlPercentage) / 100 // Risk based on PnL magnitude
+        risk: Math.abs(pnlPercentage) / 100
       }
     ])
 
@@ -130,11 +111,36 @@ export async function POST(request) {
       console.error('Error creating close signal:', closeSignalError)
     }
 
-    // Now create the new position
+    return new Response(JSON.stringify({ 
+      message: 'Buy position closed successfully',
+      symbol: symbolUpper,
+      closed_signal_created: !closeSignalError,
+      closed_position: {
+        id: buyPosition.id,
+        entry_price: entryPrice,
+        exit_price: exitPrice,
+        pnl: pnlPercentage.toFixed(2) + '%'
+      }
+    }), { status: 200 })
+  }
+
+  // For buy signals
+  if (side === 'buy') {
+    // Check if there's already an open buy position
+    const existingBuy = existingPositions?.find(pos => pos.side === 'BUY')
+    if (existingBuy) {
+      return new Response(JSON.stringify({ 
+        message: 'Buy position already exists, no new position created',
+        signal_created: false,
+        existing_position_id: existingBuy.id
+      }), { status: 200 })
+    }
+
+    // Create new buy position
     const { error: positionError } = await supabase.from('positions').insert([
       {
         symbol: symbolUpper,
-        side: sideUpper,
+        side: 'BUY',
         entry_price: price,
         entry_time: createISOTimestamp(validTimestamp),
         status: 'open',
@@ -145,99 +151,42 @@ export async function POST(request) {
     if (positionError) {
       console.error('Supabase position insert error:', positionError)
       return new Response(JSON.stringify({ 
-        message: 'Position closed but failed to create new position',
-        closed_signal_created: !closeSignalError,
-        error: 'New position creation failed', 
+        error: 'Position creation failed', 
         details: positionError.message 
       }), { status: 500 })
     }
 
-    // Create the new entry signal
-    const { error: entrySignalError } = await supabase.from('signals').insert([
+    // Create the buy signal
+    const { error: signalError } = await supabase.from('signals').insert([
       {
         symbol: symbolUpper,
-        typ: side,
+        typ: 'buy',
         price: price,
         timestamp: createISOTimestamp(validTimestamp),
-        reason: reason || `New ${side.toUpperCase()} position opened`,
+        reason: reason || 'New BUY position opened',
         rsi: rsi ? Number(rsi) : null,
         macd: macd ? Number(macd) : null,
         risk: Math.random() * 0.8 + 0.2 // Random risk between 0.2-1.0
       }
     ])
 
-    if (entrySignalError) {
-      console.error('Error creating entry signal:', entrySignalError)
+    if (signalError) {
+      console.error('Supabase signal insert error:', signalError)
+      return new Response(JSON.stringify({ 
+        message: 'Position created but signal creation failed',
+        position_created: true,
+        signal_created: false,
+        error: 'Signal insert failed', 
+        details: signalError.message 
+      }), { status: 200 })
     }
 
     return new Response(JSON.stringify({ 
-      message: 'Position closed and new position created',
+      message: 'New buy position and signal created successfully',
       symbol: symbolUpper,
-      side: side,
-      closed_signal_created: !closeSignalError,
-      entry_signal_created: !entrySignalError,
-      new_position_created: true,
-      closed_position: {
-        id: oppositePosition.id,
-        side: oppositePosition.side,
-        entry_price: entryPrice,
-        exit_price: exitPrice,
-        pnl: pnlPercentage.toFixed(2) + '%'
-      }
-    }), { status: 200 })
-  }
-
-  // Create new position (no existing positions found) - also create entry signal
-  const { error: positionError } = await supabase.from('positions').insert([
-    {
-      symbol: symbolUpper,
-      side: sideUpper,
-      entry_price: price,
-      entry_time: createISOTimestamp(validTimestamp),
-      status: 'open',
-      pnl: 0
-    }
-  ])
-
-  if (positionError) {
-    console.error('Supabase position insert error:', positionError)
-    return new Response(JSON.stringify({ 
-      error: 'Position creation failed', 
-      details: positionError.message 
-    }), { status: 500 })
-  }
-
-  // Create the entry signal
-  const { error: signalError } = await supabase.from('signals').insert([
-    {
-      symbol: symbolUpper,
-      typ: side,
-      price: price,
-      timestamp: createISOTimestamp(validTimestamp),
-      reason: reason || `New ${side.toUpperCase()} position opened`,
-      rsi: rsi ? Number(rsi) : null,
-      macd: macd ? Number(macd) : null,
-      risk: Math.random() * 0.8 + 0.2 // Random risk between 0.2-1.0
-    }
-  ])
-
-  if (signalError) {
-    console.error('Supabase signal insert error:', signalError)
-    return new Response(JSON.stringify({ 
-      message: 'Position created but signal creation failed',
+      signal_created: true,
       position_created: true,
-      signal_created: false,
-      error: 'Signal insert failed', 
-      details: signalError.message 
+      entry_price: price
     }), { status: 200 })
   }
-
-  return new Response(JSON.stringify({ 
-    message: 'New position and signal created successfully',
-    symbol: symbolUpper,
-    side: side,
-    signal_created: true,
-    position_created: true,
-    entry_price: price
-  }), { status: 200 })
 }
