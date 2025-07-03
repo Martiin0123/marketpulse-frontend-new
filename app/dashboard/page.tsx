@@ -13,6 +13,7 @@ export default async function DashboardPage() {
     getUser(supabase),
     getSubscription(supabase)
   ]);
+  console.log(user);
 
   if (!user) {
     return redirect('/signin');

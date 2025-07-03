@@ -6,8 +6,9 @@ import Link from 'next/link';
 import { signUp } from '@/utils/auth-helpers/server';
 import { handleRequest } from '@/utils/auth-helpers/client';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Mail, Lock, Eye, EyeOff, UserPlus, Gift } from 'lucide-react';
+import debounce from 'lodash/debounce';
 
 // Define prop type with allowEmail boolean
 interface SignUpProps {
@@ -34,7 +35,7 @@ export default function SignUp({ allowEmail, redirectMethod }: SignUpProps) {
   }, [searchParams]);
 
   const validateReferralCode = async (code: string) => {
-    if (!code.trim()) {
+    if (!code) {
       setReferralValid(null);
       setReferralMessage('');
       return;
@@ -46,44 +47,63 @@ export default function SignUp({ allowEmail, redirectMethod }: SignUpProps) {
       );
       const data = await response.json();
 
-      if (data.valid) {
+      if (response.ok && data.valid) {
         setReferralValid(true);
-        setReferralMessage(
-          "Valid referral code! You'll receive special benefits."
-        );
-        // Track the referral click
-        await fetch('/api/referrals/track', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ referralCode: code })
-        });
+        setReferralMessage('Valid referral code!');
       } else {
         setReferralValid(false);
-        setReferralMessage('Invalid referral code');
+        setReferralMessage(data.error || 'Invalid referral code');
       }
     } catch (error) {
+      console.error('Error validating referral code:', error);
       setReferralValid(false);
       setReferralMessage('Error validating referral code');
     }
   };
 
+  // Debounced validation function
+  const debouncedValidate = useCallback(
+    debounce((code: string) => validateReferralCode(code), 500),
+    []
+  );
+
+  useEffect(() => {
+    // Cleanup debounced function on unmount
+    return () => {
+      debouncedValidate.cancel();
+    };
+  }, [debouncedValidate]);
+
   const handleReferralCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const code = e.target.value;
+    const code = e.target.value.trim();
     setReferralCode(code);
-    validateReferralCode(code);
+
+    if (code) {
+      debouncedValidate(code);
+    } else {
+      setReferralValid(null);
+      setReferralMessage('');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setIsSubmitting(true);
 
-    // Add referral code to form data if valid
-    if (referralValid && referralCode) {
+    try {
       const formData = new FormData(e.currentTarget);
-      formData.append('referralCode', referralCode);
-    }
 
-    await handleRequest(e, signUp, router);
-    setIsSubmitting(false);
+      // Only add referral code if it's valid
+      if (referralValid && referralCode) {
+        formData.append('referralCode', referralCode);
+      }
+
+      await handleRequest(e, signUp, router);
+    } catch (error) {
+      console.error('Error during signup:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
