@@ -25,7 +25,7 @@ export default function PositionsTab({ positions }: Props) {
 
   const calculatePositionPnL = (position: Position) => {
     if (!position.pnl) return 0;
-    return (position.pnl / 100) * 10000; // Assuming $10k account size
+    return position.pnl; // Return the percentage directly
   };
 
   const formatTime = (timestamp: string | number) => {
@@ -140,8 +140,8 @@ export default function PositionsTab({ positions }: Props) {
                           : 'text-red-400'
                       }`}
                     >
-                      {calculatePositionPnL(position) >= 0 ? '+' : ''}$
-                      {calculatePositionPnL(position).toFixed(2)}
+                      {calculatePositionPnL(position) >= 0 ? '+' : ''}
+                      {calculatePositionPnL(position).toFixed(2)}%
                     </span>
                   </div>
 
@@ -233,8 +233,8 @@ export default function PositionsTab({ positions }: Props) {
                           : 'text-red-400'
                       }`}
                     >
-                      {calculatePositionPnL(position) >= 0 ? '+' : ''}$
-                      {calculatePositionPnL(position).toFixed(2)}
+                      {calculatePositionPnL(position) >= 0 ? '+' : ''}
+                      {calculatePositionPnL(position).toFixed(2)}%
                     </span>
                   </div>
 

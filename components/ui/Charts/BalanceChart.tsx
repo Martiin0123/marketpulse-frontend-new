@@ -275,6 +275,16 @@ export default function BalanceChart({
       totalPositions: relevantPositions.length
     };
 
+    // Calculate dynamic y-axis range
+    const balanceValues = balanceData.map((d) => d.balance);
+    const minBalance = Math.min(...balanceValues, 100); // Include 100% as minimum
+    const maxBalance = Math.max(...balanceValues, 100); // Include 100% as maximum
+
+    // Add some padding to the range (10% on each side)
+    const padding = Math.max((maxBalance - minBalance) * 0.1, 5);
+    const yMin = Math.max(minBalance - padding, 0); // Don't go below 0%
+    const yMax = maxBalance + padding;
+
     // Chart options
     const chartOptions: ApexOptions = {
       chart: {
@@ -318,8 +328,8 @@ export default function BalanceChart({
         }
       },
       yaxis: {
-        min: 80, // 80% minimum
-        max: 120, // 120% maximum
+        min: yMin,
+        max: yMax,
         tickAmount: 4,
         labels: {
           style: {

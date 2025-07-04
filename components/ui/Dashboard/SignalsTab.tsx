@@ -32,7 +32,6 @@ interface SignalGroup {
 
 export default function SignalsTab({ signals: initialSignals }: Props) {
   const [signals, setSignals] = useState<Signal[]>(initialSignals);
-  const [filter, setFilter] = useState<'all' | 'buy' | 'sell' | 'close'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [groupedSignals, setGroupedSignals] = useState<SignalGroup[]>([]);
   const supabase = createClient();
@@ -116,38 +115,46 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
         });
       }
     });
-    setGroupedSignals(
-      const sortedGroups = groups.sort((a, b) => {
-        // Sort by most recent signal in the group
-        const aTime = Math.max(
-          a.buySignal ? new Date(a.buySignal.created_at).getTime() : 0,
-          a.sellSignal ? new Date(a.sellSignal.created_at).getTime() : 0
-        );
-        const bTime = Math.max(
-          b.buySignal ? new Date(b.buySignal.created_at).getTime() : 0,
-          b.sellSignal ? new Date(b.sellSignal.created_at).getTime() : 0
-        );
-        console.log(`Group A time: ${aTime}, Group B time: ${bTime}, Difference: ${bTime - aTime}`);
-        return bTime - aTime;
-      });
-      
-      console.log('Sorted groups (most recent first):', sortedGroups);
-      setGroupedSignals(sortedGroups);
+    const sortedGroups = groups.sort((a, b) => {
+      // Sort by buy signal timestamp first, then sell signal if no buy
+      const aBuyTime = a.buySignal
+        ? new Date(a.buySignal.created_at).getTime()
+        : 0;
+      const bBuyTime = b.buySignal
+        ? new Date(b.buySignal.created_at).getTime()
+        : 0;
+
+      // If both have buy signals, sort by buy time (most recent first)
+      if (aBuyTime > 0 && bBuyTime > 0) {
+        return bBuyTime - aBuyTime;
+      }
+
+      // If only one has buy signal, prioritize the one with buy signal
+      if (aBuyTime > 0 && bBuyTime === 0) return -1;
+      if (aBuyTime === 0 && bBuyTime > 0) return 1;
+
+      // If neither has buy signal, sort by sell signal time
+      const aSellTime = a.sellSignal
+        ? new Date(a.sellSignal.created_at).getTime()
+        : 0;
+      const bSellTime = b.sellSignal
+        ? new Date(b.sellSignal.created_at).getTime()
+        : 0;
+
+      return bSellTime - aSellTime;
+    });
+
+    console.log('Sorted groups (most recent first):', sortedGroups);
+    setGroupedSignals(sortedGroups);
   }, [signals]);
 
-  // Filter signals based on type and search term
+  // Filter signals based on search term only
   const filteredGroups = groupedSignals.filter((group) => {
-    const matchesFilter =
-      filter === 'all' ||
-      (filter === 'buy' && group.buySignal) ||
-      (filter === 'sell' && group.sellSignal) ||
-      (filter === 'close' && group.isComplete);
-
     const matchesSearch = group.symbol
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
 
-    return matchesFilter && matchesSearch;
+    return matchesSearch;
   });
 
   const buySignals = signals.filter((signal) => signal.type === 'buy');
@@ -208,41 +215,16 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        {/* Search */}
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search signals..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-full text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
-          />
-        </div>
-
-        {/* Filter Buttons */}
-        <div className="flex bg-slate-800/50 backdrop-blur-sm rounded-full p-1 border border-slate-700/50">
-          {[
-            { id: 'all', label: 'All', count: signals.length },
-            { id: 'buy', label: 'Buy', count: buySignals.length },
-            { id: 'sell', label: 'Sell', count: sellSignals.length },
-            { id: 'close', label: 'Close', count: closeSignals.length }
-          ].map((filterOption) => (
-            <button
-              key={filterOption.id}
-              onClick={() => setFilter(filterOption.id as any)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
-                filter === filterOption.id
-                  ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-              }`}
-            >
-              {filterOption.label} ({filterOption.count})
-            </button>
-          ))}
-        </div>
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <input
+          type="text"
+          placeholder="Search signals..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-full text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+        />
       </div>
 
       {/* Signals Grid */}
@@ -253,8 +235,8 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
             No signals found
           </h3>
           <p className="text-slate-500">
-            {searchTerm || filter !== 'all'
-              ? 'Try adjusting your search or filters'
+            {searchTerm
+              ? 'Try adjusting your search'
               : 'Signals will appear here as they are generated'}
           </p>
         </div>
@@ -298,7 +280,7 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
               </div>
 
               {/* Signal Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative">
                 {group.buySignal && (
                   <div className="relative">
                     <SignalCard signal={group.buySignal} />
@@ -309,9 +291,39 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
                     )}
                   </div>
                 )}
+
+                {/* Percentage Gain Badge for Complete Pairs */}
+                {group.isComplete && group.buySignal && group.sellSignal && (
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20">
+                    {(() => {
+                      const buyPrice = group.buySignal.entry_price;
+                      const sellPrice = group.sellSignal.entry_price;
+                      const percentageGain =
+                        ((sellPrice - buyPrice) / buyPrice) * 100;
+                      const isProfit = percentageGain > 0;
+
+                      return (
+                        <div
+                          className={`px-3 py-1 rounded-full text-xs font-medium shadow-md border border-slate-700 ${
+                            isProfit
+                              ? 'bg-emerald-500/80 text-white'
+                              : 'bg-red-500/80 text-white'
+                          }`}
+                        >
+                          {isProfit ? '+' : ''}
+                          {percentageGain.toFixed(2)}%
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
                 {group.sellSignal && (
                   <div className="relative">
-                    <SignalCard signal={group.sellSignal} />
+                    <SignalCard
+                      signal={group.sellSignal}
+                      isPartOfCompleteGroup={group.isComplete}
+                    />
                     {group.isComplete && (
                       <div className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
                         <TrendingDown className="w-2 h-2 text-white" />
