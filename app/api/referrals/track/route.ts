@@ -31,22 +31,19 @@ const validateReferralCode = async (supabase: any, code: string) => {
 };
 
 const updateReferralCodeClicks = async (supabase: any, code: string) => {
-  // First get current clicks count
-  const { data: currentData } = await supabase
-    .from('referral_codes')
-    .select('clicks')
-    .eq('code', code)
-    .single();
+  try {
+    // Use the database function to update clicks
+    const { error } = await supabase.rpc('update_referral_code_clicks', {
+      code_param: code
+    });
 
-  const newClicks = (currentData?.clicks || 0) + 1;
-
-  const { error } = await supabase
-    .from('referral_codes')
-    .update({ clicks: newClicks })
-    .eq('code', code);
-
-  if (error) {
-    console.error('Error updating referral code clicks:', error);
+    if (error) {
+      console.error('❌ Error updating referral code clicks:', error);
+    } else {
+      console.log('✅ Click tracked successfully for code:', code);
+    }
+  } catch (error) {
+    console.error('❌ Error calling update_referral_code_clicks:', error);
   }
 };
 
@@ -95,7 +92,10 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const referralCode = searchParams.get('code');
 
+    console.log('🔍 Referral validation request:', { referralCode });
+
     if (!referralCode) {
+      console.log('❌ No referral code provided');
       return NextResponse.json(
         { error: 'Referral code is required' },
         { status: 400 }
@@ -106,21 +106,29 @@ export async function GET(request: NextRequest) {
 
     // Validate the referral code
     const validation = await validateReferralCode(supabase, referralCode);
+    
+    console.log('🔍 Validation result:', validation);
 
     if (!validation.valid) {
+      console.log('❌ Invalid referral code:', validation.error);
       return NextResponse.json(
         { error: validation.error },
         { status: 400 }
       );
     }
 
+    // Track the click for valid referral codes
+    console.log('📊 Tracking click for referral code:', referralCode);
+    await updateReferralCodeClicks(supabase, referralCode);
+
+    console.log('✅ Valid referral code found:', validation.referrerId);
     return NextResponse.json({
       valid: true,
       referrerId: validation.referrerId
     });
 
   } catch (error) {
-    console.error('Error validating referral:', error);
+    console.error('❌ Error validating referral:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

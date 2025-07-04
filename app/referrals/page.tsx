@@ -5,7 +5,8 @@ import {
   getSubscription,
   getUserReferralCode,
   getReferrals,
-  getReferralRewards
+  getReferralRewards,
+  getReferralStats
 } from '@/utils/supabase/queries';
 import ReferralDashboard from '@/components/ui/Referrals/ReferralDashboard';
 
@@ -28,10 +29,11 @@ export default async function ReferralsPage() {
   }
 
   // Fetch referral data
-  const [referralCode, referrals, rewards] = await Promise.all([
+  const [referralCode, referrals, rewards, stats] = await Promise.all([
     getUserReferralCode(supabase),
     getReferrals(supabase),
-    getReferralRewards(supabase)
+    getReferralRewards(supabase),
+    getReferralStats(supabase)
   ]);
 
   return (
@@ -40,6 +42,7 @@ export default async function ReferralsPage() {
       initialReferralCode={referralCode}
       initialReferrals={referrals || []}
       initialRewards={rewards || []}
+      initialStats={stats}
     />
   );
 }

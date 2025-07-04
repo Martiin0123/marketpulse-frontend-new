@@ -29,13 +29,16 @@ export default function SignUp({ allowEmail, redirectMethod }: SignUpProps) {
   // Get referral code from URL params
   useEffect(() => {
     const refParam = searchParams?.get('ref');
+    console.log('🔍 URL referral code:', refParam);
     if (refParam) {
       setReferralCode(refParam);
+      console.log('🔍 Validating referral code:', refParam);
       validateReferralCode(refParam);
     }
   }, [searchParams]);
 
   const validateReferralCode = async (code: string) => {
+    console.log('🔍 Starting validation for code:', code);
     if (!code) {
       setReferralValid(null);
       setReferralMessage('');
@@ -43,20 +46,27 @@ export default function SignUp({ allowEmail, redirectMethod }: SignUpProps) {
     }
 
     try {
+      console.log(
+        '🔍 Making API call to:',
+        `/api/referrals/track?code=${encodeURIComponent(code)}`
+      );
       const response = await fetch(
         `/api/referrals/track?code=${encodeURIComponent(code)}`
       );
       const data = await response.json();
+      console.log('🔍 API response:', data);
 
       if (response.ok && data.valid) {
         setReferralValid(true);
         setReferralMessage('Valid referral code!');
+        console.log('✅ Referral code is valid');
       } else {
         setReferralValid(false);
         setReferralMessage(data.error || 'Invalid referral code');
+        console.log('❌ Referral code is invalid:', data.error);
       }
     } catch (error) {
-      console.error('Error validating referral code:', error);
+      console.error('❌ Error validating referral code:', error);
       setReferralValid(false);
       setReferralMessage('Error validating referral code');
     }

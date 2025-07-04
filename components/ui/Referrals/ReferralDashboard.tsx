@@ -7,7 +7,8 @@ import {
   getUserReferralCode,
   getReferrals,
   getReferralRewards,
-  ensureUserReferralCode
+  getReferralStats,
+  ensureUserReferralCodeClient
 } from '@/utils/supabase/queries';
 import {
   Share2,
@@ -82,19 +83,28 @@ interface Props {
   initialReferralCode: ReferralCode | null;
   initialReferrals: Referral[];
   initialRewards: ReferralReward[];
+  initialStats: {
+    totalEarnings: number;
+    pendingAmount: number;
+    totalClicks: number;
+    pendingReferrals: number;
+    activeReferrals: number;
+  };
 }
 
 export default function ReferralDashboard({
   user,
   initialReferralCode,
   initialReferrals,
-  initialRewards
+  initialRewards,
+  initialStats
 }: Props) {
   const [referralCode, setReferralCode] = useState<ReferralCode | null>(
     initialReferralCode
   );
   const [referrals, setReferrals] = useState<Referral[]>(initialReferrals);
   const [rewards, setRewards] = useState<ReferralReward[]>(initialRewards);
+  const [stats, setStats] = useState(initialStats);
   const [loading, setLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const supabase = createClient();
@@ -104,19 +114,10 @@ export default function ReferralDashboard({
     ? `${baseUrl}/signin/signup?ref=${referralCode.code}`
     : '';
 
-  const totalEarnings = rewards.reduce(
-    (sum, reward) => sum + Number(reward.amount),
-    0
-  );
-  const activeReferrals = referrals.filter((r) => r.status === 'active').length;
-  const pendingReferrals = referrals.filter(
-    (r) => r.status === 'pending'
-  ).length;
-
   const createReferralCode = async () => {
     setLoading(true);
     try {
-      const newCode = await ensureUserReferralCode(supabase);
+      const newCode = await ensureUserReferralCodeClient(supabase);
       if (newCode) {
         setReferralCode(newCode);
         setToastMessage('Referral code created successfully!');
@@ -199,7 +200,7 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
         </div>
 
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
             <div className="flex items-center">
               <div className="p-2 bg-green-500/20 rounded-lg">
@@ -210,7 +211,23 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
                   Total Earnings
                 </p>
                 <p className="text-2xl font-bold text-white">
-                  ${totalEarnings.toFixed(2)}
+                  €{stats.totalEarnings.toFixed(2)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-purple-500/20 rounded-lg">
+                <Clock className="w-6 h-6 text-purple-400" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-400">
+                  Pending Amount
+                </p>
+                <p className="text-2xl font-bold text-white">
+                  €{stats.pendingAmount.toFixed(2)}
                 </p>
               </div>
             </div>
@@ -226,7 +243,7 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
                   Active Referrals
                 </p>
                 <p className="text-2xl font-bold text-white">
-                  {activeReferrals}
+                  {stats.activeReferrals}
                 </p>
               </div>
             </div>
@@ -240,7 +257,7 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-400">Pending</p>
                 <p className="text-2xl font-bold text-white">
-                  {pendingReferrals}
+                  {stats.pendingReferrals}
                 </p>
               </div>
             </div>
@@ -248,13 +265,13 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
 
           <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-purple-500/20 rounded-lg">
-                <Target className="w-6 h-6 text-purple-400" />
+              <div className="p-2 bg-orange-500/20 rounded-lg">
+                <Target className="w-6 h-6 text-orange-400" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-400">Clicks</p>
                 <p className="text-2xl font-bold text-white">
-                  {referralCode?.clicks || 0}
+                  {stats.totalClicks}
                 </p>
               </div>
             </div>

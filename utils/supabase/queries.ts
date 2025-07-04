@@ -281,7 +281,7 @@ export const getReferrals = cache(async (supabase: SupabaseClient) => {
     return [];
   }
 
-  // First get the referrals
+  // First get the referrals with all available fields
   const { data: referrals, error } = await supabase
     .from('referrals')
     .select('*')
@@ -296,27 +296,76 @@ export const getReferrals = cache(async (supabase: SupabaseClient) => {
     return [];
   }
 
-  // Get referee user details separately
-  const refereeIds = referrals.map(r => r.referee_id);
-  const { data: users, error: usersError } = await supabase
-    .from('users')
-    .select('id, full_name, email')
-    .in('id', refereeIds);
-
-  if (usersError) {
-    console.error('Error fetching referee users:', usersError);
-    // Return referrals without user details
-    return referrals.map(referral => ({
-      ...referral,
-      referee: null
-    }));
-  }
-
-  // Combine the data
+  // Since we don't have a public.users table, just return the referrals
+  // You can get user details from auth.users if needed later
   return referrals.map(referral => ({
     ...referral,
-    referee: users?.find(u => u.id === referral.referee_id) || null
+    referee: {
+      id: referral.referee_id,
+      // You can get user details from auth.users if needed
+    }
   }));
+});
+
+// New function to get referral statistics
+export const getReferralStats = cache(async (supabase: SupabaseClient) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    return {
+      totalEarnings: 0,
+      pendingAmount: 0,
+      totalClicks: 0,
+      pendingReferrals: 0,
+      activeReferrals: 0
+    };
+  }
+
+  try {
+    // Use the fixed database function
+    const { data: stats, error } = await supabase.rpc('get_referral_stats', {
+      user_id_param: user.id
+    });
+
+    if (!error && stats && stats.length > 0) {
+      return {
+        totalEarnings: Number(stats[0].total_earnings) || 0,
+        pendingAmount: Number(stats[0].pending_amount) || 0,
+        totalClicks: Number(stats[0].total_clicks) || 0,
+        pendingReferrals: Number(stats[0].pending_referrals) || 0,
+        activeReferrals: Number(stats[0].active_referrals) || 0
+      };
+    }
+  } catch (error) {
+    console.error('Error calling get_referral_stats:', error);
+  }
+
+  // Fallback: calculate manually
+  const [referralCode, referrals, rewards] = await Promise.all([
+    getUserReferralCode(supabase),
+    getReferrals(supabase),
+    getReferralRewards(supabase)
+  ]);
+
+  const totalEarnings = rewards
+    .filter(r => r.status === 'paid')
+    .reduce((sum, r) => sum + Number(r.amount), 0);
+
+  const pendingAmount = rewards
+    .filter(r => r.status === 'eligible')
+    .reduce((sum, r) => sum + Number(r.amount), 0);
+
+  const pendingReferrals = referrals.filter(r => r.status === 'pending').length;
+  const activeReferrals = referrals.filter(r => r.status === 'active').length;
+  const totalClicks = referralCode?.clicks || 0;
+
+  return {
+    totalEarnings,
+    pendingAmount,
+    totalClicks,
+    pendingReferrals,
+    activeReferrals
+  };
 });
 
 export const getReferralRewards = cache(async (supabase: SupabaseClient) => {
@@ -357,47 +406,49 @@ export const getReferralRewards = cache(async (supabase: SupabaseClient) => {
     }));
   }
 
-  // Get referee user details if we have referrals
-  let users: any[] = [];
-  if (referrals && referrals.length > 0) {
-    const refereeIds = referrals.map(r => r.referee_id);
-    const { data: usersData } = await supabase
-      .from('users')
-      .select('id, full_name')
-      .in('id', refereeIds);
-    users = usersData || [];
-  }
-
   // Combine the data
   return rewards.map(reward => {
     const referral = referrals?.find(r => r.id === reward.referral_id);
-    const referee = referral ? users.find(u => u.id === referral.referee_id) : null;
     
     return {
       ...reward,
       referral: referral ? {
         referral_code: referral.referral_code,
-        referee: referee ? {
-          full_name: referee.full_name
-        } : null
+        referee: {
+          id: referral.referee_id,
+          // You can get user details from auth.users if needed
+        }
       } : null
     };
   });
 });
 
 export const validateReferralCode = async (supabase: SupabaseClient, code: string) => {
-  const { data: referralCode, error } = await supabase
-    .from('referral_codes')
-    .select('user_id, is_active')
-    .eq('code', code)
-    .eq('is_active', true)
-    .single();
+  try {
+    // Use the new database function
+    const { data: result, error } = await supabase.rpc('validate_referral_code', {
+      code_param: code
+    });
 
-  if (error) {
+    if (error) {
+      console.error('Error validating referral code:', error);
+      return { valid: false, error: 'Invalid referral code' };
+    }
+
+    if (result && result.length > 0) {
+      const validation = result[0];
+      return { 
+        valid: validation.valid, 
+        referrerId: validation.referrer_id,
+        error: validation.error_message
+      };
+    }
+
+    return { valid: false, error: 'Invalid referral code' };
+  } catch (error) {
+    console.error('Error calling validate_referral_code:', error);
     return { valid: false, error: 'Invalid referral code' };
   }
-
-  return { valid: true, referrerId: referralCode.user_id };
 };
 
 export const createReferral = async (
@@ -406,48 +457,42 @@ export const createReferral = async (
   refereeId: string, 
   referralCode: string
 ) => {
-  const { data, error } = await supabase
-    .from('referrals')
-    .insert({
-      referrer_id: referrerId,
-      referee_id: refereeId,
-      referral_code: referralCode,
-      status: 'pending'
-    })
-    .single();
+  try {
+    // Use the new database function
+    const { data, error } = await supabase.rpc('create_referral', {
+      referrer_id_param: referrerId,
+      referee_id_param: refereeId,
+      referral_code_param: referralCode
+    });
 
-  // Update click count
-  await updateReferralCodeClicks(supabase, referralCode);
+    if (error) {
+      console.error('Error creating referral:', error);
+      return null;
+    }
 
-  if (error) {
-    console.error('Error creating referral:', error);
+    return { id: data };
+  } catch (error) {
+    console.error('Error calling create_referral:', error);
     return null;
   }
-
-  return data;
 };
 
 export const updateReferralCodeClicks = async (supabase: SupabaseClient, code: string) => {
-  // First get current clicks count
-  const { data: currentData } = await supabase
-    .from('referral_codes')
-    .select('clicks')
-    .eq('code', code)
-    .single();
+  try {
+    // Use the new database function
+    const { error } = await supabase.rpc('update_referral_code_clicks', {
+      code_param: code
+    });
 
-  const newClicks = (currentData?.clicks || 0) + 1;
-
-  const { error } = await supabase
-    .from('referral_codes')
-    .update({ clicks: newClicks })
-    .eq('code', code);
-
-  if (error) {
-    console.error('Error updating referral code clicks:', error);
+    if (error) {
+      console.error('Error updating referral code clicks:', error);
+    }
+  } catch (error) {
+    console.error('Error calling update_referral_code_clicks:', error);
   }
 };
 
-// Function to ensure user has a referral code
+// Function to ensure user has a referral code (server-side)
 export const ensureUserReferralCode = async (supabase: SupabaseClient) => {
   const { data: { user } } = await supabase.auth.getUser();
   
@@ -461,17 +506,11 @@ export const ensureUserReferralCode = async (supabase: SupabaseClient) => {
     return existingCode;
   }
 
-  // Get user profile to get full name
-  const { data: userProfile } = await supabase
-    .from('users')
-    .select('full_name')
-    .eq('id', user.id)
-    .single();
-
   // Call the database function to create referral code
+  // Since we don't have a public.users table, we'll pass null for user_name
   const { data, error } = await supabase.rpc('create_user_referral_code', {
-    user_id: user.id,
-    user_name: userProfile?.full_name || null
+    user_id_param: user.id,
+    user_name: null
   });
 
   if (error) {
@@ -481,4 +520,55 @@ export const ensureUserReferralCode = async (supabase: SupabaseClient) => {
 
   // Fetch the newly created referral code
   return await getUserReferralCode(supabase);
+};
+
+// Client-side version without cache
+export const ensureUserReferralCodeClient = async (supabase: SupabaseClient) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    return null;
+  }
+
+  // Check if user already has a referral code
+  const { data: referralCode, error } = await supabase
+    .from('referral_codes')
+    .select('*')
+    .eq('user_id', user.id)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error fetching existing referral code:', error);
+    return null;
+  }
+
+  if (referralCode) {
+    return referralCode;
+  }
+
+  // Call the database function to create referral code
+  // Since we don't have a public.users table, we'll pass null for user_name
+  const { data, error: createError } = await supabase.rpc('create_user_referral_code', {
+    user_id_param: user.id,
+    user_name: null
+  });
+
+  if (createError) {
+    console.error('Error creating referral code:', createError);
+    return null;
+  }
+
+  // Fetch the newly created referral code
+  const { data: newReferralCode, error: fetchError } = await supabase
+    .from('referral_codes')
+    .select('*')
+    .eq('user_id', user.id)
+    .single();
+
+  if (fetchError) {
+    console.error('Error fetching new referral code:', fetchError);
+    return null;
+  }
+
+  return newReferralCode;
 };
