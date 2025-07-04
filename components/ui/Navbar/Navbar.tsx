@@ -24,34 +24,38 @@ export default async function Navbar() {
           </Link>
 
           {/* Navigation Links */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center space-x-1">
             <Link
               href="/"
-              className="text-slate-300 hover:text-white transition-colors"
+              className="relative px-4 py-2 text-slate-300 hover:text-white transition-all duration-200 rounded-lg hover:bg-slate-800/50 group"
             >
-              Home
+              <span className="relative z-10">Home</span>
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
             </Link>
             {!subscription && (
               <>
                 <Link
                   href="/pricing"
-                  className="text-slate-300 hover:text-white transition-colors"
+                  className="relative px-4 py-2 text-slate-300 hover:text-white transition-all duration-200 rounded-lg hover:bg-slate-800/50 group"
                 >
-                  Pricing
+                  <span className="relative z-10">Pricing</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
                 </Link>
               </>
             )}
             <Link
               href="/performance-reports"
-              className="text-slate-300 hover:text-white transition-colors"
+              className="relative px-4 py-2 text-slate-300 hover:text-white transition-all duration-200 rounded-lg hover:bg-slate-800/50 group"
             >
-              Reports
+              <span className="relative z-10">Reports</span>
+              <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 to-red-500/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
             </Link>
             <Link
               href="/performance-guarantee"
-              className="text-slate-300 hover:text-white transition-colors"
+              className="relative px-4 py-2 text-slate-300 hover:text-white transition-all duration-200 rounded-lg hover:bg-slate-800/50 group"
             >
-              Performance Guarantee
+              <span className="relative z-10">Performance Guarantee</span>
+              <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/20 to-blue-500/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
             </Link>
           </div>
 
