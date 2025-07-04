@@ -93,7 +93,7 @@ export async function POST(request) {
       .single()
 
     if (existingPosition) {
-      // If existing position is a sell, close it first
+      // If existing position is a sell, close it and don't create new position
       if (existingPosition.type === 'sell') {
         const entryPrice = Number(existingPosition.entry_price)
         const exitPrice = Number(price)
@@ -116,6 +116,13 @@ export async function POST(request) {
             details: updateError.message 
           }), { status: 500 })
         }
+
+        return new Response(JSON.stringify({ 
+          message: 'Sell position closed successfully',
+          position_id: existingPosition.id,
+          symbol: symbolUpper,
+          exit_price: price
+        }), { status: 200 })
       } else {
         // If existing position is already a buy, return without creating new
         return new Response(JSON.stringify({ 
@@ -125,6 +132,7 @@ export async function POST(request) {
       }
     }
 
+    // No existing position, create new buy position
     // Create new signal first
     const { data: signal, error: signalError } = await supabase
       .from('signals')
@@ -186,7 +194,7 @@ export async function POST(request) {
       .single()
 
     if (existingPosition) {
-      // If existing position is a buy, close it first
+      // If existing position is a buy, close it and don't create new position
       if (existingPosition.type === 'buy') {
         const entryPrice = Number(existingPosition.entry_price)
         const exitPrice = Number(price)
@@ -209,6 +217,13 @@ export async function POST(request) {
             details: updateError.message 
           }), { status: 500 })
         }
+
+        return new Response(JSON.stringify({ 
+          message: 'Buy position closed successfully',
+          position_id: existingPosition.id,
+          symbol: symbolUpper,
+          exit_price: price
+        }), { status: 200 })
       } else {
         // If existing position is already a sell, return without creating new
         return new Response(JSON.stringify({ 
@@ -218,6 +233,7 @@ export async function POST(request) {
       }
     }
 
+    // No existing position, create new sell position
     // Create new signal first
     const { data: signal, error: signalError } = await supabase
       .from('signals')
