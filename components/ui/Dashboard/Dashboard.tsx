@@ -4,17 +4,11 @@ import { User } from '@supabase/supabase-js';
 import { Tables } from '@/types_db';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import SignalCard from './SignalCard';
-import StatsOverview from './StatsOverview';
 import {
   Activity,
   TrendingUp,
   TrendingDown,
   DollarSign,
-  Clock,
-  Calendar,
-  ArrowRight,
-  X,
   Settings
 } from 'lucide-react';
 import { Database } from '@/types_db';
@@ -36,12 +30,11 @@ export default function Dashboard({
   positions: initialPositions
 }: Props) {
   const [positions, setPositions] = useState<Position[]>(initialPositions);
-  const [loading, setLoading] = useState(false);
-  const [accountSize, setAccountSize] = useState<number>(10000); // Default $10,000
+  const [accountSize, setAccountSize] = useState<number>(10000);
   const supabase = createClient();
 
+  // Real-time updates for positions
   useEffect(() => {
-    // Set up real-time subscription for new positions
     const channel = supabase
       .channel('positions-changes')
       .on(
@@ -69,11 +62,13 @@ export default function Dashboard({
       supabase.removeChannel(channel);
     };
   }, [supabase]);
-  const openPositions = positions.filter(
-    (position) => position.status === 'open'
-  );
+
+  // Calculate basic stats
   const closedPositions = positions.filter(
     (position) => position.status === 'closed'
+  );
+  const openPositions = positions.filter(
+    (position) => position.status === 'open'
   );
   const totalPositions = positions.length;
   const recentPositions = positions.slice(0, 10);
@@ -87,14 +82,14 @@ export default function Dashboard({
       ? (winningTrades / closedPositions.length) * 100
       : 0;
 
-  // Calculate total PnL based on account size
+  // Calculate total PnL
   const totalPnLPercentage = closedPositions.reduce(
     (sum, position) => sum + (position.pnl || 0),
     0
   );
   const totalPnLDollar = (totalPnLPercentage / 100) * accountSize;
 
-  // Calculate PnL for individual position based on account size
+  // Calculate individual position PnL
   const calculatePositionPnL = (position: Position) => {
     if (!position.pnl) return 0;
     return (position.pnl / 100) * accountSize;
@@ -229,49 +224,9 @@ export default function Dashboard({
           </div>
         </div>
 
-        {/* Account Settings */}
-        <div className="mt-12 bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center space-x-3 mb-4 sm:mb-0">
-              <div className="p-2 bg-yellow-500/20 rounded-lg">
-                <Settings className="w-6 h-6 text-yellow-400" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-white">
-                  Account Settings
-                </h3>
-                <p className="text-gray-400 text-sm">
-                  Configure your trading account parameters
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <label className="text-gray-400 text-sm font-medium">
-                Account Size:
-              </label>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="number"
-                  value={accountSize}
-                  onChange={(e) => setAccountSize(Number(e.target.value))}
-                  className="bg-gray-700 border border-gray-600 rounded-lg pl-10 pr-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent w-32"
-                  min="1000"
-                  max="1000000"
-                  step="1000"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Balance Chart */}
         <div className="mt-8">
-          <BalanceChart
-            positions={positions}
-            winRate={winRate.toFixed(1)}
-            accountSize={accountSize}
-          />
+          <BalanceChart positions={positions} accountSize={accountSize} />
         </div>
 
         {/* Recent Positions */}

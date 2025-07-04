@@ -144,30 +144,34 @@ export default function Pricing({ user, products, subscription }: Props) {
     const baseFeatures = [
       {
         icon: <TrendingUp className="w-5 h-5" />,
-        text: 'Real-time trading signals'
+        text: 'Live trading signals'
       },
       {
-        icon: <BarChart3 className="w-5 h-5" />,
-        text: 'Technical analysis (RSI, MACD)'
-      },
-      { icon: <Eye className="w-5 h-5" />, text: 'Market trend insights' }
+        icon: <Star className="w-5 h-5" />,
+        text: 'Proven by real traders worldwide'
+      }
     ];
 
     const proFeatures = [
-      ...baseFeatures,
-      { icon: <Bell className="w-5 h-5" />, text: 'Instant notifications' },
       {
-        icon: <Target className="w-5 h-5" />,
-        text: 'Advanced risk management'
+        icon: <TrendingUp className="w-5 h-5" />,
+        text: 'Live trading signals'
       },
-      { icon: <Clock className="w-5 h-5" />, text: '24/7 market monitoring' }
+      {
+        icon: <Bell className="w-5 h-5" />,
+        text: 'Instant notifications'
+      }
     ];
 
     const premiumFeatures = [
-      ...proFeatures,
-      { icon: <Shield className="w-5 h-5" />, text: 'Priority support' },
-      { icon: <Zap className="w-5 h-5" />, text: 'Custom signal alerts' },
-      { icon: <Star className="w-5 h-5" />, text: 'Exclusive market insights' }
+      {
+        icon: <TrendingUp className="w-5 h-5" />,
+        text: 'Live trading signals'
+      },
+      {
+        icon: <Shield className="w-5 h-5" />,
+        text: 'Priority support'
+      }
     ];
 
     if (
@@ -212,7 +216,12 @@ export default function Pricing({ user, products, subscription }: Props) {
   }
 
   return (
-    <section className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+    <section className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden">
+      {/* Background Effects */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(168,85,247,0.1),_rgba(0,0,0,0))]"></div>
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl"></div>
+
       {/* Subscription Required Message */}
       {showMessage && (
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-pulse">
@@ -225,46 +234,37 @@ export default function Pricing({ user, products, subscription }: Props) {
         </div>
       )}
 
-      <div className="relative overflow-hidden">
-        <div className="relative max-w-7xl px-4 py-16 mx-auto sm:py-24 sm:px-6 lg:px-8">
+      <div className="relative">
+        <div className="max-w-7xl px-4 py-16 mx-auto sm:py-24 sm:px-6 lg:px-8">
           {/* Header Section */}
-          <div className="text-center mb-16">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-4 sm:text-6xl">
-              Market<span className="text-purple-400">Pulse</span> Plans
+          <div className="text-center mb-20">
+            <div className="inline-flex items-center px-4 py-2 bg-purple-500/10 backdrop-blur-sm rounded-full border border-purple-500/30 mb-6">
+              <Star className="w-4 h-4 text-purple-400 mr-2" />
+              <span className="text-purple-200 text-sm font-medium">
+                Choose Your Plan
+              </span>
+            </div>
+
+            <h1 className="text-5xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent mb-6 sm:text-7xl">
+              Market<span className="text-white">Pulse</span> Plans
             </h1>
-            <p className="max-w-3xl mx-auto text-lg text-gray-300 sm:text-xl mb-8">
-              Get real-time trading signals, technical analysis, and market
-              insights to make informed trading decisions
+
+            <p className="max-w-3xl mx-auto text-xl text-gray-300 sm:text-2xl mb-12 leading-relaxed">
+              Get real-time trading signals, advanced technical analysis, and
+              market insights to make informed trading decisions
             </p>
 
-            {/* Current Subscription Status */}
-            {subscription && (
-              <div className="inline-flex items-center px-6 py-3 bg-green-500/20 backdrop-blur-sm rounded-full border border-green-500/50 mb-8">
-                <Check className="w-5 h-5 text-green-400 mr-3" />
-                <span className="text-green-400 font-medium">
-                  Currently subscribed to {subscription?.prices?.products?.name}
-                </span>
-                <Button
-                  variant="slim"
-                  onClick={handleViewDashboard}
-                  className="ml-4 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-all"
-                >
-                  View Dashboard
-                </Button>
-              </div>
-            )}
-
             {/* Billing Interval Toggle */}
-            <div className="relative inline-flex bg-gray-800/50 backdrop-blur-sm rounded-xl p-1 border border-gray-700">
+            <div className="relative inline-flex bg-gray-800/50 backdrop-blur-sm rounded-2xl p-2 border border-gray-700/50 shadow-xl mb-12">
               {intervals.includes('month') && (
                 <button
                   onClick={() => setBillingInterval('month')}
                   type="button"
                   className={`${
                     billingInterval === 'month'
-                      ? 'bg-purple-600 text-white shadow-lg'
+                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
                       : 'text-gray-400 hover:text-white'
-                  } relative px-6 py-3 text-sm font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                  } relative px-8 py-3 text-sm font-medium rounded-xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-500`}
                 >
                   Monthly
                 </button>
@@ -275,12 +275,12 @@ export default function Pricing({ user, products, subscription }: Props) {
                   type="button"
                   className={`${
                     billingInterval === 'year'
-                      ? 'bg-purple-600 text-white shadow-lg'
+                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
                       : 'text-gray-400 hover:text-white'
-                  } relative px-6 py-3 text-sm font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                  } relative px-8 py-3 text-sm font-medium rounded-xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-500`}
                 >
                   Yearly
-                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-green-500/20 text-green-400">
+                  <span className="ml-2 inline-flex items-center px-3 py-1 rounded-full text-xs bg-green-500/20 text-green-300 font-medium">
                     Save 20%
                   </span>
                 </button>
@@ -289,7 +289,7 @@ export default function Pricing({ user, products, subscription }: Props) {
           </div>
 
           {/* Pricing Cards */}
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-6 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-8 max-w-7xl mx-auto mb-20">
             {products.map((product, index) => {
               const price = product?.prices?.find(
                 (price) => price.interval === billingInterval
@@ -312,22 +312,22 @@ export default function Pricing({ user, products, subscription }: Props) {
                 <div
                   key={product.id}
                   className={cn(
-                    'relative bg-gray-800/50 backdrop-blur-sm rounded-2xl border p-8 transition-all duration-300 hover:scale-105',
+                    'relative bg-gray-800/30 backdrop-blur-sm rounded-3xl border p-10 transition-all duration-500 hover:scale-105 hover:shadow-2xl',
                     {
-                      'border-purple-500 shadow-2xl shadow-purple-500/25':
+                      'border-purple-500/50 shadow-2xl shadow-purple-500/25 bg-gray-800/40':
                         isPopular,
-                      'border-green-500 shadow-2xl shadow-green-500/25':
+                      'border-green-500/50 shadow-2xl shadow-green-500/25 bg-gray-800/40':
                         isCurrentPlan,
-                      'border-gray-700 hover:border-gray-600':
+                      'border-gray-700/50 hover:border-gray-600/50 bg-gray-800/20':
                         !isPopular && !isCurrentPlan
                     }
                   )}
                 >
                   {/* Popular Badge */}
                   {isPopular && (
-                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                      <div className="bg-gradient-to-r from-purple-500 to-pink-500 px-4 py-1 rounded-full text-white text-sm font-medium flex items-center">
-                        <Star className="w-4 h-4 mr-1" />
+                    <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
+                      <div className="bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
+                        <Star className="w-4 h-4 mr-2" />
                         Most Popular
                       </div>
                     </div>
@@ -335,27 +335,29 @@ export default function Pricing({ user, products, subscription }: Props) {
 
                   {/* Current Plan Badge */}
                   {isCurrentPlan && (
-                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                      <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-1 rounded-full text-white text-sm font-medium flex items-center">
-                        <Check className="w-4 h-4 mr-1" />
+                    <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
+                      <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-6 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
+                        <Check className="w-4 h-4 mr-2" />
                         Current Plan
                       </div>
                     </div>
                   )}
 
                   {/* Plan Header */}
-                  <div className="text-center mb-8">
-                    <h3 className="text-2xl font-bold text-white mb-2">
+                  <div className="text-center mb-10">
+                    <h3 className="text-3xl font-bold text-white mb-4">
                       {product.name}
                     </h3>
-                    <p className="text-gray-400 mb-6">{product.description}</p>
+                    <p className="text-gray-400 text-lg mb-8 leading-relaxed">
+                      {product.description}
+                    </p>
 
                     {/* Price */}
-                    <div className="mb-6">
-                      <span className="text-5xl font-bold text-white">
+                    <div className="mb-8">
+                      <span className="text-6xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                         {priceString}
                       </span>
-                      <span className="text-gray-400 text-lg">
+                      <span className="text-gray-400 text-xl ml-2">
                         /{billingInterval}
                       </span>
                     </div>
@@ -365,7 +367,7 @@ export default function Pricing({ user, products, subscription }: Props) {
                       <Button
                         variant="slim"
                         onClick={handleViewDashboard}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white py-3 text-lg font-semibold rounded-xl transition-all"
+                        className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-4 text-lg font-bold rounded-2xl transition-all shadow-lg"
                       >
                         View Dashboard
                       </Button>
@@ -376,7 +378,7 @@ export default function Pricing({ user, products, subscription }: Props) {
                         loading={priceIdLoading === price.id}
                         onClick={() => handleStripeCheckout(price)}
                         className={cn(
-                          'w-full py-3 text-lg font-semibold rounded-xl transition-all',
+                          'w-full py-4 text-lg font-bold rounded-2xl transition-all shadow-lg',
                           isPopular
                             ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white'
                             : 'bg-gray-700 hover:bg-gray-600 text-white'
@@ -388,19 +390,21 @@ export default function Pricing({ user, products, subscription }: Props) {
                   </div>
 
                   {/* Features List */}
-                  <div className="space-y-4">
-                    <h4 className="text-lg font-semibold text-white mb-4">
+                  <div className="space-y-6">
+                    <h4 className="text-xl font-bold text-white mb-6 text-center">
                       What's included:
                     </h4>
                     {features.map((feature, featureIndex) => (
                       <div
                         key={featureIndex}
-                        className="flex items-center space-x-3"
+                        className="flex items-center space-x-4 p-3 rounded-xl bg-gray-700/30 hover:bg-gray-700/50 transition-all"
                       >
-                        <div className="flex-shrink-0 text-purple-400">
-                          {feature.icon}
+                        <div className="flex-shrink-0 w-10 h-10 bg-purple-500/20 rounded-full flex items-center justify-center">
+                          <div className="text-purple-400">{feature.icon}</div>
                         </div>
-                        <span className="text-gray-300">{feature.text}</span>
+                        <span className="text-gray-200 font-medium">
+                          {feature.text}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -410,51 +414,59 @@ export default function Pricing({ user, products, subscription }: Props) {
           </div>
 
           {/* Features Highlight Section */}
-          <div className="mt-20 text-center">
-            <h2 className="text-3xl font-bold text-white mb-4">
-              Why Choose MarketPulse?
+          <div className="text-center">
+            <div className="inline-flex items-center px-4 py-2 bg-blue-500/10 backdrop-blur-sm rounded-full border border-blue-500/30 mb-8">
+              <Shield className="w-4 h-4 text-blue-400 mr-2" />
+              <span className="text-blue-200 text-sm font-medium">
+                Why Choose MarketPulse?
+              </span>
+            </div>
+
+            <h2 className="text-4xl font-bold text-white mb-6">
+              Advanced Trading Technology
             </h2>
-            <p className="text-xl text-gray-300 mb-12 max-w-3xl mx-auto">
+            <p className="text-xl text-gray-300 mb-16 max-w-3xl mx-auto leading-relaxed">
               Advanced trading signals and market analysis to help you make
-              profitable decisions
+              profitable decisions with confidence
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <TrendingUp className="w-8 h-8 text-purple-400" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-5xl mx-auto">
+              <div className="text-center group">
+                <div className="w-20 h-20 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                  <TrendingUp className="w-10 h-10 text-purple-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-2">
+                <h3 className="text-2xl font-bold text-white mb-4">
                   Real-Time Signals
                 </h3>
-                <p className="text-gray-400">
+                <p className="text-gray-400 text-lg leading-relaxed">
                   Get instant buy/sell signals based on advanced technical
-                  analysis
+                  analysis and market trends
                 </p>
               </div>
 
-              <div className="text-center">
-                <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <BarChart3 className="w-8 h-8 text-green-400" />
+              <div className="text-center group">
+                <div className="w-20 h-20 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                  <BarChart3 className="w-10 h-10 text-green-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-2">
+                <h3 className="text-2xl font-bold text-white mb-4">
                   Technical Analysis
                 </h3>
-                <p className="text-gray-400">
+                <p className="text-gray-400 text-lg leading-relaxed">
                   RSI, MACD, and other indicators to validate trading
-                  opportunities
+                  opportunities and market conditions
                 </p>
               </div>
 
-              <div className="text-center">
-                <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Shield className="w-8 h-8 text-blue-400" />
+              <div className="text-center group">
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                  <Shield className="w-10 h-10 text-blue-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-2">
+                <h3 className="text-2xl font-bold text-white mb-4">
                   Risk Management
                 </h3>
-                <p className="text-gray-400">
-                  Built-in risk assessment to help protect your investments
+                <p className="text-gray-400 text-lg leading-relaxed">
+                  Built-in risk assessment and position sizing to help protect
+                  your investments
                 </p>
               </div>
             </div>

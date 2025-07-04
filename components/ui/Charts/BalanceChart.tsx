@@ -21,6 +21,7 @@ type Position = Database['public']['Tables']['positions']['Row'];
 interface BalanceChartProps {
   positions: Position[];
   accountSize?: number;
+  showContainer?: boolean;
 }
 
 interface BalanceDataPoint {
@@ -52,11 +53,9 @@ const calculateMaxDrawdown = (balances: number[]): number => {
 
 export default function BalanceChart({
   positions,
-  accountSize = 10000
+  accountSize = 10000,
+  showContainer = true
 }: BalanceChartProps) {
-  const [timeframe, setTimeframe] = useState<'1M' | '3M' | '6M' | '1Y' | 'ALL'>(
-    '3M'
-  );
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -65,8 +64,19 @@ export default function BalanceChart({
 
   const { balanceData, stats, chartOptions, series } = useMemo(() => {
     if (!positions || positions.length === 0) {
+      // Add default datapoint at 100%
+      const defaultData = [
+        {
+          date: new Date().toLocaleDateString(),
+          balance: 100,
+          timestamp: Date.now(),
+          type: 'entry' as const,
+          position: {} as Position
+        }
+      ];
+
       return {
-        balanceData: [],
+        balanceData: defaultData,
         stats: {
           currentBalance: accountSize,
           totalReturn: 0,
@@ -77,21 +87,82 @@ export default function BalanceChart({
           openPositions: 0,
           totalPositions: 0
         },
-        chartOptions: {},
-        series: []
+        chartOptions: {
+          chart: {
+            type: 'area' as const,
+            height: '100%',
+            toolbar: { show: false },
+            zoom: { enabled: false },
+            background: 'transparent'
+          },
+          dataLabels: { enabled: false },
+          stroke: { curve: 'smooth' as const, width: 2 },
+          fill: {
+            type: 'gradient',
+            gradient: {
+              shadeIntensity: 1,
+              opacityFrom: 0.45,
+              opacityTo: 0.05,
+              stops: [50, 100, 100]
+            }
+          },
+          xaxis: {
+            type: 'datetime' as const,
+            categories: defaultData.map((d) => d.timestamp),
+            labels: { show: false },
+            axisBorder: { show: false },
+            axisTicks: { show: false }
+          },
+          yaxis: {
+            min: 80,
+            max: 120,
+            tickAmount: 4,
+            labels: {
+              style: { colors: '#9ca3af' },
+              formatter: function (value: number) {
+                return value.toFixed(0) + '%';
+              }
+            }
+          },
+          tooltip: {
+            x: { format: 'dd MMM yyyy' },
+            y: {
+              formatter: function (value: number) {
+                return value.toFixed(1) + '%';
+              }
+            }
+          },
+          grid: {
+            borderColor: '#374151',
+            xaxis: { lines: { show: false } },
+            yaxis: { lines: { show: true } }
+          },
+          theme: { mode: 'dark' as const }
+        },
+        series: [
+          {
+            name: 'Balance',
+            data: defaultData.map((d) => ({ x: d.timestamp, y: d.balance }))
+          }
+        ]
       };
     }
 
     // Helper function to get entry timestamp
     const getEntryTimestamp = (position: Position) => {
-      // Handle both entry_timestamp (Unix) and entry_time (ISO string)
-      if (position.entry_timestamp) {
-        return position.entry_timestamp;
+      // Handle ISO string timestamps
+      if (
+        position.entry_timestamp &&
+        typeof position.entry_timestamp === 'string'
+      ) {
+        return Math.floor(new Date(position.entry_timestamp).getTime() / 1000);
       }
-      if ((position as any).entry_time) {
-        return Math.floor(
-          new Date((position as any).entry_time).getTime() / 1000
-        );
+      // Handle Unix timestamps
+      if (
+        position.entry_timestamp &&
+        typeof position.entry_timestamp === 'number'
+      ) {
+        return position.entry_timestamp;
       }
       // Fallback to created_at
       return position.created_at
@@ -101,48 +172,27 @@ export default function BalanceChart({
 
     // Helper function to get exit timestamp
     const getExitTimestamp = (position: Position) => {
-      // Handle both exit_timestamp (Unix) and exit_time (ISO string)
-      if (position.exit_timestamp) {
-        return position.exit_timestamp;
+      // Handle ISO string timestamps
+      if (
+        position.exit_timestamp &&
+        typeof position.exit_timestamp === 'string'
+      ) {
+        return Math.floor(new Date(position.exit_timestamp).getTime() / 1000);
       }
-      if ((position as any).exit_time) {
-        return Math.floor(
-          new Date((position as any).exit_time).getTime() / 1000
-        );
+      // Handle Unix timestamps
+      if (
+        position.exit_timestamp &&
+        typeof position.exit_timestamp === 'number'
+      ) {
+        return position.exit_timestamp;
       }
       return null;
     };
 
-    // Filter positions by timeframe
-    const now = new Date();
-    const timeframeMs: Record<string, number> = {
-      '1M': 30 * 24 * 60 * 60 * 1000,
-      '3M': 90 * 24 * 60 * 60 * 1000,
-      '6M': 180 * 24 * 60 * 60 * 1000,
-      '1Y': 365 * 24 * 60 * 60 * 1000
-    };
-
-    const cutoffDate =
-      timeframe === 'ALL'
-        ? new Date(0)
-        : new Date(now.getTime() - timeframeMs[timeframe]);
-
-    // Filter and sort positions by entry time
+    // Filter and sort positions by entry time - only closed positions
     const relevantPositions = positions
-      .filter((pos) => {
-        const entryTimestamp = getEntryTimestamp(pos);
-        const positionDate = new Date(entryTimestamp * 1000);
-        return positionDate >= cutoffDate;
-      })
+      .filter((pos) => pos.status === 'closed')
       .sort((a, b) => getEntryTimestamp(a) - getEntryTimestamp(b));
-
-    // Separate closed and open positions
-    const closedPositions = relevantPositions.filter(
-      (pos) => pos.status === 'closed'
-    );
-    const openPositions = relevantPositions.filter(
-      (pos) => pos.status === 'open'
-    );
 
     // Build comprehensive balance progression
     const balanceData: BalanceDataPoint[] = [];
@@ -157,37 +207,33 @@ export default function BalanceChart({
       return new Date(ts * 1000).toLocaleDateString();
     };
 
-    // Process all positions chronologically
-    const allPositions = [...positions].sort((a, b) => {
+    // Process all closed positions chronologically
+    const allPositions = [...relevantPositions].sort((a, b) => {
       const aTime = getExitTimestamp(a) || getEntryTimestamp(a);
       const bTime = getExitTimestamp(b) || getEntryTimestamp(b);
       return aTime - bTime;
     });
 
-    // Add initial balance point if we have positions
+    // Add initial balance point at 100% (account size)
     if (allPositions.length > 0) {
       const firstEntryTimestamp = getEntryTimestamp(allPositions[0]);
       balanceData.push({
         date: new Date(firstEntryTimestamp * 1000).toLocaleDateString(),
-        balance: accountSize,
+        balance: 100, // 100% represents the initial account size
         timestamp: firstEntryTimestamp * 1000,
         type: 'entry',
         position: allPositions[0]
       });
     }
 
-    // Process each position
+    // Process each closed position
     let lastTimestamp = 0;
     allPositions.forEach((position, index) => {
       const pnlPercent = position.pnl || 0;
       const pnlDollar = (pnlPercent / 100) * accountSize;
 
-      // For open positions, calculate current PnL
-      if (position.status === 'open') {
-        runningBalance += pnlDollar;
-      } else {
-        runningBalance += pnlDollar;
-      }
+      // Add PnL to running balance
+      runningBalance += pnlDollar;
 
       const exitTimestamp = getExitTimestamp(position);
       const entryTimestamp = getEntryTimestamp(position);
@@ -198,29 +244,19 @@ export default function BalanceChart({
         finalTimestamp !== lastTimestamp ||
         index === allPositions.length - 1
       ) {
+        // Convert balance to percentage (100% = initial account size)
+        const balancePercent = (runningBalance / accountSize) * 100;
+
         balanceData.push({
           date: getDateFromTimestamp(exitTimestamp, entryTimestamp),
-          balance: runningBalance,
+          balance: balancePercent,
           timestamp: finalTimestamp * 1000,
-          type: position.status === 'closed' ? 'exit' : 'entry',
+          type: 'exit',
           position
         });
         lastTimestamp = finalTimestamp;
       }
     });
-
-    // Add current point for open positions if we have any
-    const hasOpenPositions = allPositions.some((p) => p.status === 'open');
-    if (hasOpenPositions) {
-      const currentBalance = runningBalance;
-      balanceData.push({
-        date: new Date().toLocaleDateString(),
-        balance: currentBalance,
-        timestamp: Date.now(),
-        type: 'entry',
-        position: allPositions[allPositions.length - 1]
-      });
-    }
 
     // Calculate stats
     const stats = {
@@ -228,22 +264,22 @@ export default function BalanceChart({
       totalReturn: runningBalance - accountSize,
       totalReturnPercent: ((runningBalance - accountSize) / accountSize) * 100,
       winRate:
-        closedPositions.length > 0
-          ? (closedPositions.filter((p) => (p.pnl || 0) > 0).length /
-              closedPositions.length) *
+        relevantPositions.length > 0
+          ? (relevantPositions.filter((p) => (p.pnl || 0) > 0).length /
+              relevantPositions.length) *
             100
           : 0,
-      totalTrades: positions.length,
+      totalTrades: relevantPositions.length,
       maxDrawdown: calculateMaxDrawdown(balanceData.map((d) => d.balance)),
-      openPositions: openPositions.length,
-      totalPositions: positions.length
+      openPositions: 0,
+      totalPositions: relevantPositions.length
     };
 
     // Chart options
     const chartOptions: ApexOptions = {
       chart: {
         type: 'area' as const,
-        height: 350,
+        height: '100%',
         toolbar: {
           show: false
         },
@@ -272,9 +308,7 @@ export default function BalanceChart({
         type: 'datetime',
         categories: balanceData.map((d) => d.timestamp),
         labels: {
-          style: {
-            colors: '#9ca3af'
-          }
+          show: false
         },
         axisBorder: {
           show: false
@@ -284,15 +318,15 @@ export default function BalanceChart({
         }
       },
       yaxis: {
-        min: 8000,
-        max: 12000,
+        min: 80, // 80% minimum
+        max: 120, // 120% maximum
         tickAmount: 4,
         labels: {
           style: {
             colors: '#9ca3af'
           },
           formatter: function (value: number) {
-            return '$' + value.toFixed(0);
+            return value.toFixed(0) + '%';
           }
         }
       },
@@ -302,7 +336,7 @@ export default function BalanceChart({
         },
         y: {
           formatter: function (value: number) {
-            return '$' + value.toFixed(2);
+            return value.toFixed(1) + '%';
           }
         }
       },
@@ -341,103 +375,51 @@ export default function BalanceChart({
       chartOptions,
       series
     };
-  }, [positions, accountSize, timeframe]);
+  }, [positions, accountSize]);
 
-  const timeframes = ['1M', '3M', '6M', '1Y', 'ALL'] as const;
+  const chartContent = (
+    <div className="h-full">
+      {!isMounted ? (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-gray-400">Loading chart...</div>
+        </div>
+      ) : balanceData.length > 0 ? (
+        <div className="w-full h-full">
+          <Chart
+            options={chartOptions}
+            series={series}
+            type="area"
+            height="100%"
+          />
+        </div>
+      ) : (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <div className="text-gray-400 text-lg mb-2">
+              No trading data available
+            </div>
+            <div className="text-gray-500 text-sm">
+              Generate sample data to see the chart
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  if (!showContainer) {
+    return chartContent;
+  }
 
   return (
     <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-semibold text-white">Account Balance</h2>
-        <div className="flex space-x-2">
-          {timeframes.map((tf) => (
-            <button
-              key={tf}
-              onClick={() => setTimeframe(tf)}
-              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                timeframe === tf
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-              }`}
-            >
-              {tf}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Chart */}
-      <div className="h-80">
-        {!isMounted ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-gray-400">Loading chart...</div>
-          </div>
-        ) : balanceData.length > 0 ? (
-          <div className="w-full h-full">
-            <Chart
-              options={chartOptions}
-              series={series}
-              type="area"
-              height="100%"
-            />
-          </div>
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="text-gray-400 text-lg mb-2">
-                No trading data available for selected timeframe
-              </div>
-              <div className="text-gray-500 text-sm">
-                Adjust the timeframe or generate sample data to see the chart
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Chart Summary */}
-      <div className="mt-6 bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-        <h3 className="text-sm font-medium text-gray-400 mb-3">
-          Chart Data Summary
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-          <div>
-            <span className="text-gray-400">Total Positions:</span>
-            <span className="text-white ml-2">{stats.totalPositions || 0}</span>
-          </div>
-          <div>
-            <span className="text-gray-400">Closed Positions:</span>
-            <span className="text-white ml-2">{stats.totalTrades}</span>
-          </div>
-          <div>
-            <span className="text-gray-400">Open Positions:</span>
-            <span className="text-white ml-2">{stats.openPositions || 0}</span>
-          </div>
-          <div>
-            <span className="text-gray-400">Data Points:</span>
-            <span className="text-white ml-2">{balanceData.length}</span>
-          </div>
-        </div>
-        <div className="mt-3 text-xs text-gray-500">
-          {stats.totalTrades > 0 ? (
-            <>
-              Chart shows account balance progression based on realized P&L from
-              closed positions. Each data point represents a completed trade.
-            </>
-          ) : stats.openPositions > 0 ? (
-            <>
-              Chart shows position entry points. No realized P&L yet as all
-              positions are open. Balance will update as positions are closed.
-            </>
-          ) : (
-            <>
-              No position data available. Generate sample data or create
-              positions to see chart progression.
-            </>
-          )}
-        </div>
-      </div>
+      <div className="h-48">{chartContent}</div>
     </div>
   );
 }

@@ -5,7 +5,10 @@ import Stats from '@/components/ui/Stats/Stats';
 import CTA from '@/components/ui/CTA/CTA';
 import { createClient } from '@/utils/supabase/server';
 import { getUser } from '@/utils/supabase/queries';
-import { getClosedPositionsCurrentMonth } from '@/utils/supabase/queries';
+import {
+  getClosedPositionsCurrentMonth,
+  getPositions
+} from '@/utils/supabase/queries';
 
 interface MonthlyPnL {
   totalPnL: number;
@@ -75,10 +78,11 @@ export default async function HomePage() {
   const supabase = createClient();
   const user = await getUser(supabase);
   const monthlyPnL = await getMonthlyPnL(supabase);
+  const positions = await getPositions(supabase);
 
   return (
     <>
-      <Hero user={user} monthlyPnL={monthlyPnL} />
+      <Hero user={user} monthlyPnL={monthlyPnL} positions={positions} />
       <Stats />
       <Features />
       <Testimonials />

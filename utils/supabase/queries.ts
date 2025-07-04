@@ -233,35 +233,10 @@ export const getClosedPositionsCurrentMonth = cache(async (supabase: SupabaseCli
   const startOfMonth = new Date(2025, now.getMonth(), 1);
   const endOfMonth = new Date(2025, now.getMonth() + 1, 0, 23, 59, 59);
   
-  console.log('startOfMonth', startOfMonth);
-  console.log('endOfMonth', endOfMonth);
-  
   // Convert to ISO strings for proper comparison
   const startDate = startOfMonth.toISOString();
   const endDate = endOfMonth.toISOString();
 
-  console.log('startDate', startDate);
-  console.log('endDate', endDate);
-
-  // First, let's see what positions exist
-  const { data: allPositions, error: allError } = await supabase
-    .from('positions')
-    .select('*')
-    .limit(10);
-
-  console.log('All positions:', allPositions);
-  console.log('All positions error:', allError);
-
-  // Now check for closed positions
-  const { data: closedPositions, error: closedError } = await supabase
-    .from('positions')
-    .select('*')
-    .eq('status', 'closed');
-
-  console.log('Closed positions:', closedPositions);
-  console.log('Closed positions error:', closedError);
-
-  // Finally, apply the full filter using ISO date strings
   const { data: positions, error } = await supabase
     .from('positions')
     .select('*')
@@ -270,9 +245,6 @@ export const getClosedPositionsCurrentMonth = cache(async (supabase: SupabaseCli
     .gte('exit_timestamp', startDate)
     .lte('exit_timestamp', endDate)
     .order('exit_timestamp', { ascending: false });
-
-  console.log('Filtered positions:', positions);
-  console.log('Filtered positions error:', error);
 
   if (error) {
     return [];

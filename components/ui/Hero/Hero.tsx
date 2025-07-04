@@ -4,18 +4,8 @@ import { User } from '@supabase/supabase-js';
 import Link from 'next/link';
 import { TrendingUp, ArrowRight, Shield, CheckCircle } from 'lucide-react';
 import Button from '@/components/ui/Button';
-import dynamic from 'next/dynamic';
-import { useState, useEffect } from 'react';
-
-// Dynamically import Chart to avoid SSR issues
-const Chart = dynamic(() => import('react-apexcharts'), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-32">
-      <div className="text-gray-400">Loading chart...</div>
-    </div>
-  )
-});
+import BalanceChart from '@/components/ui/Charts/BalanceChart';
+import { Tables } from '@/types_db';
 
 interface HeroProps {
   user: User | null | undefined;
@@ -25,15 +15,10 @@ interface HeroProps {
     totalPositions: number;
     monthlyData: { timestamp: number; value: number }[];
   };
+  positions?: Tables<'positions'>[];
 }
 
-export default function Hero({ user, monthlyPnL }: HeroProps) {
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
+export default function Hero({ user, monthlyPnL, positions }: HeroProps) {
   // Calculate win rate
   const winRate = monthlyPnL?.totalPositions
     ? (
@@ -52,76 +37,6 @@ export default function Hero({ user, monthlyPnL }: HeroProps) {
     monthlyPnL?.totalPnL && monthlyPnL.totalPnL > 0
       ? 'text-green-400'
       : 'text-red-400';
-
-  // Chart configuration
-  const chartOptions = {
-    chart: {
-      type: 'area' as const,
-      toolbar: { show: false },
-      sparkline: { enabled: true },
-      background: 'transparent',
-      fontFamily: 'Inter, sans-serif'
-    },
-    stroke: {
-      curve: 'smooth' as const,
-      width: 2
-    },
-    fill: {
-      type: 'gradient',
-      gradient: {
-        shadeIntensity: 1,
-        opacityFrom: 0.2,
-        opacityTo: 0.0,
-        stops: [0, 100]
-      }
-    },
-    tooltip: {
-      enabled: true,
-      x: {
-        show: false
-      },
-      y: {
-        formatter: function (value: number) {
-          return `$${value.toFixed(2)}`;
-        }
-      }
-    },
-    grid: { show: false },
-    xaxis: {
-      type: 'datetime',
-      labels: { show: false },
-      axisBorder: { show: false },
-      axisTicks: { show: false }
-    },
-    yaxis: {
-      labels: { show: false },
-      min: monthlyPnL?.monthlyData?.length
-        ? Math.min(
-            0,
-            Math.min(...monthlyPnL.monthlyData.map((d) => d.value)) * 1.1
-          )
-        : 0,
-      max: monthlyPnL?.monthlyData?.length
-        ? Math.max(
-            0,
-            Math.max(...monthlyPnL.monthlyData.map((d) => d.value)) * 1.1
-          )
-        : 100
-    },
-    colors: [
-      monthlyPnL?.totalPnL && monthlyPnL.totalPnL > 0 ? '#10B981' : '#EF4444'
-    ]
-  };
-
-  const series = [
-    {
-      name: 'Balance',
-      data: monthlyPnL?.monthlyData?.map((d) => ({
-        x: d.timestamp,
-        y: d.value
-      })) || [{ x: new Date().getTime(), y: 0 }]
-    }
-  ];
 
   return (
     <section className="relative min-h-[90vh] bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 overflow-hidden">
@@ -207,7 +122,7 @@ export default function Hero({ user, monthlyPnL }: HeroProps) {
               <div className="flex items-center justify-between mb-8">
                 <div>
                   <h3 className="text-2xl font-bold text-white mb-2">
-                    Monthly Performance
+                    This Month's Performance
                   </h3>
                   <p className="text-gray-400">Real-time trading results</p>
                 </div>
@@ -218,14 +133,13 @@ export default function Hero({ user, monthlyPnL }: HeroProps) {
                   <div className="text-gray-400">Win Rate: {winRate}%</div>
                 </div>
               </div>
-              {isMounted && (
-                <Chart
-                  options={chartOptions}
-                  series={series}
-                  type="area"
-                  height={200}
+              <div className="h-48">
+                <BalanceChart
+                  positions={positions || []}
+                  accountSize={10000}
+                  showContainer={false}
                 />
-              )}
+              </div>
             </div>
           </div>
         </div>
