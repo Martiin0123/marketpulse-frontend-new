@@ -19,7 +19,7 @@ export default function CTA({ user }: CTAProps) {
             <div className="inline-flex items-center px-4 py-2 bg-emerald-500/10 backdrop-blur-sm rounded-full border border-emerald-500/30 mb-8">
               <Shield className="w-4 h-4 text-emerald-500 mr-2" />
               <span className="text-emerald-200 text-sm font-medium">
-                30-Day Money-Back Guarantee
+                Monthly Performance Guarantee
               </span>
             </div>
 
@@ -36,11 +36,13 @@ export default function CTA({ user }: CTAProps) {
             <div className="space-y-3 mb-8">
               <div className="flex items-center justify-center gap-2">
                 <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                <span className="text-slate-300">7-Day Free Trial</span>
+                <span className="text-slate-300">
+                  Monthly Performance Guarantee
+                </span>
               </div>
               <div className="flex items-center justify-center gap-2">
                 <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                <span className="text-slate-300">No Credit Card Required</span>
+                <span className="text-slate-300">Instant Access</span>
               </div>
               <div className="flex items-center justify-center gap-2">
                 <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0" />
@@ -59,7 +61,7 @@ export default function CTA({ user }: CTAProps) {
             ) : (
               <Link href="/signin/signup">
                 <Button variant="slim" className="group">
-                  Start Free Trial
+                  Get Started
                   <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>

@@ -53,33 +53,19 @@ export default async function SignIn({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4 pt-24">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl mb-4">
-            <Logo width="32px" height="32px" />
+          <div className="flex justify-center mb-4">
+            <Logo />
           </div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            PrimeScope
-          </h1>
-          <p className="text-gray-400 text-sm mt-2">
+          <p className="text-slate-400 text-sm mt-2">
             AI-Powered Trading Platform
           </p>
         </div>
-
         {/* Auth Card */}
-        <Card
-          title={
-            viewProp === 'forgot_password'
-              ? 'Reset Password'
-              : viewProp === 'update_password'
-                ? 'Update Password'
-                : viewProp === 'signup'
-                  ? 'Sign Up'
-                  : 'Sign In'
-          }
-        >
+        <Card title="Sign In">
           {viewProp === 'password_signin' && (
             <PasswordSignIn
               allowEmail={allowEmail}

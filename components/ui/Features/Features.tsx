@@ -64,36 +64,12 @@ export default function Features() {
               advanced AI algorithms
             </p>
           </div>
-          {/* Risk Management */}
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-8 hover:border-cyan-500/50 transition-all duration-300">
-            <div className="w-12 h-12 bg-cyan-500/20 rounded-lg flex items-center justify-center mb-6">
-              <svg
-                className="w-6 h-6 text-cyan-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold text-white mb-4">
-              Risk Management
-            </h3>
-            <p className="text-slate-400">
-              Advanced position sizing and stop-loss strategies to protect your
-              capital
-            </p>
-          </div>
+
           {/* Market Analysis */}
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-8 hover:border-emerald-500/50 transition-all duration-300">
-            <div className="w-12 h-12 bg-emerald-500/20 rounded-lg flex items-center justify-center mb-6">
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-8 hover:border-blue-500/50 transition-all duration-300">
+            <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center mb-6">
               <svg
-                className="w-6 h-6 text-emerald-500"
+                className="w-6 h-6 text-blue-500"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -113,61 +89,12 @@ export default function Features() {
               Deep market insights with technical and fundamental analysis tools
             </p>
           </div>
-          {/* Portfolio Tracking */}
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-8 hover:border-blue-500/50 transition-all duration-300">
+
+          {/* 24/7 Support */}
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-8 hover:border-blue  -500/50 transition-all duration-300">
             <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center mb-6">
               <svg
                 className="w-6 h-6 text-blue-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold text-white mb-4">
-              Portfolio Tracking
-            </h3>
-            <p className="text-slate-400">
-              Monitor your performance with detailed analytics and performance
-              metrics
-            </p>
-          </div>
-          {/* Mobile Trading */}
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-8 hover:border-cyan-500/50 transition-all duration-300">
-            <div className="w-12 h-12 bg-cyan-500/20 rounded-lg flex items-center justify-center mb-6">
-              <svg
-                className="w-6 h-6 text-cyan-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"
-                />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold text-white mb-4">
-              Mobile Trading
-            </h3>
-            <p className="text-slate-400">
-              Trade anywhere with our mobile-optimized platform and real-time
-              alerts
-            </p>
-          </div>
-          {/* 24/7 Support */}
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-8 hover:border-emerald-500/50 transition-all duration-300">
-            <div className="w-12 h-12 bg-emerald-500/20 rounded-lg flex items-center justify-center mb-6">
-              <svg
-                className="w-6 h-6 text-emerald-500"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"

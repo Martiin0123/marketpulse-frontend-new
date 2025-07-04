@@ -7,16 +7,19 @@ import { handleRequest } from '@/utils/auth-helpers/client';
 import { useRouter } from 'next/navigation';
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import Logo from '@/components/icons/Logo';
 
 // Define prop type with allowEmail boolean
 interface PasswordSignInProps {
   allowEmail: boolean;
   redirectMethod: string;
+  disableButton?: boolean;
 }
 
 export default function PasswordSignIn({
   allowEmail,
-  redirectMethod
+  redirectMethod,
+  disableButton
 }: PasswordSignInProps) {
   const router = redirectMethod === 'client' ? useRouter() : null;
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -30,6 +33,16 @@ export default function PasswordSignIn({
 
   return (
     <div>
+      <div className="text-center mb-6">
+        <div className="flex justify-center mb-4">
+          <Logo />
+        </div>
+        <h2 className="text-2xl font-bold text-white mb-2">Welcome Back</h2>
+        <p className="text-slate-400 text-sm">
+          Sign in to your account to continue
+        </p>
+      </div>
+
       <form
         noValidate={true}
         className="space-y-6"
@@ -39,13 +52,13 @@ export default function PasswordSignIn({
         <div>
           <label
             htmlFor="email"
-            className="block text-sm font-medium text-gray-300 mb-2"
+            className="block text-sm font-medium text-slate-300 mb-2"
           >
             Email Address
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Mail className="h-5 w-5 text-gray-400" />
+              <Mail className="h-5 w-5 text-slate-400" />
             </div>
             <input
               id="email"
@@ -55,7 +68,7 @@ export default function PasswordSignIn({
               autoCapitalize="none"
               autoComplete="email"
               autoCorrect="off"
-              className="w-full pl-10 pr-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+              className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
             />
           </div>
         </div>
@@ -64,31 +77,33 @@ export default function PasswordSignIn({
         <div>
           <label
             htmlFor="password"
-            className="block text-sm font-medium text-gray-300 mb-2"
+            className="block text-sm font-medium text-slate-300 mb-2"
           >
             Password
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Lock className="h-5 w-5 text-gray-400" />
+              <Lock className="h-5 w-5 text-slate-400" />
             </div>
             <input
               id="password"
               placeholder="Enter your password"
               type={showPassword ? 'text' : 'password'}
               name="password"
+              autoCapitalize="none"
               autoComplete="current-password"
-              className="w-full pl-10 pr-12 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+              autoCorrect="off"
+              className="w-full pl-10 pr-12 py-3 bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
             />
             <button
               type="button"
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-300"
             >
               {showPassword ? (
-                <EyeOff className="h-5 w-5" />
+                <EyeOff className="h-5 w-5 text-slate-400 hover:text-slate-300" />
               ) : (
-                <Eye className="h-5 w-5" />
+                <Eye className="h-5 w-5 text-slate-400 hover:text-slate-300" />
               )}
             </button>
           </div>
@@ -97,8 +112,9 @@ export default function PasswordSignIn({
         <Button
           variant="slim"
           type="submit"
-          className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
+          className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
           loading={isSubmitting}
+          disabled={disableButton}
         >
           Sign In
         </Button>
@@ -108,8 +124,8 @@ export default function PasswordSignIn({
       <div className="mt-8 space-y-4">
         <div className="text-center">
           <Link
-            href="/signin/forgot_password"
-            className="text-sm text-purple-400 hover:text-purple-300 transition-colors"
+            href="/auth/reset_password"
+            className="text-sm text-slate-400 hover:text-slate-300 transition-colors"
           >
             Forgot your password?
           </Link>
@@ -119,18 +135,20 @@ export default function PasswordSignIn({
           <div className="text-center">
             <Link
               href="/signin/email_signin"
-              className="text-sm text-gray-400 hover:text-gray-300 transition-colors"
+              className="text-sm text-slate-400 hover:text-slate-300 transition-colors"
             >
               Sign in via magic link
             </Link>
           </div>
         )}
 
-        <div className="text-center pt-4 border-t border-gray-700">
-          <span className="text-sm text-gray-400">Don't have an account? </span>
+        <div className="text-center pt-4 border-t border-slate-700">
+          <span className="text-sm text-slate-400">
+            Don't have an account?{' '}
+          </span>
           <Link
             href="/signin/signup"
-            className="text-sm text-purple-400 hover:text-purple-300 transition-colors font-medium"
+            className="text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium"
           >
             Sign up
           </Link>

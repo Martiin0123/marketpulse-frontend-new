@@ -84,7 +84,7 @@ export default function Hero({ user, monthlyPnL, positions }: HeroProps) {
             <div className="inline-flex items-center px-6 py-3 bg-emerald-500/10 backdrop-blur-sm rounded-xl border border-emerald-500/30 mb-8">
               <Shield className="w-5 h-5 text-emerald-500 mr-3" />
               <span className="text-emerald-200 font-medium">
-                30-Day Money-Back Guarantee
+                Performance Guarantee for any net-negative month
               </span>
             </div>
 

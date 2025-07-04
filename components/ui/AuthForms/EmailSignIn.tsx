@@ -7,6 +7,7 @@ import { handleRequest } from '@/utils/auth-helpers/client';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Mail, Zap } from 'lucide-react';
+import Logo from '@/components/icons/Logo';
 
 // Define prop type with allowPassword boolean
 interface EmailSignInProps {
@@ -32,10 +33,13 @@ export default function EmailSignIn({
   return (
     <div>
       <div className="text-center mb-6">
-        <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full mb-4">
-          <Zap className="w-6 h-6 text-white" />
+        <div className="flex justify-center mb-4">
+          <Logo />
         </div>
-        <p className="text-gray-400 text-sm">
+        <h2 className="text-2xl font-bold text-white mb-2">
+          Magic Link Sign In
+        </h2>
+        <p className="text-slate-400 text-sm">
           We'll send you a magic link to sign in instantly
         </p>
       </div>
@@ -49,13 +53,13 @@ export default function EmailSignIn({
         <div>
           <label
             htmlFor="email"
-            className="block text-sm font-medium text-gray-300 mb-2"
+            className="block text-sm font-medium text-slate-300 mb-2"
           >
             Email Address
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Mail className="h-5 w-5 text-gray-400" />
+              <Mail className="h-5 w-5 text-slate-400" />
             </div>
             <input
               id="email"
@@ -65,7 +69,7 @@ export default function EmailSignIn({
               autoCapitalize="none"
               autoComplete="email"
               autoCorrect="off"
-              className="w-full pl-10 pr-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+              className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
             />
           </div>
         </div>
@@ -73,7 +77,7 @@ export default function EmailSignIn({
         <Button
           variant="slim"
           type="submit"
-          className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
+          className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
           loading={isSubmitting}
           disabled={disableButton}
         >
@@ -87,19 +91,19 @@ export default function EmailSignIn({
           <div className="text-center">
             <Link
               href="/signin/password_signin"
-              className="text-sm text-gray-400 hover:text-gray-300 transition-colors"
+              className="text-sm text-slate-400 hover:text-slate-300 transition-colors"
             >
               Sign in with email and password
             </Link>
           </div>
 
-          <div className="text-center pt-4 border-t border-gray-700">
-            <span className="text-sm text-gray-400">
+          <div className="text-center pt-4 border-t border-slate-700">
+            <span className="text-sm text-slate-400">
               Don't have an account?{' '}
             </span>
             <Link
               href="/signin/signup"
-              className="text-sm text-purple-400 hover:text-purple-300 transition-colors font-medium"
+              className="text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium"
             >
               Sign up
             </Link>

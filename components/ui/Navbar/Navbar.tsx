@@ -1,6 +1,5 @@
 import { createClient } from '@/utils/supabase/server';
 import { getSubscription } from '@/utils/supabase/queries';
-import Navlinks from './Navlinks';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import Logo from '@/components/icons/Logo';
@@ -26,14 +25,14 @@ export default async function Navbar() {
 
           {/* Navigation Links */}
           <div className="hidden md:flex items-center space-x-8">
+            <Link
+              href="/"
+              className="text-slate-300 hover:text-white transition-colors"
+            >
+              Home
+            </Link>
             {!subscription && (
               <>
-                <Link
-                  href="/"
-                  className="text-slate-300 hover:text-white transition-colors"
-                >
-                  Home
-                </Link>
                 <Link
                   href="/pricing"
                   className="text-slate-300 hover:text-white transition-colors"
@@ -42,6 +41,18 @@ export default async function Navbar() {
                 </Link>
               </>
             )}
+            <Link
+              href="/performance-reports"
+              className="text-slate-300 hover:text-white transition-colors"
+            >
+              Reports
+            </Link>
+            <Link
+              href="/performance-guarantee"
+              className="text-slate-300 hover:text-white transition-colors"
+            >
+              Performance Guarantee
+            </Link>
           </div>
 
           {/* Auth Buttons */}

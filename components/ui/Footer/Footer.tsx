@@ -95,6 +95,22 @@ export default function Footer({ user, subscription }: FooterProps) {
                   Dashboard
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/performance-reports"
+                  className="text-slate-400 hover:text-white transition-colors"
+                >
+                  Performance Reports
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/performance-guarantee"
+                  className="text-slate-400 hover:text-white transition-colors"
+                >
+                  Performance Guarantee
+                </Link>
+              </li>
             </ul>
           </div>
           {/* Legal */}

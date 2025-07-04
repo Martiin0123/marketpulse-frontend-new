@@ -52,7 +52,7 @@ export default async function RootLayout({ children }: PropsWithChildren) {
         <Navbar />
         <main
           id="skip"
-          className="min-h-[calc(100dvh-4rem)] md:min-h-[calc(100dvh-5rem)]"
+          className="min-h-[calc(100dvh-4rem)] md:min-h-[calc(100dvh-5rem)] pt-24"
         >
           {children}
         </main>
