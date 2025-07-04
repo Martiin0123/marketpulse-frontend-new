@@ -17,11 +17,11 @@ export default function Terms() {
         <h2 className="text-xl font-semibold mb-4 text-red-500">
           2. Important Risk Disclosure
         </h2>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-4">
-          <p className="font-bold mb-4">
+        <div className="bg-red-900/50 border border-red-500 rounded-lg p-6 mb-4">
+          <p className="font-bold mb-4 text-red-100">
             SIMULATED TRADING ENVIRONMENT - NOT REAL TRADING
           </p>
-          <ul className="list-disc pl-6 space-y-2">
+          <ul className="list-disc pl-6 space-y-2 text-red-200">
             <li>
               This is a SIMULATED trading platform. No real money is involved,
               and no real trades are executed.

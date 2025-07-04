@@ -3,11 +3,11 @@ export default function RiskDisclosure() {
     <div className="max-w-4xl mx-auto px-4 py-16">
       <h1 className="text-3xl font-bold mb-8">Risk Disclosure Statement</h1>
 
-      <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-8">
-        <p className="text-lg font-bold text-red-700">
+      <div className="bg-red-900/50 border-l-4 border-red-500 p-4 mb-8">
+        <p className="text-lg font-bold text-red-100">
           IMPORTANT: This is a Simulated Trading Environment
         </p>
-        <p className="text-red-600">
+        <p className="text-red-200">
           All trading activities on this platform are simulated. No real money
           is involved, and no actual trades are executed on any real market.
         </p>
