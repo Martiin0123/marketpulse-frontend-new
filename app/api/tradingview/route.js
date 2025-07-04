@@ -104,9 +104,9 @@ export async function POST(request) {
       .from('signals')
       .insert([{
         symbol: symbolUpper,
-        typ: 'buy',
+        type: 'buy',
         entry_price: price,
-        timestamp: validTimestamp
+        created_at: validTimestamp
       }])
       .select()
       .single()
