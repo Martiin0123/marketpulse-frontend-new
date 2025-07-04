@@ -105,7 +105,7 @@ export async function POST(request) {
       .insert([{
         symbol: symbolUpper,
         typ: 'buy',
-        price: price,
+        entry_price: price,
         timestamp: validTimestamp
       }])
       .select()
