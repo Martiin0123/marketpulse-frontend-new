@@ -112,11 +112,6 @@ export default function Dashboard({
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-cyan-600/20"></div>
         <div className="relative max-w-7xl mx-auto px-4 py-16 sm:px-6 lg:px-8">
           <div className="text-center">
-            <Logo
-              width={250}
-              height={60}
-              className="h-12 w-auto mx-auto mb-4"
-            />
             <p className="mt-4 text-xl text-slate-300">
               Welcome back, {user.email?.split('@')[0]}
             </p>

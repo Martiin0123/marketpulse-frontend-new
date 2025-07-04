@@ -84,7 +84,7 @@ export async function POST(request) {
 
   // Handle BUY action
   if (action.toUpperCase() === 'BUY') {
-    // Check for existing open position and close it if it's a sell position
+    // Check for existing open position
     const { data: existingPosition } = await supabase
       .from('positions')
       .select('*')
@@ -177,7 +177,7 @@ export async function POST(request) {
 
   // Handle SELL action
   if (action.toUpperCase() === 'SELL') {
-    // Check for existing open position and close it if it's a buy position
+    // Check for existing open position
     const { data: existingPosition } = await supabase
       .from('positions')
       .select('*')
