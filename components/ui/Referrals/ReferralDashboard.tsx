@@ -144,12 +144,12 @@ export default function ReferralDashboard({
   };
 
   const shareViaEmail = () => {
-    const subject = 'Join MarketPulse - Get AI-Powered Trading Signals';
-    const body = `Hey! I've been using MarketPulse for AI-powered trading signals and thought you'd love it too. 
+    const subject = 'Join PrimeScope - Get AI-Powered Trading Signals';
+    const body = `Hey! I've been using PrimeScope for AI-powered trading signals and thought you'd love it too. 
 
 Use my referral link to get started: ${referralUrl}
 
-MarketPulse provides real-time trading signals backed by advanced AI and technical analysis. Perfect for both beginners and experienced traders!`;
+PrimeScope provides real-time trading signals backed by advanced AI and technical analysis. Perfect for both beginners and experienced traders!`;
 
     window.open(
       `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
@@ -157,7 +157,7 @@ MarketPulse provides real-time trading signals backed by advanced AI and technic
   };
 
   const shareViaTwitter = () => {
-    const text = `🚀 Get AI-powered trading signals with MarketPulse! Use my referral link for exclusive access: ${referralUrl} #TradingSignals #AI #Investing`;
+    const text = `🚀 Get AI-powered trading signals with PrimeScope! Use my referral link for exclusive access: ${referralUrl} #TradingSignals #AI #Investing`;
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`
     );
@@ -193,7 +193,7 @@ MarketPulse provides real-time trading signals backed by advanced AI and technic
             Referral Program
           </h1>
           <p className="text-gray-400 text-lg">
-            Share MarketPulse with friends and earn rewards for every successful
+            Share PrimeScope with friends and earn rewards for every successful
             referral
           </p>
         </div>

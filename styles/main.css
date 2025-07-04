@@ -2,6 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --color-blue: #3B82F6;
+    --color-cyan: #06B6D4;
+    --color-emerald: #10B981;
+    --color-indigo: #4338CA;
+    --color-navy: #1E3A8A;
+    --color-slate: #334155;
+    --color-charcoal: #1E293B;
+  }
+}
+
+/* Gradient text utilities */
+.gradient-text {
+  @apply text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500;
+}
+
+/* Button gradients */
+.btn-gradient {
+  @apply bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 rounded-full transition-all duration-300 hover:scale-105 hover:shadow-xl;
+}
+
+/* Card hover effects */
+.card-hover {
+  @apply hover:border-blue-500/50 hover:shadow-blue-500/10 transition-all duration-300 hover:scale-105;
+}
+
+/* Glass morphism effect */
+.glass {
+  @apply bg-slate-800/50 backdrop-blur-sm border border-slate-700/50;
+}
+
+/* Custom focus styles */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900;
+}
+
+/* Button animations */
+.btn-animate {
+  @apply transition-all duration-300 hover:scale-105 active:scale-95;
+}
+
+/* Interactive elements */
+.interactive {
+  @apply transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3B82F6;
+}
+
 *,
 *:before,
 *:after {
@@ -9,7 +71,7 @@
 }
 
 *:focus:not(ol) {
-  @apply outline-none ring-2 ring-pink-500 ring-opacity-50;
+  @apply outline-none ring-2 ring-blue-500 ring-opacity-50;
 }
 
 html {
@@ -28,7 +90,7 @@ body {
     'Helvetica', sans-serif;
   text-rendering: optimizeLegibility;
   -moz-osx-font-smoothing: grayscale;
-  @apply text-white bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 antialiased;
+  @apply text-white bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 antialiased;
 }
 
 body {

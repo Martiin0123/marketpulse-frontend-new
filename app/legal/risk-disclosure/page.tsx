@@ -18,7 +18,7 @@ export default function RiskDisclosure() {
           1. Nature of Simulated Trading
         </h2>
         <p className="mb-4">
-          MarketPulse provides a simulated trading environment designed for
+          PrimeScope provides a simulated trading environment designed for
           educational and entertainment purposes only. While we strive to create
           realistic market conditions, there are significant differences between
           simulated and real trading, including:

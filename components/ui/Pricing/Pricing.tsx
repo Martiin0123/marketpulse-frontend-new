@@ -190,17 +190,17 @@ export default function Pricing({ user, products, subscription }: Props) {
 
   if (!products.length) {
     return (
-      <section className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      <section className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <div className="max-w-6xl px-4 py-8 mx-auto sm:py-24 sm:px-6 lg:px-8">
           <div className="text-center">
             <AlertTriangle className="mx-auto h-16 w-16 text-orange-400 mb-6" />
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-6 sm:text-6xl">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 bg-clip-text text-transparent mb-6 sm:text-6xl">
               No Pricing Plans Available
             </h1>
-            <p className="text-xl text-gray-300 mb-8">
+            <p className="text-xl text-slate-300 mb-8">
               Subscription pricing plans need to be created. Set them up in your{' '}
               <a
-                className="text-purple-400 underline hover:text-purple-300 transition-colors"
+                className="text-blue-400 underline hover:text-blue-300 transition-colors"
                 href="https://dashboard.stripe.com/products"
                 rel="noopener noreferrer"
                 target="_blank"
@@ -216,11 +216,11 @@ export default function Pricing({ user, products, subscription }: Props) {
   }
 
   return (
-    <section className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden">
+    <section className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
       {/* Background Effects */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(168,85,247,0.1),_rgba(0,0,0,0))]"></div>
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(59,130,246,0.1),_rgba(0,0,0,0))]"></div>
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
 
       {/* Subscription Required Message */}
       {showMessage && (
@@ -238,33 +238,33 @@ export default function Pricing({ user, products, subscription }: Props) {
         <div className="max-w-7xl px-4 py-16 mx-auto sm:py-24 sm:px-6 lg:px-8">
           {/* Header Section */}
           <div className="text-center mb-20">
-            <div className="inline-flex items-center px-4 py-2 bg-purple-500/10 backdrop-blur-sm rounded-full border border-purple-500/30 mb-6">
-              <Star className="w-4 h-4 text-purple-400 mr-2" />
-              <span className="text-purple-200 text-sm font-medium">
+            <div className="inline-flex items-center px-4 py-2 bg-blue-500/10 backdrop-blur-sm rounded-full border border-blue-500/30 mb-6">
+              <Star className="w-4 h-4 text-blue-400 mr-2" />
+              <span className="text-blue-200 text-sm font-medium">
                 Choose Your Plan
               </span>
             </div>
 
-            <h1 className="text-5xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent mb-6 sm:text-7xl">
-              Market<span className="text-white">Pulse</span> Plans
+            <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 bg-clip-text text-transparent mb-6 sm:text-7xl">
+              PrimeScope<span className="text-white"> Plans</span>
             </h1>
 
-            <p className="max-w-3xl mx-auto text-xl text-gray-300 sm:text-2xl mb-12 leading-relaxed">
+            <p className="max-w-3xl mx-auto text-xl text-slate-300 sm:text-2xl mb-12 leading-relaxed">
               Get real-time trading signals, advanced technical analysis, and
               market insights to make informed trading decisions
             </p>
 
             {/* Billing Interval Toggle */}
-            <div className="relative inline-flex bg-gray-800/50 backdrop-blur-sm rounded-2xl p-2 border border-gray-700/50 shadow-xl mb-12">
+            <div className="relative inline-flex bg-slate-800/50 backdrop-blur-sm rounded-full p-2 border border-slate-700/50 shadow-xl mb-12">
               {intervals.includes('month') && (
                 <button
                   onClick={() => setBillingInterval('month')}
                   type="button"
                   className={`${
                     billingInterval === 'month'
-                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
-                      : 'text-gray-400 hover:text-white'
-                  } relative px-8 py-3 text-sm font-medium rounded-xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                      ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg'
+                      : 'text-slate-400 hover:text-white'
+                  } relative px-8 py-3 text-sm font-medium rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:scale-105`}
                 >
                   Monthly
                 </button>
@@ -275,12 +275,12 @@ export default function Pricing({ user, products, subscription }: Props) {
                   type="button"
                   className={`${
                     billingInterval === 'year'
-                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
-                      : 'text-gray-400 hover:text-white'
-                  } relative px-8 py-3 text-sm font-medium rounded-xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                      ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg'
+                      : 'text-slate-400 hover:text-white'
+                  } relative px-8 py-3 text-sm font-medium rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:scale-105`}
                 >
                   Yearly
-                  <span className="ml-2 inline-flex items-center px-3 py-1 rounded-full text-xs bg-green-500/20 text-green-300 font-medium">
+                  <span className="ml-2 inline-flex items-center px-3 py-1 rounded-full text-xs bg-emerald-500/20 text-emerald-300 font-medium">
                     Save 20%
                   </span>
                 </button>
@@ -312,13 +312,13 @@ export default function Pricing({ user, products, subscription }: Props) {
                 <div
                   key={product.id}
                   className={cn(
-                    'relative bg-gray-800/30 backdrop-blur-sm rounded-3xl border p-10 transition-all duration-500 hover:scale-105 hover:shadow-2xl',
+                    'relative bg-slate-800/30 backdrop-blur-sm rounded-3xl border p-10 transition-all duration-500 hover:scale-105 hover:shadow-2xl',
                     {
-                      'border-purple-500/50 shadow-2xl shadow-purple-500/25 bg-gray-800/40':
+                      'border-blue-500/50 shadow-2xl shadow-blue-500/25 bg-slate-800/40':
                         isPopular,
-                      'border-green-500/50 shadow-2xl shadow-green-500/25 bg-gray-800/40':
+                      'border-emerald-500/50 shadow-2xl shadow-emerald-500/25 bg-slate-800/40':
                         isCurrentPlan,
-                      'border-gray-700/50 hover:border-gray-600/50 bg-gray-800/20':
+                      'border-slate-700/50 hover:border-slate-600/50 bg-slate-800/20':
                         !isPopular && !isCurrentPlan
                     }
                   )}
@@ -326,7 +326,7 @@ export default function Pricing({ user, products, subscription }: Props) {
                   {/* Popular Badge */}
                   {isPopular && (
                     <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
-                      <div className="bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
+                      <div className="bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
                         <Star className="w-4 h-4 mr-2" />
                         Most Popular
                       </div>
@@ -336,7 +336,7 @@ export default function Pricing({ user, products, subscription }: Props) {
                   {/* Current Plan Badge */}
                   {isCurrentPlan && (
                     <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
-                      <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-6 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
+                      <div className="bg-gradient-to-r from-emerald-500 to-green-500 px-6 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
                         <Check className="w-4 h-4 mr-2" />
                         Current Plan
                       </div>
@@ -348,16 +348,16 @@ export default function Pricing({ user, products, subscription }: Props) {
                     <h3 className="text-3xl font-bold text-white mb-4">
                       {product.name}
                     </h3>
-                    <p className="text-gray-400 text-lg mb-8 leading-relaxed">
+                    <p className="text-slate-400 text-lg mb-8 leading-relaxed">
                       {product.description}
                     </p>
 
                     {/* Price */}
                     <div className="mb-8">
-                      <span className="text-6xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                      <span className="text-6xl font-bold bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 bg-clip-text text-transparent">
                         {priceString}
                       </span>
-                      <span className="text-gray-400 text-xl ml-2">
+                      <span className="text-slate-400 text-xl ml-2">
                         /{billingInterval}
                       </span>
                     </div>
@@ -367,7 +367,7 @@ export default function Pricing({ user, products, subscription }: Props) {
                       <Button
                         variant="slim"
                         onClick={handleViewDashboard}
-                        className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-4 text-lg font-bold rounded-2xl transition-all shadow-lg"
+                        className="w-full"
                       >
                         View Dashboard
                       </Button>
@@ -377,12 +377,7 @@ export default function Pricing({ user, products, subscription }: Props) {
                         type="button"
                         loading={priceIdLoading === price.id}
                         onClick={() => handleStripeCheckout(price)}
-                        className={cn(
-                          'w-full py-4 text-lg font-bold rounded-2xl transition-all shadow-lg',
-                          isPopular
-                            ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white'
-                            : 'bg-gray-700 hover:bg-gray-600 text-white'
-                        )}
+                        className="w-full"
                       >
                         {subscription ? 'Change Plan' : 'Get Started'}
                       </Button>
@@ -397,12 +392,12 @@ export default function Pricing({ user, products, subscription }: Props) {
                     {features.map((feature, featureIndex) => (
                       <div
                         key={featureIndex}
-                        className="flex items-center space-x-4 p-3 rounded-xl bg-gray-700/30 hover:bg-gray-700/50 transition-all"
+                        className="flex items-center space-x-4 p-3 rounded-xl bg-slate-700/30 hover:bg-slate-700/50 transition-all"
                       >
-                        <div className="flex-shrink-0 w-10 h-10 bg-purple-500/20 rounded-full flex items-center justify-center">
-                          <div className="text-purple-400">{feature.icon}</div>
+                        <div className="flex-shrink-0 w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
+                          <div className="text-blue-400">{feature.icon}</div>
                         </div>
-                        <span className="text-gray-200 font-medium">
+                        <span className="text-slate-200 font-medium">
                           {feature.text}
                         </span>
                       </div>
@@ -418,53 +413,53 @@ export default function Pricing({ user, products, subscription }: Props) {
             <div className="inline-flex items-center px-4 py-2 bg-blue-500/10 backdrop-blur-sm rounded-full border border-blue-500/30 mb-8">
               <Shield className="w-4 h-4 text-blue-400 mr-2" />
               <span className="text-blue-200 text-sm font-medium">
-                Why Choose MarketPulse?
+                Why Choose PrimeScope?
               </span>
             </div>
 
             <h2 className="text-4xl font-bold text-white mb-6">
               Advanced Trading Technology
             </h2>
-            <p className="text-xl text-gray-300 mb-16 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-xl text-slate-300 mb-16 max-w-3xl mx-auto leading-relaxed">
               Advanced trading signals and market analysis to help you make
               profitable decisions with confidence
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-5xl mx-auto">
               <div className="text-center group">
-                <div className="w-20 h-20 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <TrendingUp className="w-10 h-10 text-purple-400" />
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                  <TrendingUp className="w-10 h-10 text-blue-400" />
                 </div>
                 <h3 className="text-2xl font-bold text-white mb-4">
                   Real-Time Signals
                 </h3>
-                <p className="text-gray-400 text-lg leading-relaxed">
+                <p className="text-slate-400 text-lg leading-relaxed">
                   Get instant buy/sell signals based on advanced technical
                   analysis and market trends
                 </p>
               </div>
 
               <div className="text-center group">
-                <div className="w-20 h-20 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <BarChart3 className="w-10 h-10 text-green-400" />
+                <div className="w-20 h-20 bg-gradient-to-br from-emerald-500/20 to-green-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                  <BarChart3 className="w-10 h-10 text-emerald-400" />
                 </div>
                 <h3 className="text-2xl font-bold text-white mb-4">
                   Technical Analysis
                 </h3>
-                <p className="text-gray-400 text-lg leading-relaxed">
+                <p className="text-slate-400 text-lg leading-relaxed">
                   RSI, MACD, and other indicators to validate trading
                   opportunities and market conditions
                 </p>
               </div>
 
               <div className="text-center group">
-                <div className="w-20 h-20 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <Shield className="w-10 h-10 text-blue-400" />
+                <div className="w-20 h-20 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                  <Shield className="w-10 h-10 text-cyan-400" />
                 </div>
                 <h3 className="text-2xl font-bold text-white mb-4">
                   Risk Management
                 </h3>
-                <p className="text-gray-400 text-lg leading-relaxed">
+                <p className="text-slate-400 text-lg leading-relaxed">
                   Built-in risk assessment and position sizing to help protect
                   your investments
                 </p>

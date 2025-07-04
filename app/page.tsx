@@ -81,12 +81,12 @@ export default async function HomePage() {
   const positions = await getPositions(supabase);
 
   return (
-    <>
+    <div className="min-h-screen bg-slate-900">
       <Hero user={user} monthlyPnL={monthlyPnL} positions={positions} />
       <Stats />
       <Features />
       <Testimonials />
       <CTA user={user} />
-    </>
+    </div>
   );
 }

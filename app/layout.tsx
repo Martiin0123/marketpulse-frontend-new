@@ -8,7 +8,7 @@ import 'styles/main.css';
 import { GeistSans } from 'geist/font/sans';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 
-const title = 'MarketPulse - AI-Powered Trading Platform';
+const title = 'PrimeScope - AI-Powered Trading Platform';
 const description =
   'Master the markets with AI precision. Get real-time trading signals, advanced technical analysis, and market insights powered by cutting-edge AI.';
 
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     title: title,
     description: description,
     url: getURL(),
-    siteName: 'MarketPulse',
+    siteName: 'PrimeScope',
     images: [
       {
         url: `${getURL()}/opengraph-image.png`,
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: PropsWithChildren) {
   return (
     <html lang="en" className={GeistSans.className}>
-      <body className="bg-gray-900 text-white">
+      <body className="bg-slate-900 text-white">
         <Navbar />
         <main
           id="skip"

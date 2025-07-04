@@ -6,7 +6,7 @@ export default function Terms() {
       <section className="mb-8">
         <h2 className="text-xl font-semibold mb-4">1. Introduction</h2>
         <p className="mb-4">
-          These Terms of Service govern your use of MarketPulse (the "Service"),
+          These Terms of Service govern your use of PrimeScope (the "Service"),
           a simulated trading platform operated by Martin Zangerl ("we", "us",
           or "our"). By accessing or using the Service, you agree to be bound by
           these terms.
@@ -46,7 +46,7 @@ export default function Terms() {
       <section className="mb-8">
         <h2 className="text-xl font-semibold mb-4">3. Service Description</h2>
         <p className="mb-4">
-          MarketPulse provides a simulated trading environment where users can:
+          PrimeScope provides a simulated trading environment where users can:
         </p>
         <ul className="list-disc pl-6 mb-4 space-y-2">
           <li>Practice trading strategies without financial risk</li>
