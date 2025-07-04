@@ -7,7 +7,8 @@ import {
   Linkedin,
   Shield,
   Clock,
-  Zap
+  Zap,
+  AlertTriangle
 } from 'lucide-react';
 
 export default function Footer() {
@@ -28,10 +29,16 @@ export default function Footer() {
                 </span>
               </div>
               <p className="text-gray-400 mb-6 max-w-sm">
-                AI-powered trading platform providing real-time signals,
-                technical analysis, and market insights to help you make smarter
-                trading decisions.
+                AI-powered simulated trading platform for educational purposes.
+                Practice trading strategies and learn market analysis in a
+                risk-free environment.
               </p>
+              <div className="flex items-center space-x-2 bg-yellow-900/20 text-yellow-200 p-3 rounded-lg">
+                <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                <span className="text-sm">
+                  Simulated Trading Only - No Real Money
+                </span>
+              </div>
               <div className="flex space-x-4">
                 <a
                   href="https://twitter.com/marketpulse"
@@ -96,52 +103,23 @@ export default function Footer() {
               </ul>
             </div>
 
-            {/* Resources */}
+            {/* Legal Pages */}
             <div>
-              <h3 className="text-white font-semibold mb-6">Resources</h3>
+              <h3 className="text-white font-semibold mb-6">
+                Legal Information
+              </h3>
               <ul className="space-y-4">
                 <li>
                   <Link
-                    href="/docs"
+                    href="/legal/impressum"
                     className="text-gray-400 hover:text-purple-400 transition-colors"
                   >
-                    Documentation
+                    Impressum
                   </Link>
                 </li>
                 <li>
                   <Link
-                    href="/api"
-                    className="text-gray-400 hover:text-purple-400 transition-colors"
-                  >
-                    API Reference
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/blog"
-                    className="text-gray-400 hover:text-purple-400 transition-colors"
-                  >
-                    Trading Blog
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/support"
-                    className="text-gray-400 hover:text-purple-400 transition-colors"
-                  >
-                    Help Center
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            {/* Legal & Contact */}
-            <div>
-              <h3 className="text-white font-semibold mb-6">Legal</h3>
-              <ul className="space-y-4 mb-6">
-                <li>
-                  <Link
-                    href="/privacy"
+                    href="/legal/privacy"
                     className="text-gray-400 hover:text-purple-400 transition-colors"
                   >
                     Privacy Policy
@@ -149,7 +127,7 @@ export default function Footer() {
                 </li>
                 <li>
                   <Link
-                    href="/terms"
+                    href="/legal/terms"
                     className="text-gray-400 hover:text-purple-400 transition-colors"
                   >
                     Terms of Service
@@ -157,20 +135,36 @@ export default function Footer() {
                 </li>
                 <li>
                   <Link
-                    href="/disclaimer"
+                    href="/legal/risk-disclosure"
                     className="text-gray-400 hover:text-purple-400 transition-colors"
                   >
-                    Risk Disclaimer
+                    Risk Disclosure
                   </Link>
                 </li>
+              </ul>
+            </div>
+
+            {/* Contact */}
+            <div>
+              <h3 className="text-white font-semibold mb-6">Contact</h3>
+              <ul className="space-y-4 mb-6">
                 <li>
                   <a
-                    href="mailto:support@marketpulse.ai"
+                    href="mailto:zangerl.martin@hotmail.com"
                     className="text-gray-400 hover:text-purple-400 transition-colors flex items-center"
                   >
                     <Mail className="w-4 h-4 mr-2" />
-                    Contact Us
+                    Email Us
                   </a>
+                </li>
+                <li className="text-gray-400">
+                  Martin Zangerl
+                  <br />
+                  Dorfstraße 22
+                  <br />
+                  6561 Ischgl
+                  <br />
+                  Austria
                 </li>
               </ul>
             </div>
@@ -186,8 +180,8 @@ export default function Footer() {
                 © {new Date().getFullYear()} MarketPulse. All rights reserved.
               </p>
               <p className="text-gray-500 text-sm mt-1">
-                Trading involves risk. Past performance does not guarantee
-                future results.
+                This is a simulated trading environment. No real money is
+                involved.
               </p>
             </div>
 
@@ -195,15 +189,15 @@ export default function Footer() {
             <div className="flex items-center space-x-6 text-gray-400">
               <div className="flex items-center space-x-2">
                 <Shield className="w-4 h-4 text-green-400" />
-                <span className="text-sm">SSL Secured</span>
+                <span className="text-sm">Secure Platform</span>
               </div>
               <div className="flex items-center space-x-2">
                 <Clock className="w-4 h-4 text-blue-400" />
-                <span className="text-sm">99.9% Uptime</span>
+                <span className="text-sm">24/7 Simulation</span>
               </div>
               <div className="flex items-center space-x-2">
                 <Zap className="w-4 h-4 text-yellow-400" />
-                <span className="text-sm">Real-time Data</span>
+                <span className="text-sm">AI-Powered</span>
               </div>
             </div>
           </div>
