@@ -142,7 +142,7 @@ export async function POST(request) {
         symbol: symbolUpper,
         side: 'BUY',
         entry_price: price,
-        entry_time: createISOTimestamp(validTimestamp),
+        created_at: createISOTimestamp(validTimestamp),
         status: 'open',
         pnl: 0
       }
