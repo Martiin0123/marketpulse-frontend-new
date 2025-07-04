@@ -97,7 +97,7 @@ export default function Navlinks({ user, subscription }: NavlinksProps) {
     <div className="relative flex items-center justify-between py-2">
       {/* Logo */}
       <div className="flex items-center">
-        <Link href="/" className="flex items-center space-x-2 group">
+        <Link href="/" className="flex items-center group">
           <div className="relative">
             <Logo width={120} height={32} />
           </div>
@@ -105,15 +105,15 @@ export default function Navlinks({ user, subscription }: NavlinksProps) {
       </div>
 
       {/* Desktop Navigation */}
-      <div className="hidden md:flex items-center space-x-8">
+      <div className="hidden md:flex items-center space-x-2">
         {navLinks.map((link) => (
           <Link
             key={link.href}
             href={link.href}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+            className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
               isActiveLink(link.href)
-                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                : 'text-gray-300 hover:text-white hover:bg-gray-800/50'
+                ? 'bg-white/10 text-white'
+                : 'text-gray-300 hover:text-white hover:bg-white/5'
             }`}
           >
             {link.icon}
@@ -129,31 +129,33 @@ export default function Navlinks({ user, subscription }: NavlinksProps) {
             {/* Avatar Button */}
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="flex items-center space-x-3 px-4 py-2 rounded-lg hover:bg-gray-800/50 transition-all duration-200 group"
+              className="flex items-center space-x-3 px-2 py-1.5 rounded-md hover:bg-white/5 transition-all duration-200 group"
             >
               <div
-                className={`w-8 h-8 rounded-full ${getAvatarColor(user.email)} flex items-center justify-center text-white text-sm font-bold`}
+                className={`w-7 h-7 rounded-md ${getAvatarColor(user.email)} flex items-center justify-center text-white text-sm font-medium shadow-sm`}
               >
                 {getInitials(user.email)}
               </div>
               <div className="hidden sm:block text-left">
-                <div className="text-sm font-medium text-white">
+                <div className="text-sm font-medium text-white group-hover:text-purple-300 transition-colors">
                   {user.email?.split('@')[0]}
                 </div>
-                <div className="text-xs text-gray-400">View profile</div>
+                <div className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors">
+                  View profile
+                </div>
               </div>
               <ChevronDown
-                className={`w-4 h-4 text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}
+                className={`w-4 h-4 text-gray-400 group-hover:text-gray-300 transition-all duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}
               />
             </button>
 
             {/* Dropdown Menu */}
             {isDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-gray-800/95 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg z-50">
-                <div className="p-4 border-b border-gray-700">
+              <div className="absolute right-0 mt-1 w-64 bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-lg shadow-xl z-50 overflow-hidden">
+                <div className="p-3 border-b border-white/10">
                   <div className="flex items-center space-x-3">
                     <div
-                      className={`w-10 h-10 rounded-full ${getAvatarColor(user.email)} flex items-center justify-center text-white font-bold`}
+                      className={`w-9 h-9 rounded-md ${getAvatarColor(user.email)} flex items-center justify-center text-white font-medium shadow-sm`}
                     >
                       {getInitials(user.email)}
                     </div>
@@ -166,11 +168,11 @@ export default function Navlinks({ user, subscription }: NavlinksProps) {
                   </div>
                 </div>
 
-                <div className="p-2">
+                <div className="p-1.5">
                   <Link
                     href="/account"
                     onClick={() => setIsDropdownOpen(false)}
-                    className="flex items-center space-x-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
+                    className="flex items-center space-x-3 px-3 py-1.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-md transition-all duration-200"
                   >
                     <User className="w-4 h-4" />
                     <span>Account Settings</span>
@@ -180,7 +182,7 @@ export default function Navlinks({ user, subscription }: NavlinksProps) {
                     <Link
                       href="/referrals"
                       onClick={() => setIsDropdownOpen(false)}
-                      className="flex items-center space-x-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-lg transition-colors"
+                      className="flex items-center space-x-3 px-3 py-1.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-md transition-all duration-200"
                     >
                       <Users className="w-4 h-4" />
                       <span>Referral Program</span>
@@ -196,10 +198,10 @@ export default function Navlinks({ user, subscription }: NavlinksProps) {
                     <input type="hidden" name="pathName" value={pathname} />
                     <button
                       type="submit"
-                      className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-gray-300 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                      className="w-full flex items-center space-x-3 px-3 py-1.5 text-sm text-gray-300 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all duration-200"
                     >
                       <LogOut className="w-4 h-4" />
-                      <span>Sign out</span>
+                      <span>Sign Out</span>
                     </button>
                   </form>
                 </div>
@@ -207,16 +209,16 @@ export default function Navlinks({ user, subscription }: NavlinksProps) {
             )}
           </div>
         ) : (
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
             <Link
               href="/signin"
-              className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white transition-colors"
+              className="px-3 py-1.5 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 rounded-md transition-all duration-200"
             >
               Sign In
             </Link>
             <Link
-              href="/pricing"
-              className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
+              href="/signin"
+              className="px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-500 rounded-md transition-all duration-200"
             >
               Get Started
             </Link>

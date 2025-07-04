@@ -2,13 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import {
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  Target,
-  Activity
-} from 'lucide-react';
+
 import { Database } from '@/types_db';
 import { ApexOptions } from 'apexcharts';
 
@@ -26,7 +20,7 @@ type Position = Database['public']['Tables']['positions']['Row'];
 
 interface BalanceChartProps {
   positions: Position[];
-  accountSize: number;
+  accountSize?: number;
 }
 
 interface BalanceDataPoint {
@@ -58,7 +52,7 @@ const calculateMaxDrawdown = (balances: number[]): number => {
 
 export default function BalanceChart({
   positions,
-  accountSize
+  accountSize = 10000
 }: BalanceChartProps) {
   const [timeframe, setTimeframe] = useState<'1M' | '3M' | '6M' | '1Y' | 'ALL'>(
     '3M'
@@ -290,12 +284,15 @@ export default function BalanceChart({
         }
       },
       yaxis: {
+        min: 8000,
+        max: 12000,
+        tickAmount: 4,
         labels: {
           style: {
             colors: '#9ca3af'
           },
           formatter: function (value: number) {
-            return '$' + value.toFixed(2);
+            return '$' + value.toFixed(0);
           }
         }
       },
@@ -367,80 +364,6 @@ export default function BalanceChart({
               {tf}
             </button>
           ))}
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-        <div className="bg-gray-800 rounded-lg p-4">
-          <div className="flex items-center space-x-2">
-            <DollarSign className="h-4 w-4 text-green-400" />
-            <span className="text-gray-400 text-sm">Balance</span>
-          </div>
-          <div className="text-xl font-bold text-white mt-1">
-            ${stats.currentBalance.toLocaleString()}
-          </div>
-        </div>
-
-        <div className="bg-gray-800 rounded-lg p-4">
-          <div className="flex items-center space-x-2">
-            {stats.totalReturn >= 0 ? (
-              <TrendingUp className="h-4 w-4 text-green-400" />
-            ) : (
-              <TrendingDown className="h-4 w-4 text-red-400" />
-            )}
-            <span className="text-gray-400 text-sm">Total Return</span>
-          </div>
-          <div
-            className={`text-xl font-bold mt-1 ${
-              stats.totalReturn >= 0 ? 'text-green-400' : 'text-red-400'
-            }`}
-          >
-            {stats.totalReturnPercent >= 0 ? '+' : ''}
-            {stats.totalReturnPercent.toFixed(1)}%
-          </div>
-          <div
-            className={`text-sm ${stats.totalReturn >= 0 ? 'text-green-400' : 'text-red-400'}`}
-          >
-            {stats.totalReturn >= 0 ? '+' : ''}$
-            {Math.abs(stats.totalReturn).toLocaleString()}
-          </div>
-        </div>
-
-        <div className="bg-gray-800 rounded-lg p-4">
-          <div className="flex items-center space-x-2">
-            <Target className="h-4 w-4 text-blue-400" />
-            <span className="text-gray-400 text-sm">Win Rate</span>
-          </div>
-          <div className="text-xl font-bold text-white mt-1">
-            {stats.winRate.toFixed(1)}%
-          </div>
-          <div className="text-sm text-gray-400">
-            {stats.totalTrades} closed
-          </div>
-        </div>
-
-        <div className="bg-gray-800 rounded-lg p-4">
-          <div className="flex items-center space-x-2">
-            <Activity className="h-4 w-4 text-orange-400" />
-            <span className="text-gray-400 text-sm">Open Positions</span>
-          </div>
-          <div className="text-xl font-bold text-white mt-1">
-            {stats.openPositions || 0}
-          </div>
-          <div className="text-sm text-gray-400">
-            {stats.totalPositions} total
-          </div>
-        </div>
-
-        <div className="bg-gray-800 rounded-lg p-4">
-          <div className="flex items-center space-x-2">
-            <TrendingDown className="h-4 w-4 text-red-400" />
-            <span className="text-gray-400 text-sm">Max Drawdown</span>
-          </div>
-          <div className="text-xl font-bold text-red-400 mt-1">
-            -{stats.maxDrawdown.toFixed(1)}%
-          </div>
         </div>
       </div>
 

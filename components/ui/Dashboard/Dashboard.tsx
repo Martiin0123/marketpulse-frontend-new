@@ -69,11 +69,6 @@ export default function Dashboard({
       supabase.removeChannel(channel);
     };
   }, [supabase]);
-
-  const buyPositions = positions.filter((position) => position.type === 'buy');
-  const sellPositions = positions.filter(
-    (position) => position.type === 'sell'
-  );
   const openPositions = positions.filter(
     (position) => position.status === 'open'
   );
@@ -82,7 +77,6 @@ export default function Dashboard({
   );
   const totalPositions = positions.length;
   const recentPositions = positions.slice(0, 10);
-  console.log('recentPositions', recentPositions);
 
   // Calculate win rate
   const winningTrades = closedPositions.filter(
@@ -273,7 +267,11 @@ export default function Dashboard({
 
         {/* Balance Chart */}
         <div className="mt-8">
-          <BalanceChart positions={positions} accountSize={accountSize} />
+          <BalanceChart
+            positions={positions}
+            winRate={winRate.toFixed(1)}
+            accountSize={accountSize}
+          />
         </div>
 
         {/* Recent Positions */}

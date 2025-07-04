@@ -9,12 +9,9 @@ export const getUser = cache(async (supabase: SupabaseClient) => {
 });
 
 export const getSubscription = cache(async (supabase: SupabaseClient) => {
-  console.log("[SERVER] Starting subscription fetch");
   const { data: user } = await supabase.auth.getUser();
-  console.log("[SERVER] Auth user data:", user);
   
   if (!user.user?.id) {
-    console.log("[SERVER] No user found");
     return null;
   }
 
@@ -25,11 +22,6 @@ export const getSubscription = cache(async (supabase: SupabaseClient) => {
     .eq('id', user.user.id)
     .single();
 
-  console.log('[SERVER] Database user check:', {
-    userId: user.user.id,
-    dbUser,
-    error: userError
-  });
 
   // Check if user has a customer record
   const { data: customer, error: customerError } = await supabase
@@ -37,12 +29,6 @@ export const getSubscription = cache(async (supabase: SupabaseClient) => {
     .select('*')
     .eq('id', user.user.id)
     .single();
-
-  console.log('[SERVER] Customer record check:', {
-    userId: user.user.id,
-    customer,
-    error: customerError
-  });
 
   // Check all subscriptions regardless of status
   const { data: allSubscriptions, error: listError } = await supabase
@@ -66,12 +52,6 @@ export const getSubscription = cache(async (supabase: SupabaseClient) => {
     `)
     .eq('user_id', user.user.id);
 
-  console.log('[SERVER] All subscriptions check:', {
-    userId: user.user.id,
-    subscriptions: allSubscriptions,
-    error: listError
-  });
-
   if (listError) {
     console.error('[SERVER] Error checking subscriptions:', listError);
     return null;
@@ -79,12 +59,10 @@ export const getSubscription = cache(async (supabase: SupabaseClient) => {
 
   // If no subscriptions found at all
   if (!allSubscriptions || allSubscriptions.length === 0) {
-    console.log('[SERVER] No subscriptions found for user');
     return null;
   }
 
   // Now try to get the active subscription with all relations
-  console.log('[SERVER] Found subscriptions, fetching active one with relations');
   const { data: subscription, error } = await supabase
     .from('subscriptions')
     .select(`
@@ -135,16 +113,10 @@ export const getSubscription = cache(async (supabase: SupabaseClient) => {
     return null;
   }
 
-  console.log('[SERVER] Final subscription result:', {
-    subscription,
-    error
-  });
-  
   return subscription;
 });
 
 export const getProducts = cache(async (supabase: SupabaseClient) => {
-  console.log('Fetching products...');
   const { data: products, error } = await supabase
     .from('products')
     .select(`
@@ -177,7 +149,6 @@ export const getProducts = cache(async (supabase: SupabaseClient) => {
     return [];
   }
 
-  console.log('Raw products data:', products);
   return products;
 });
 
@@ -256,6 +227,60 @@ export const getClosedPositions = cache(async (supabase: SupabaseClient) => {
   return positions;
 });
 
+export const getClosedPositionsCurrentMonth = cache(async (supabase: SupabaseClient) => {
+  // Get the start and end of the current month in 2025
+  const now = new Date();
+  const startOfMonth = new Date(2025, now.getMonth(), 1);
+  const endOfMonth = new Date(2025, now.getMonth() + 1, 0, 23, 59, 59);
+  
+  console.log('startOfMonth', startOfMonth);
+  console.log('endOfMonth', endOfMonth);
+  
+  // Convert to ISO strings for proper comparison
+  const startDate = startOfMonth.toISOString();
+  const endDate = endOfMonth.toISOString();
+
+  console.log('startDate', startDate);
+  console.log('endDate', endDate);
+
+  // First, let's see what positions exist
+  const { data: allPositions, error: allError } = await supabase
+    .from('positions')
+    .select('*')
+    .limit(10);
+
+  console.log('All positions:', allPositions);
+  console.log('All positions error:', allError);
+
+  // Now check for closed positions
+  const { data: closedPositions, error: closedError } = await supabase
+    .from('positions')
+    .select('*')
+    .eq('status', 'closed');
+
+  console.log('Closed positions:', closedPositions);
+  console.log('Closed positions error:', closedError);
+
+  // Finally, apply the full filter using ISO date strings
+  const { data: positions, error } = await supabase
+    .from('positions')
+    .select('*')
+    .eq('status', 'closed')
+    .not('exit_timestamp', 'is', null)
+    .gte('exit_timestamp', startDate)
+    .lte('exit_timestamp', endDate)
+    .order('exit_timestamp', { ascending: false });
+
+  console.log('Filtered positions:', positions);
+  console.log('Filtered positions error:', error);
+
+  if (error) {
+    return [];
+  }
+
+  return positions;
+});
+
 // Referral-related queries
 export const getUserReferralCode = cache(async (supabase: SupabaseClient) => {
   const { data: user } = await supabase.auth.getUser();
@@ -271,7 +296,6 @@ export const getUserReferralCode = cache(async (supabase: SupabaseClient) => {
     .single();
 
   if (error && error.code !== 'PGRST116') {
-    console.error('Error fetching referral code:', error);
     return null;
   }
 
@@ -293,7 +317,6 @@ export const getReferrals = cache(async (supabase: SupabaseClient) => {
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching referrals:', error);
     return [];
   }
 

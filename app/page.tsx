@@ -5,6 +5,7 @@ import Stats from '@/components/ui/Stats/Stats';
 import CTA from '@/components/ui/CTA/CTA';
 import { createClient } from '@/utils/supabase/server';
 import { getUser } from '@/utils/supabase/queries';
+import { getClosedPositionsCurrentMonth } from '@/utils/supabase/queries';
 
 interface MonthlyPnL {
   totalPnL: number;
@@ -27,27 +28,8 @@ async function getMonthlyPnL(supabase: any): Promise<MonthlyPnL | undefined> {
     0
   ).toISOString();
 
-  // Fetch closed positions for the current month
-  const { data: positions, error } = await supabase
-    .from('positions')
-    .select('*')
-    .eq('status', 'closed')
-    .gte('exit_timestamp', Math.floor(new Date(startOfMonth).getTime() / 1000))
-    .lte('exit_timestamp', Math.floor(new Date(endOfMonth).getTime() / 1000))
-    .order('exit_timestamp', { ascending: true });
-
-  if (error) {
-    console.error('Error fetching monthly PnL:', error);
-    return undefined;
-  }
-
-  console.log('Monthly PnL Query:', {
-    startOfMonth,
-    endOfMonth,
-    startTimestamp: Math.floor(new Date(startOfMonth).getTime() / 1000),
-    endTimestamp: Math.floor(new Date(endOfMonth).getTime() / 1000),
-    positionsCount: positions?.length || 0
-  });
+  const positions = await getClosedPositionsCurrentMonth(supabase);
+  console.log('positions', positions);
 
   // Calculate total PnL and count profitable positions
   let runningBalance = 0;

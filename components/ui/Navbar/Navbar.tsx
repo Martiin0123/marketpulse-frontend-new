@@ -12,8 +12,8 @@ export default async function Navbar() {
   const subscription = user ? await getSubscription(supabase) : null;
 
   return (
-    <nav className="sticky top-0 z-50 bg-gray-900/50 backdrop-blur-sm border-b border-gray-800">
-      <div className="max-w-7xl mx-auto px-4">
+    <nav className="sticky top-0 z-50 bg-gray-900/80 backdrop-blur-xl border-b border-gray-800/50 shadow-lg">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <Navlinks user={user} subscription={subscription} />
       </div>
     </nav>

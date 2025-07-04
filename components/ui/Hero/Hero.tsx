@@ -133,14 +133,6 @@ export default function Hero({ user, monthlyPnL }: HeroProps) {
           {/* Left Column - Content */}
           <div className="text-center lg:text-left">
             {/* Performance Badge */}
-            <div className="inline-flex items-center px-4 py-2 bg-white/5 backdrop-blur-sm rounded-full mb-8">
-              <TrendingUp className="w-4 h-4 text-purple-400 mr-2" />
-              <span className="text-purple-200 text-sm font-medium">
-                Monthly Performance:{' '}
-                <span className={pnlColor}>{formattedPnL}</span>
-              </span>
-            </div>
-
             {/* Main Headline */}
             <h1 className="text-5xl sm:text-6xl font-bold text-white mb-6 leading-tight">
               AI-Powered
