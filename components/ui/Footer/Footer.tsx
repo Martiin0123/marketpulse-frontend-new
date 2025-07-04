@@ -11,7 +11,12 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
-export default function Footer() {
+interface FooterProps {
+  user?: any;
+  subscription?: any;
+}
+
+export default function Footer({ user, subscription }: FooterProps) {
   return (
     <footer className="bg-slate-900 border-t border-slate-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -19,10 +24,9 @@ export default function Footer() {
           {/* Logo and Description */}
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center space-x-2 mb-4">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">M</span>
-              </div>
-              <span className="text-white font-bold text-xl">PrimeScope</span>
+              <Link href="/">
+                <Logo />
+              </Link>
             </div>
             <p className="text-slate-400 mb-6 max-w-md">
               Advanced AI-powered trading signals and market analysis to help
@@ -73,14 +77,16 @@ export default function Footer() {
                   Trading Signals
                 </Link>
               </li>
-              <li>
-                <Link
-                  href="/pricing"
-                  className="text-slate-400 hover:text-white transition-colors"
-                >
-                  Pricing
-                </Link>
-              </li>
+              {!subscription && (
+                <li>
+                  <Link
+                    href="/pricing"
+                    className="text-slate-400 hover:text-white transition-colors"
+                  >
+                    Pricing
+                  </Link>
+                </li>
+              )}
               <li>
                 <Link
                   href="/dashboard"

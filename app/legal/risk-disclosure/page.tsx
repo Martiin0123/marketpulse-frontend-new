@@ -98,7 +98,31 @@ export default function RiskDisclosure() {
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">6. Acknowledgment</h2>
+        <h2 className="text-xl font-semibold mb-4">
+          6. Performance Guarantee and Refund Policy
+        </h2>
+        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-6 mb-4">
+          <p className="font-bold mb-4 text-emerald-800">REFUND POLICY:</p>
+          <div className="space-y-3 text-emerald-700">
+            <p>
+              You are eligible for a full refund of your subscription fee for
+              any month in which PrimeScope's published signal results show a
+              net loss.
+            </p>
+            <p>
+              Refunds are based solely on the performance displayed on our
+              platform, not on individual user trading results.
+            </p>
+            <p>
+              PrimeScope is not responsible for users' personal trading activity
+              or outcomes.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-xl font-semibold mb-4">7. Acknowledgment</h2>
         <p className="mb-4">
           By using this platform, you acknowledge and agree that:
         </p>

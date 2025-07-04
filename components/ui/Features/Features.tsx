@@ -189,6 +189,34 @@ export default function Features() {
             </p>
           </div>
         </div>
+
+        {/* Performance Guarantee FAQ */}
+        <div className="mt-20 text-center">
+          <div className="max-w-4xl mx-auto">
+            <div className="inline-flex items-center px-6 py-3 bg-emerald-500/10 backdrop-blur-sm rounded-full border border-emerald-500/30 mb-8">
+              <Shield className="w-5 h-5 text-emerald-400 mr-3" />
+              <span className="text-emerald-200 text-sm font-medium">
+                Performance Guarantee
+              </span>
+            </div>
+
+            <h3 className="text-2xl font-bold text-white mb-6">
+              What if the signals don't perform well?
+            </h3>
+
+            <div className="bg-slate-800/30 backdrop-blur-sm rounded-xl border border-slate-700/50 p-8 max-w-3xl mx-auto">
+              <p className="text-lg text-slate-200 mb-4 leading-relaxed">
+                We believe in transparency. If the signals we publish on our
+                platform result in a net loss for the month, you'll receive a
+                full refund for that billing cycle.
+              </p>
+              <p className="text-slate-400 text-sm">
+                You don't need to prove anything — your personal trades are not
+                our responsibility.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );

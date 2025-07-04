@@ -20,7 +20,8 @@ import {
   Eye,
   Clock,
   Target,
-  AlertTriangle
+  AlertTriangle,
+  Sparkles
 } from 'lucide-react';
 
 type Subscription = Tables<'subscriptions'>;
@@ -139,55 +140,6 @@ export default function Pricing({ user, products, subscription }: Props) {
     router.push('/dashboard');
   };
 
-  // Feature lists for different plans
-  const getFeatures = (productName: string) => {
-    const baseFeatures = [
-      {
-        icon: <TrendingUp className="w-5 h-5" />,
-        text: 'Live trading signals'
-      },
-      {
-        icon: <Star className="w-5 h-5" />,
-        text: 'Proven by real traders worldwide'
-      }
-    ];
-
-    const proFeatures = [
-      {
-        icon: <TrendingUp className="w-5 h-5" />,
-        text: 'Live trading signals'
-      },
-      {
-        icon: <Bell className="w-5 h-5" />,
-        text: 'Instant notifications'
-      }
-    ];
-
-    const premiumFeatures = [
-      {
-        icon: <TrendingUp className="w-5 h-5" />,
-        text: 'Live trading signals'
-      },
-      {
-        icon: <Shield className="w-5 h-5" />,
-        text: 'Priority support'
-      }
-    ];
-
-    if (
-      productName?.toLowerCase().includes('premium') ||
-      productName?.toLowerCase().includes('pro')
-    ) {
-      return premiumFeatures;
-    } else if (
-      productName?.toLowerCase().includes('professional') ||
-      productName?.toLowerCase().includes('standard')
-    ) {
-      return proFeatures;
-    }
-    return baseFeatures;
-  };
-
   if (!products.length) {
     return (
       <section className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -239,7 +191,7 @@ export default function Pricing({ user, products, subscription }: Props) {
           {/* Header Section */}
           <div className="text-center mb-20">
             <div className="inline-flex items-center px-4 py-2 bg-blue-500/10 backdrop-blur-sm rounded-full border border-blue-500/30 mb-6">
-              <Star className="w-4 h-4 text-blue-400 mr-2" />
+              <Sparkles className="w-4 h-4 text-blue-400 mr-2" />
               <span className="text-blue-200 text-sm font-medium">
                 Choose Your Plan
               </span>
@@ -288,182 +240,123 @@ export default function Pricing({ user, products, subscription }: Props) {
             </div>
           </div>
 
-          {/* Pricing Cards */}
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-8 max-w-7xl mx-auto mb-20">
-            {products.map((product, index) => {
-              const price = product?.prices?.find(
-                (price) => price.interval === billingInterval
-              );
-              if (!price) return null;
-
-              const priceString = new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: price.currency!,
-                minimumFractionDigits: 0
-              }).format((price?.unit_amount || 0) / 100);
-
-              const isPopular =
-                index === 1 || product.name?.toLowerCase().includes('pro');
-              const isCurrentPlan =
-                subscription?.prices?.products?.name === product.name;
-              const features = getFeatures(product.name || '');
-
-              return (
-                <div
-                  key={product.id}
-                  className={cn(
-                    'relative bg-slate-800/30 backdrop-blur-sm rounded-3xl border p-10 transition-all duration-500 hover:scale-105 hover:shadow-2xl',
-                    {
-                      'border-blue-500/50 shadow-2xl shadow-blue-500/25 bg-slate-800/40':
-                        isPopular,
-                      'border-emerald-500/50 shadow-2xl shadow-emerald-500/25 bg-slate-800/40':
-                        isCurrentPlan,
-                      'border-slate-700/50 hover:border-slate-600/50 bg-slate-800/20':
-                        !isPopular && !isCurrentPlan
-                    }
-                  )}
-                >
-                  {/* Popular Badge */}
-                  {isPopular && (
-                    <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
-                      <div className="bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
-                        <Star className="w-4 h-4 mr-2" />
-                        Most Popular
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Current Plan Badge */}
-                  {isCurrentPlan && (
-                    <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
-                      <div className="bg-gradient-to-r from-emerald-500 to-green-500 px-6 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
-                        <Check className="w-4 h-4 mr-2" />
-                        Current Plan
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Plan Header */}
-                  <div className="text-center mb-10">
-                    <h3 className="text-3xl font-bold text-white mb-4">
-                      {product.name}
-                    </h3>
-                    <p className="text-slate-400 text-lg mb-8 leading-relaxed">
-                      {product.description}
-                    </p>
-
-                    {/* Price */}
-                    <div className="mb-8">
-                      <span className="text-6xl font-bold bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 bg-clip-text text-transparent">
-                        {priceString}
-                      </span>
-                      <span className="text-slate-400 text-xl ml-2">
-                        /{billingInterval}
-                      </span>
-                    </div>
-
-                    {/* CTA Button */}
-                    {isCurrentPlan ? (
-                      <Button
-                        variant="slim"
-                        onClick={handleViewDashboard}
-                        className="w-full"
-                      >
-                        View Dashboard
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="slim"
-                        type="button"
-                        loading={priceIdLoading === price.id}
-                        onClick={() => handleStripeCheckout(price)}
-                        className="w-full"
-                      >
-                        {subscription ? 'Change Plan' : 'Get Started'}
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Features List */}
-                  <div className="space-y-6">
-                    <h4 className="text-xl font-bold text-white mb-6 text-center">
-                      What's included:
-                    </h4>
-                    {features.map((feature, featureIndex) => (
-                      <div
-                        key={featureIndex}
-                        className="flex items-center space-x-4 p-3 rounded-xl bg-slate-700/30 hover:bg-slate-700/50 transition-all"
-                      >
-                        <div className="flex-shrink-0 w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
-                          <div className="text-blue-400">{feature.icon}</div>
-                        </div>
-                        <span className="text-slate-200 font-medium">
-                          {feature.text}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Features Highlight Section */}
-          <div className="text-center">
-            <div className="inline-flex items-center px-4 py-2 bg-blue-500/10 backdrop-blur-sm rounded-full border border-blue-500/30 mb-8">
-              <Shield className="w-4 h-4 text-blue-400 mr-2" />
-              <span className="text-blue-200 text-sm font-medium">
-                Why Choose PrimeScope?
+          {/* Money Back Guarantee */}
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center px-6 py-3 bg-emerald-500/10 backdrop-blur-sm rounded-full border border-emerald-500/30">
+              <Shield className="w-5 h-5 text-emerald-400 mr-3" />
+              <span className="text-emerald-200 text-sm font-medium">
+                Performance Guarantee
               </span>
             </div>
+            <div className="mt-4 max-w-2xl mx-auto">
+              <p className="text-lg text-white font-semibold mb-2">
+                If our own signal performance for the month is negative, you get
+                your subscription fee refunded — automatically.
+              </p>
+              <p className="text-slate-300 text-sm">
+                You are never judged by your trades, only ours.
+              </p>
+            </div>
+          </div>
 
-            <h2 className="text-4xl font-bold text-white mb-6">
-              Advanced Trading Technology
-            </h2>
-            <p className="text-xl text-slate-300 mb-16 max-w-3xl mx-auto leading-relaxed">
-              Advanced trading signals and market analysis to help you make
-              profitable decisions with confidence
-            </p>
+          {/* Pricing Cards */}
+          <div className="flex justify-center">
+            <div className="grid grid-cols-1 gap-8 max-w-md">
+              {products.map((product, index) => {
+                const price = product?.prices?.find(
+                  (price) => price.interval === billingInterval
+                );
+                if (!price) return null;
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-5xl mx-auto">
-              <div className="text-center group">
-                <div className="w-20 h-20 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <TrendingUp className="w-10 h-10 text-blue-400" />
-                </div>
-                <h3 className="text-2xl font-bold text-white mb-4">
-                  Real-Time Signals
-                </h3>
-                <p className="text-slate-400 text-lg leading-relaxed">
-                  Get instant buy/sell signals based on advanced technical
-                  analysis and market trends
-                </p>
-              </div>
+                const priceString = new Intl.NumberFormat('en-US', {
+                  style: 'currency',
+                  currency: price.currency!,
+                  minimumFractionDigits: 0
+                }).format((price?.unit_amount || 0) / 100);
 
-              <div className="text-center group">
-                <div className="w-20 h-20 bg-gradient-to-br from-emerald-500/20 to-green-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <BarChart3 className="w-10 h-10 text-emerald-400" />
-                </div>
-                <h3 className="text-2xl font-bold text-white mb-4">
-                  Technical Analysis
-                </h3>
-                <p className="text-slate-400 text-lg leading-relaxed">
-                  RSI, MACD, and other indicators to validate trading
-                  opportunities and market conditions
-                </p>
-              </div>
+                const isPopular =
+                  index === 1 || product.name?.toLowerCase().includes('pro');
+                const isCurrentPlan =
+                  subscription?.prices?.products?.name === product.name;
 
-              <div className="text-center group">
-                <div className="w-20 h-20 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <Shield className="w-10 h-10 text-cyan-400" />
-                </div>
-                <h3 className="text-2xl font-bold text-white mb-4">
-                  Risk Management
-                </h3>
-                <p className="text-slate-400 text-lg leading-relaxed">
-                  Built-in risk assessment and position sizing to help protect
-                  your investments
-                </p>
-              </div>
+                return (
+                  <div
+                    key={product.id}
+                    className={cn(
+                      'relative bg-slate-800/30 backdrop-blur-sm rounded-3xl border p-8 transition-all duration-500 hover:scale-105 hover:shadow-2xl group',
+                      {
+                        'border-blue-500/50 shadow-2xl shadow-blue-500/25 bg-slate-800/40':
+                          isPopular,
+                        'border-emerald-500/50 shadow-2xl shadow-emerald-500/25 bg-slate-800/40':
+                          isCurrentPlan,
+                        'border-slate-700/50 hover:border-slate-600/50 bg-slate-800/20':
+                          !isPopular && !isCurrentPlan
+                      }
+                    )}
+                  >
+                    {/* Popular Badge */}
+                    {isPopular && (
+                      <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
+                        <div className="bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
+                          <Star className="w-4 h-4 mr-2" />
+                          Most Popular
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Current Plan Badge */}
+                    {isCurrentPlan && (
+                      <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
+                        <div className="bg-gradient-to-r from-emerald-500 to-green-500 px-6 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
+                          <Check className="w-4 h-4 mr-2" />
+                          Current Plan
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Plan Header */}
+                    <div className="text-center mb-8">
+                      {/* Price */}
+                      <div className="mb-6">
+                        <span className="text-5xl font-bold bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 bg-clip-text text-transparent">
+                          {priceString}
+                        </span>
+                        <span className="text-slate-400 text-lg ml-2">
+                          /{billingInterval}
+                        </span>
+                      </div>
+
+                      <h3 className="text-2xl font-bold text-white mb-4">
+                        {product.name}
+                      </h3>
+                      <p className="text-slate-400 text-sm mb-6 leading-relaxed">
+                        {product.description}
+                      </p>
+
+                      {/* CTA Button */}
+                      {isCurrentPlan ? (
+                        <Button
+                          variant="slim"
+                          onClick={handleViewDashboard}
+                          className="w-full group-hover:scale-105 transition-transform duration-300"
+                        >
+                          View Dashboard
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="slim"
+                          type="button"
+                          loading={priceIdLoading === price.id}
+                          onClick={() => handleStripeCheckout(price)}
+                          className="w-full group-hover:scale-105 transition-transform duration-300"
+                        >
+                          {subscription ? 'Change Plan' : 'Get Started'}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

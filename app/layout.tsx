@@ -7,6 +7,8 @@ import { getURL } from '@/utils/helpers';
 import 'styles/main.css';
 import { GeistSans } from 'geist/font/sans';
 import { SpeedInsights } from '@vercel/speed-insights/react';
+import { createClient } from '@/utils/supabase/server';
+import { getUser, getSubscription } from '@/utils/supabase/queries';
 
 const title = 'PrimeScope - AI-Powered Trading Platform';
 const description =
@@ -39,7 +41,11 @@ export const metadata: Metadata = {
   }
 };
 
-export default function RootLayout({ children }: PropsWithChildren) {
+export default async function RootLayout({ children }: PropsWithChildren) {
+  const supabase = createClient();
+  const user = await getUser(supabase);
+  const subscription = user ? await getSubscription(supabase) : null;
+
   return (
     <html lang="en" className={GeistSans.className}>
       <body className="bg-slate-900 text-white">
@@ -50,7 +56,7 @@ export default function RootLayout({ children }: PropsWithChildren) {
         >
           {children}
         </main>
-        <Footer />
+        <Footer user={user} subscription={subscription} />
         <Suspense>
           <Toaster />
         </Suspense>

@@ -5,6 +5,7 @@ import Stats from '@/components/ui/Stats/Stats';
 import CTA from '@/components/ui/CTA/CTA';
 import { createClient } from '@/utils/supabase/server';
 import { getUser } from '@/utils/supabase/queries';
+import { getSubscription } from '@/utils/supabase/queries';
 import {
   getClosedPositionsCurrentMonth,
   getPositions
@@ -77,6 +78,7 @@ async function getMonthlyPnL(supabase: any): Promise<MonthlyPnL | undefined> {
 export default async function HomePage() {
   const supabase = createClient();
   const user = await getUser(supabase);
+  const subscription = user ? await getSubscription(supabase) : null;
   const monthlyPnL = await getMonthlyPnL(supabase);
   const positions = await getPositions(supabase);
 

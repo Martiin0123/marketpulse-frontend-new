@@ -5,8 +5,8 @@ export default function Logo() {
     <Image
       src="/primescope-full.png"
       alt="PrimeScope Logo"
-      width={32}
-      height={32}
+      width={82}
+      height={82}
       className="rounded-lg"
     />
   );
