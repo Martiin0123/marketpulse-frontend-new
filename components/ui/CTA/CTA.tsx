@@ -68,10 +68,9 @@ export default function CTA({ user }: CTAProps) {
             )}
 
             {/* Trust Stats */}
-            <div className="mt-8 grid grid-cols-3 gap-4 text-center text-sm text-slate-400">
-              <div>50,000+ Active Traders</div>
-              <div>94.2% Accuracy Rate</div>
-              <div>$2.5B+ Volume</div>
+            <div className="mt-8 grid grid-cols-1 gap-4 text-center text-sm text-slate-400">
+              <div>20+ Active Traders</div>
+              <div>60% Win Rate</div>
             </div>
           </div>
         </div>

@@ -46,9 +46,11 @@ export default function RiskDisclosure() {
 
       <section className="mb-8">
         <h2 className="text-xl font-semibold mb-4">3. No Investment Advice</h2>
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-4">
-          <p className="font-bold mb-4">IMPORTANT DISCLAIMERS:</p>
-          <ul className="list-disc pl-6 space-y-2">
+        <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-6 mb-4">
+          <p className="font-bold mb-4 text-yellow-800">
+            IMPORTANT DISCLAIMERS:
+          </p>
+          <ul className="list-disc pl-6 space-y-2 text-yellow-800">
             <li>We do NOT provide investment advice or recommendations</li>
             <li>Our trading signals are for educational purposes ONLY</li>
             <li>
@@ -86,9 +88,11 @@ export default function RiskDisclosure() {
         <h2 className="text-xl font-semibold mb-4">
           5. AI-Generated Signals Disclaimer
         </h2>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-4">
-          <p className="mb-4">Our AI-generated trading signals:</p>
-          <ul className="list-disc pl-6 space-y-2">
+        <div className="bg-blue-100 border border-blue-300 rounded-lg p-6 mb-4">
+          <p className="mb-4 text-blue-800 font-semibold">
+            Our AI-generated trading signals:
+          </p>
+          <ul className="list-disc pl-6 space-y-2 text-blue-800">
             <li>Are experimental and for educational purposes only</li>
             <li>May not reflect real market conditions</li>
             <li>Should not be relied upon for real investment decisions</li>

@@ -60,13 +60,13 @@ export default function Terms() {
         <h2 className="text-xl font-semibold mb-4">
           4. Disclaimer of Warranties
         </h2>
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-4">
-          <p className="mb-4">
+        <div className="bg-gray-100 border border-gray-300 rounded-lg p-6 mb-4">
+          <p className="mb-4 text-gray-800 font-semibold">
             THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT
             WARRANTIES OF ANY KIND, WHETHER EXPRESS OR IMPLIED. WE SPECIFICALLY
             DISCLAIM:
           </p>
-          <ul className="list-disc pl-6 space-y-2">
+          <ul className="list-disc pl-6 space-y-2 text-gray-800">
             <li>
               Any implied warranties of merchantability, fitness for a
               particular purpose, or non-infringement
