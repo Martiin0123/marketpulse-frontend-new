@@ -332,40 +332,28 @@ export type Database = {
       }
       signals: {
         Row: {
-          created_at: string
-          id: number
-          macd: number | null
-          price: number
-          reason: string | null
-          risk: number | null
-          rsi: number | null
+          id: string
           symbol: string
-          timestamp: number
           type: string
+          entry_price: number
+          created_at: string
+          metadata: Json | null
         }
         Insert: {
-          created_at?: string
-          id?: number
-          macd?: number | null
-          price: number
-          reason?: string | null
-          risk?: number | null
-          rsi?: number | null
+          id?: string
           symbol: string
-          timestamp: number
-          typ: string
+          type: string
+          entry_price: number
+          created_at?: string
+          metadata?: Json | null
         }
         Update: {
-          created_at?: string
-          id?: number
-          macd?: number | null
-          price?: number
-          reason?: string | null
-          risk?: number | null
-          rsi?: number | null
+          id?: string
           symbol?: string
-          timestamp?: number
-          typ?: string
+          type?: string
+          entry_price?: number
+          created_at?: string
+          metadata?: Json | null
         }
         Relationships: []
       }

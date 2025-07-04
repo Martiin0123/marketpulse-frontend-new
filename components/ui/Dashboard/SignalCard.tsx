@@ -18,20 +18,22 @@ export default function SignalCard({ signal, position }: Props) {
   const isClose = signal
     ? signal.type === 'close'
     : position?.status === 'closed';
-  const riskLevel = signal?.risk || position?.risk || 1;
+  const riskLevel = position?.risk || 1; // Risk is only available for positions
   const price =
-    signal?.price ||
+    signal?.entry_price ||
     (position?.status === 'closed'
       ? position?.exit_price
       : position?.entry_price);
   const symbol = signal?.symbol || position?.symbol;
   const timestamp =
-    (signal?.timestamp || position?.status === 'closed'
+    signal?.created_at ||
+    (position?.status === 'closed'
       ? position?.exit_timestamp
-      : position?.entry_timestamp) || Date.now() / 1000;
-  const rsi = signal?.rsi || position?.rsi;
-  const macd = signal?.macd || position?.macd;
-  const reason = signal?.reason || position?.reason;
+      : position?.entry_timestamp) ||
+    Date.now() / 1000;
+  const rsi = position?.rsi; // RSI is only available for positions
+  const macd = position?.macd; // MACD is only available for positions
+  const reason = position?.reason; // Reason is only available for positions
   const id = signal?.id || position?.id;
 
   const getRiskColor = (risk: number) => {
@@ -82,7 +84,7 @@ export default function SignalCard({ signal, position }: Props) {
     } else if (diffInMinutes < 1440) {
       return `${Math.floor(diffInMinutes / 60)}h ago`;
     } else {
-      return date.toLocaleDateString();
+      return date.toLocaleDateString('en-US');
     }
   };
 
@@ -101,11 +103,13 @@ export default function SignalCard({ signal, position }: Props) {
             </span>
           </div>
         </div>
-        <div
-          className={`px-3 py-1 rounded-full text-xs font-medium ${getRiskColor(riskLevel)}`}
-        >
-          {isClose ? 'CLOSED' : `${(riskLevel * 100).toFixed(0)}% Risk`}
-        </div>
+        {position && (
+          <div
+            className={`px-3 py-1 rounded-full text-xs font-medium ${getRiskColor(riskLevel)}`}
+          >
+            {isClose ? 'CLOSED' : `${(riskLevel * 100).toFixed(0)}% Risk`}
+          </div>
+        )}
       </div>
 
       {/* Price and Details */}

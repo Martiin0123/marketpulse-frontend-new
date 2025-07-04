@@ -17,17 +17,23 @@ export async function POST(request) {
   
   // Parse and validate timestamp
   let validTimestamp
+  let unixTimestamp
   try {
     // Handle both ISO string and Unix timestamp formats
-    validTimestamp = typeof timestamp === 'string' 
-      ? new Date(timestamp).toISOString()
-      : new Date(Number(timestamp) * 1000).toISOString()
+    if (typeof timestamp === 'string') {
+      validTimestamp = new Date(timestamp).toISOString()
+      unixTimestamp = Math.floor(new Date(timestamp).getTime() / 1000)
+    } else {
+      validTimestamp = new Date(Number(timestamp) * 1000).toISOString()
+      unixTimestamp = Number(timestamp)
+    }
       
     if (isNaN(new Date(validTimestamp).getTime())) {
       throw new Error('Invalid timestamp')
     }
   } catch (error) {
     validTimestamp = new Date().toISOString()
+    unixTimestamp = Math.floor(Date.now() / 1000)
   }
 
   // Handle CLOSE action
@@ -58,7 +64,7 @@ export async function POST(request) {
       .update({
         status: 'closed',
         exit_price: exitPrice,
-        exit_timestamp: validTimestamp,
+        exit_timestamp: unixTimestamp,
         pnl: pnlPercentage
       })
       .eq('id', openPosition.id)
@@ -67,6 +73,26 @@ export async function POST(request) {
       return new Response(JSON.stringify({ 
         error: 'Failed to close position', 
         details: updateError.message 
+      }), { status: 500 })
+    }
+
+    // Create close signal for reporting
+    const { data: signal, error: signalError } = await supabase
+      .from('signals')
+      .insert([{
+        symbol: symbolUpper,
+        type: 'close',
+        price: price,
+        timestamp: unixTimestamp,
+        created_at: validTimestamp
+      }])
+      .select()
+      .single()
+
+    if (signalError) {
+      return new Response(JSON.stringify({ 
+        error: 'Failed to create signal', 
+        details: signalError.message 
       }), { status: 500 })
     }
 
@@ -105,7 +131,7 @@ export async function POST(request) {
           .update({
             status: 'closed',
             exit_price: exitPrice,
-            exit_timestamp: validTimestamp,
+            exit_timestamp: unixTimestamp,
             pnl: pnlPercentage
           })
           .eq('id', existingPosition.id)
@@ -123,7 +149,8 @@ export async function POST(request) {
           .insert([{
             symbol: symbolUpper,
             type: 'buy',
-            entry_price: price,
+            price: price,
+            timestamp: unixTimestamp,
             created_at: validTimestamp
           }])
           .select()
@@ -159,7 +186,8 @@ export async function POST(request) {
       .insert([{
         symbol: symbolUpper,
         type: 'buy',
-        entry_price: price,
+        price: price,
+        timestamp: unixTimestamp,
         created_at: validTimestamp
       }])
       .select()
@@ -180,7 +208,7 @@ export async function POST(request) {
         signal_id: signal.id,
         type: 'buy',
         entry_price: price,
-        entry_timestamp: validTimestamp,
+        entry_timestamp: unixTimestamp,
         quantity: 1, // Default quantity
         status: 'open'
       }])
@@ -226,7 +254,7 @@ export async function POST(request) {
           .update({
             status: 'closed',
             exit_price: exitPrice,
-            exit_timestamp: validTimestamp,
+            exit_timestamp: unixTimestamp,
             pnl: pnlPercentage
           })
           .eq('id', existingPosition.id)
@@ -244,7 +272,8 @@ export async function POST(request) {
           .insert([{
             symbol: symbolUpper,
             type: 'sell',
-            entry_price: price,
+            price: price,
+            timestamp: unixTimestamp,
             created_at: validTimestamp
           }])
           .select()
@@ -254,6 +283,26 @@ export async function POST(request) {
           return new Response(JSON.stringify({ 
             error: 'Failed to create signal', 
             details: signalError.message 
+          }), { status: 500 })
+        }
+
+        // Create close signal for reporting
+        const { data: closeSignal, error: closeSignalError } = await supabase
+          .from('signals')
+          .insert([{
+            symbol: symbolUpper,
+            type: 'close',
+            price: price,
+            timestamp: unixTimestamp,
+            created_at: validTimestamp
+          }])
+          .select()
+          .single()
+
+        if (closeSignalError) {
+          return new Response(JSON.stringify({ 
+            error: 'Failed to create close signal', 
+            details: closeSignalError.message 
           }), { status: 500 })
         }
 
@@ -280,7 +329,8 @@ export async function POST(request) {
       .insert([{
         symbol: symbolUpper,
         type: 'sell',
-        entry_price: price,
+        price: price,
+        timestamp: unixTimestamp,
         created_at: validTimestamp
       }])
       .select()
@@ -301,7 +351,7 @@ export async function POST(request) {
         signal_id: signal.id,
         type: 'sell',
         entry_price: price,
-        entry_timestamp: validTimestamp,
+        entry_timestamp: unixTimestamp,
         quantity: 1, // Default quantity
         status: 'open'
       }])

@@ -45,7 +45,7 @@ export default function PositionsTab({ positions }: Props) {
     } else if (diffInMinutes < 1440) {
       return `${Math.floor(diffInMinutes / 60)}h ago`;
     } else {
-      return date.toLocaleDateString();
+      return date.toLocaleDateString('en-US');
     }
   };
 

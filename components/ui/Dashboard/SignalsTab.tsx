@@ -10,7 +10,9 @@ import {
   Filter,
   Search,
   X,
-  Clock
+  Clock,
+  Link,
+  Unlink
 } from 'lucide-react';
 
 type Signal = Tables<'signals'>;
@@ -19,10 +21,20 @@ interface Props {
   signals: Signal[];
 }
 
+interface SignalGroup {
+  id: string;
+  symbol: string;
+  buySignal?: Signal;
+  sellSignal?: Signal;
+  isComplete: boolean;
+  timeRange: string;
+}
+
 export default function SignalsTab({ signals: initialSignals }: Props) {
   const [signals, setSignals] = useState<Signal[]>(initialSignals);
   const [filter, setFilter] = useState<'all' | 'buy' | 'sell' | 'close'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [groupedSignals, setGroupedSignals] = useState<SignalGroup[]>([]);
   const supabase = createClient();
 
   useEffect(() => {
@@ -59,13 +71,82 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
     };
   }, [supabase]);
 
+  // --- New grouping logic: pair buys and sells in order for each symbol ---
+  useEffect(() => {
+    const groups: SignalGroup[] = [];
+    const signalsBySymbol: { [symbol: string]: Signal[] } = {};
+
+    // 1. Group signals by symbol and sort by created_at
+    signals.forEach((signal) => {
+      if (!signalsBySymbol[signal.symbol]) signalsBySymbol[signal.symbol] = [];
+      signalsBySymbol[signal.symbol].push(signal);
+    });
+    Object.values(signalsBySymbol).forEach((signalList) =>
+      signalList.sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      )
+    );
+
+    // 2. Pair buys and sells in order
+    Object.entries(signalsBySymbol).forEach(([symbol, signalList]) => {
+      const buys: Signal[] = [];
+      const sells: Signal[] = [];
+      signalList.forEach((sig) => {
+        if (sig.type === 'buy') buys.push(sig);
+        else if (sig.type === 'sell' || sig.type === 'close') sells.push(sig);
+      });
+
+      let i = 0;
+      for (; i < Math.max(buys.length, sells.length); i++) {
+        const buySignal = buys[i];
+        const sellSignal = sells[i];
+        groups.push({
+          id: `${symbol}-${buySignal?.id || ''}-${sellSignal?.id || ''}`,
+          symbol,
+          buySignal,
+          sellSignal,
+          isComplete: !!(buySignal && sellSignal),
+          timeRange:
+            buySignal && sellSignal
+              ? 'Complete'
+              : buySignal
+                ? 'Waiting for Sell'
+                : 'Waiting for Buy'
+        });
+      }
+    });
+    setGroupedSignals(
+      const sortedGroups = groups.sort((a, b) => {
+        // Sort by most recent signal in the group
+        const aTime = Math.max(
+          a.buySignal ? new Date(a.buySignal.created_at).getTime() : 0,
+          a.sellSignal ? new Date(a.sellSignal.created_at).getTime() : 0
+        );
+        const bTime = Math.max(
+          b.buySignal ? new Date(b.buySignal.created_at).getTime() : 0,
+          b.sellSignal ? new Date(b.sellSignal.created_at).getTime() : 0
+        );
+        console.log(`Group A time: ${aTime}, Group B time: ${bTime}, Difference: ${bTime - aTime}`);
+        return bTime - aTime;
+      });
+      
+      console.log('Sorted groups (most recent first):', sortedGroups);
+      setGroupedSignals(sortedGroups);
+  }, [signals]);
+
   // Filter signals based on type and search term
-  const filteredSignals = signals.filter((signal) => {
-    const matchesFilter = filter === 'all' || signal.type === filter;
-    const matchesSearch =
-      signal.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (signal.reason &&
-        signal.reason.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredGroups = groupedSignals.filter((group) => {
+    const matchesFilter =
+      filter === 'all' ||
+      (filter === 'buy' && group.buySignal) ||
+      (filter === 'sell' && group.sellSignal) ||
+      (filter === 'close' && group.isComplete);
+
+    const matchesSearch = group.symbol
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
+
     return matchesFilter && matchesSearch;
   });
 
@@ -76,7 +157,12 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
   const formatTime = (timestamp: string | number) => {
     let date: Date;
     if (typeof timestamp === 'number') {
-      date = new Date(timestamp * 1000);
+      // Check if it's already in milliseconds (13 digits) or seconds (10 digits)
+      if (timestamp.toString().length === 13) {
+        date = new Date(timestamp);
+      } else {
+        date = new Date(timestamp * 1000);
+      }
     } else {
       date = new Date(timestamp);
     }
@@ -90,7 +176,7 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
     } else if (diffInMinutes < 1440) {
       return `${Math.floor(diffInMinutes / 60)}h ago`;
     } else {
-      return date.toLocaleDateString();
+      return date.toLocaleDateString('en-US');
     }
   };
 
@@ -160,7 +246,7 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
       </div>
 
       {/* Signals Grid */}
-      {filteredSignals.length === 0 ? (
+      {filteredGroups.length === 0 ? (
         <div className="text-center py-16">
           <TrendingUp className="mx-auto h-12 w-12 text-slate-500 mb-4" />
           <h3 className="text-lg font-medium text-slate-300 mb-2">
@@ -173,15 +259,74 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredSignals.slice(0, 12).map((signal) => (
-            <SignalCard key={signal.id} signal={signal} />
+        <div className="space-y-6">
+          {filteredGroups.slice(0, 12).map((group) => (
+            <div key={group.id} className="space-y-4">
+              {/* Group Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <h3 className="text-lg font-semibold text-white">
+                    {group.symbol}
+                  </h3>
+                  <div className="flex items-center space-x-2">
+                    {group.isComplete ? (
+                      <div className="flex items-center space-x-1 text-emerald-400">
+                        <Link className="w-4 h-4" />
+                        <span className="text-sm">Complete</span>
+                      </div>
+                    ) : group.buySignal && !group.sellSignal ? (
+                      <div className="flex items-center space-x-1 text-blue-400">
+                        <TrendingUp className="w-4 h-4" />
+                        <span className="text-sm">Waiting for Sell</span>
+                      </div>
+                    ) : group.sellSignal && !group.buySignal ? (
+                      <div className="flex items-center space-x-1 text-red-400">
+                        <TrendingDown className="w-4 h-4" />
+                        <span className="text-sm">Waiting for Buy</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-1 text-yellow-400">
+                        <Unlink className="w-4 h-4" />
+                        <span className="text-sm">Open</span>
+                      </div>
+                    )}
+                    <span className="text-xs text-slate-500 bg-slate-700/50 px-2 py-1 rounded">
+                      {group.timeRange}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Signal Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {group.buySignal && (
+                  <div className="relative">
+                    <SignalCard signal={group.buySignal} />
+                    {group.isComplete && (
+                      <div className="absolute -top-2 -right-2 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
+                        <TrendingUp className="w-2 h-2 text-white" />
+                      </div>
+                    )}
+                  </div>
+                )}
+                {group.sellSignal && (
+                  <div className="relative">
+                    <SignalCard signal={group.sellSignal} />
+                    {group.isComplete && (
+                      <div className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+                        <TrendingDown className="w-2 h-2 text-white" />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           ))}
         </div>
       )}
 
       {/* Show More Button */}
-      {filteredSignals.length > 12 && (
+      {filteredGroups.length > 12 && (
         <div className="text-center">
           <button className="px-6 py-3 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 hover:border-slate-600/50 rounded-full text-slate-300 hover:text-white transition-all duration-300">
             Show More Signals
