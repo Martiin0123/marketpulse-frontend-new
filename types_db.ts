@@ -341,7 +341,7 @@ export type Database = {
           rsi: number | null
           symbol: string
           timestamp: number
-          typ: string
+          type: string
         }
         Insert: {
           created_at?: string

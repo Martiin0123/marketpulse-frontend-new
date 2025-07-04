@@ -94,16 +94,13 @@ export default function Navlinks({ user, subscription }: NavlinksProps) {
   ];
 
   return (
-    <div className="relative flex items-center justify-between py-4 px-6 bg-gray-900/50 backdrop-blur-sm border-b border-gray-800">
+    <div className="relative flex items-center justify-between py-2">
       {/* Logo */}
       <div className="flex items-center">
         <Link href="/" className="flex items-center space-x-2 group">
           <div className="relative">
-            <Logo />
+            <Logo width={120} height={32} />
           </div>
-          <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            MarketPulse
-          </span>
         </Link>
       </div>
 

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Database } from '@/types_db';
 import BalanceChart from '@/components/ui/Charts/BalanceChart';
+import Logo from '@/components/icons/Logo';
 
 type Position = Tables<'positions'>;
 type Subscription = Tables<'subscriptions'>;
@@ -69,9 +70,9 @@ export default function Dashboard({
     };
   }, [supabase]);
 
-  const buyPositions = positions.filter((position) => position.type === 'BUY');
+  const buyPositions = positions.filter((position) => position.type === 'buy');
   const sellPositions = positions.filter(
-    (position) => position.type === 'SELL'
+    (position) => position.type === 'sell'
   );
   const openPositions = positions.filter(
     (position) => position.status === 'open'
@@ -82,6 +83,15 @@ export default function Dashboard({
   const totalPositions = positions.length;
   const recentPositions = positions.slice(0, 10);
   console.log('recentPositions', recentPositions);
+
+  // Calculate win rate
+  const winningTrades = closedPositions.filter(
+    (position) => (position.pnl || 0) > 0
+  ).length;
+  const winRate =
+    closedPositions.length > 0
+      ? (winningTrades / closedPositions.length) * 100
+      : 0;
 
   // Calculate total PnL based on account size
   const totalPnLPercentage = closedPositions.reduce(
@@ -103,9 +113,11 @@ export default function Dashboard({
         <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-pink-600/20"></div>
         <div className="relative max-w-7xl mx-auto px-4 py-16 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h1 className="text-4xl font-bold text-white sm:text-6xl">
-              Market<span className="text-purple-400">Pulse</span>
-            </h1>
+            <Logo
+              width={250}
+              height={60}
+              className="h-12 w-auto mx-auto mb-4"
+            />
             <p className="mt-4 text-xl text-gray-300">
               Welcome back, {user.email?.split('@')[0]}
             </p>
@@ -171,38 +183,6 @@ export default function Dashboard({
 
           <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-green-500/20 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-green-400" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-400">
-                  Open Positions
-                </p>
-                <p className="text-2xl font-bold text-white">
-                  {openPositions.length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-purple-500/20 rounded-lg">
-                <TrendingDown className="w-6 h-6 text-purple-400" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-400">
-                  Closed Positions
-                </p>
-                <p className="text-2xl font-bold text-white">
-                  {closedPositions.length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
-            <div className="flex items-center">
               <div className="p-2 bg-yellow-500/20 rounded-lg">
                 <DollarSign className="w-6 h-6 text-yellow-400" />
               </div>
@@ -216,6 +196,39 @@ export default function Dashboard({
                 <p className="text-xs text-gray-500">
                   {totalPnLPercentage >= 0 ? '+' : ''}
                   {totalPnLPercentage.toFixed(2)}%
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-purple-500/20 rounded-lg">
+                <Activity className="w-6 h-6 text-purple-400" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-400">Win Rate</p>
+                <p className="text-2xl font-bold text-white">
+                  {winRate.toFixed(1)}%
+                </p>
+                <p className="text-xs text-gray-500">
+                  {winningTrades} / {closedPositions.length} trades
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-green-500/20 rounded-lg">
+                <TrendingUp className="w-6 h-6 text-green-400" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-400">
+                  Open Positions
+                </p>
+                <p className="text-2xl font-bold text-white">
+                  {openPositions.length}
                 </p>
               </div>
             </div>
@@ -339,7 +352,7 @@ export default function Dashboard({
                             ) : (
                               <TrendingDown className="w-3 h-3 mr-1" />
                             )}
-                            {position.type}
+                            {position.type.toUpperCase()}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">

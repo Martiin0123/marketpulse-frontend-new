@@ -159,8 +159,8 @@ export default function SignalsPage({
           signalGroups.push({
             symbol,
             signals: [signal],
-            openSignal: signal.typ !== 'close' ? signal : undefined,
-            closeSignal: signal.typ === 'close' ? signal : undefined,
+            openSignal: signal.type !== 'close' ? signal : undefined,
+            closeSignal: signal.type === 'close' ? signal : undefined,
             isComplete: false
           });
         });
@@ -176,7 +176,7 @@ export default function SignalsPage({
 
   // Filter signals based on type and search term
   const filteredSignals = signals.filter((signal) => {
-    const matchesFilter = filter === 'all' || signal.typ === filter;
+    const matchesFilter = filter === 'all' || signal.type === filter;
     const matchesSearch =
       signal.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (signal.reason &&
@@ -186,9 +186,9 @@ export default function SignalsPage({
 
   const signalGroups = groupSignals(filteredSignals);
 
-  const buySignals = signals.filter((signal) => signal.typ === 'buy');
-  const sellSignals = signals.filter((signal) => signal.typ === 'sell');
-  const closeSignals = signals.filter((signal) => signal.typ === 'close');
+  const buySignals = signals.filter((signal) => signal.type === 'buy');
+  const sellSignals = signals.filter((signal) => signal.type === 'sell');
+  const closeSignals = signals.filter((signal) => signal.type === 'close');
   const totalSignals = signals.length;
 
   const formatTime = (timestamp: string | number) => {
@@ -220,7 +220,7 @@ export default function SignalsPage({
     if (!isComplete || !openSignal || !closeSignal) {
       // Show individual signal for unclosed trades with special highlighting
       const signal = openSignal || closeSignal!;
-      const isUnclosed = signal.typ !== 'close' && !closeSignal;
+      const isUnclosed = signal.type !== 'close' && !closeSignal;
 
       return (
         <div
@@ -244,16 +244,16 @@ export default function SignalsPage({
             <div className="flex items-center space-x-3">
               <div
                 className={`p-2 rounded-lg ${
-                  signal.typ === 'close'
+                  signal.type === 'close'
                     ? 'bg-purple-500/20 text-purple-400'
-                    : signal.typ === 'buy'
+                    : signal.type === 'buy'
                       ? 'bg-green-500/20 text-green-400'
                       : 'bg-red-500/20 text-red-400'
                 }`}
               >
-                {signal.typ === 'close' ? (
+                {signal.type === 'close' ? (
                   <X className="w-5 h-5" />
-                ) : signal.typ === 'buy' ? (
+                ) : signal.type === 'buy' ? (
                   <TrendingUp className="w-5 h-5" />
                 ) : (
                   <TrendingDown className="w-5 h-5" />
@@ -265,14 +265,14 @@ export default function SignalsPage({
                 </h3>
                 <span
                   className={`text-sm font-medium ${
-                    signal.typ === 'close'
+                    signal.type === 'close'
                       ? 'text-purple-400'
-                      : signal.typ === 'buy'
+                      : signal.type === 'buy'
                         ? 'text-green-400'
                         : 'text-red-400'
                   }`}
                 >
-                  {signal.typ.toUpperCase()}
+                  {signal.type.toUpperCase()}
                 </span>
               </div>
             </div>
@@ -282,7 +282,7 @@ export default function SignalsPage({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-gray-400 text-sm">
-                {signal.typ === 'close' ? 'Exit Price' : 'Entry Price'}
+                {signal.type === 'close' ? 'Exit Price' : 'Entry Price'}
               </span>
               <span className="text-white font-mono text-lg">
                 ${Number(signal.price).toFixed(2)}
@@ -333,7 +333,7 @@ export default function SignalsPage({
     const exitPrice = Number(closeSignal.price);
     let pnlPercentage = 0;
 
-    if (openSignal.typ === 'buy') {
+    if (openSignal.type === 'buy') {
       pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
     } else {
       pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100;
@@ -371,9 +371,9 @@ export default function SignalsPage({
           {/* Open Signal */}
           <div className="flex items-center space-x-3 p-3 bg-gray-700/30 rounded-lg">
             <div
-              className={`p-2 rounded-lg ${openSignal.typ === 'buy' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}
+              className={`p-2 rounded-lg ${openSignal.type === 'buy' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}
             >
-              {openSignal.typ === 'buy' ? (
+              {openSignal.type === 'buy' ? (
                 <TrendingUp className="w-4 h-4" />
               ) : (
                 <TrendingDown className="w-4 h-4" />

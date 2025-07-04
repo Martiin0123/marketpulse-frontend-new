@@ -10,6 +10,7 @@ import {
   Activity
 } from 'lucide-react';
 import { Database } from '@/types_db';
+import { ApexOptions } from 'apexcharts';
 
 // Dynamically import Chart to avoid SSR issues
 const Chart = dynamic(() => import('react-apexcharts'), {
@@ -35,6 +36,25 @@ interface BalanceDataPoint {
   type: 'entry' | 'exit';
   position: Position;
 }
+
+// Helper function to calculate maximum drawdown
+const calculateMaxDrawdown = (balances: number[]): number => {
+  if (balances.length === 0) return 0;
+  let peak = balances[0];
+  let maxDrawdown = 0;
+
+  balances.forEach((balance) => {
+    if (balance > peak) {
+      peak = balance;
+    }
+    const drawdown = ((peak - balance) / peak) * 100;
+    if (drawdown > maxDrawdown) {
+      maxDrawdown = drawdown;
+    }
+  });
+
+  return maxDrawdown;
+};
 
 export default function BalanceChart({
   positions,
@@ -143,143 +163,123 @@ export default function BalanceChart({
       return new Date(ts * 1000).toLocaleDateString();
     };
 
-    // If we have no closed positions but have open positions,
-    // create a minimal chart showing position entries
-    if (closedPositions.length === 0 && openPositions.length > 0) {
-      // Start with account balance
-      const firstEntryTimestamp = getEntryTimestamp(openPositions[0]);
+    // Process all positions chronologically
+    const allPositions = [...positions].sort((a, b) => {
+      const aTime = getExitTimestamp(a) || getEntryTimestamp(a);
+      const bTime = getExitTimestamp(b) || getEntryTimestamp(b);
+      return aTime - bTime;
+    });
+
+    // Add initial balance point if we have positions
+    if (allPositions.length > 0) {
+      const firstEntryTimestamp = getEntryTimestamp(allPositions[0]);
       balanceData.push({
         date: new Date(firstEntryTimestamp * 1000).toLocaleDateString(),
         balance: accountSize,
         timestamp: firstEntryTimestamp * 1000,
         type: 'entry',
-        position: openPositions[0]
+        position: allPositions[0]
       });
+    }
 
-      // Add entry points for each open position to show trading activity
-      openPositions.forEach((position, index) => {
-        const entryTimestamp = getEntryTimestamp(position);
-        balanceData.push({
-          date: new Date(entryTimestamp * 1000).toLocaleDateString(),
-          balance: accountSize, // Keep balance flat since no realized P&L yet
-          timestamp: entryTimestamp * 1000,
-          type: 'entry',
-          position
-        });
-      });
-    } else if (closedPositions.length > 0) {
-      // Add initial balance point
-      const firstEntryTimestamp = getEntryTimestamp(closedPositions[0]);
-      balanceData.push({
-        date: new Date(firstEntryTimestamp * 1000).toLocaleDateString(),
-        balance: accountSize,
-        timestamp: firstEntryTimestamp * 1000,
-        type: 'entry',
-        position: closedPositions[0]
-      });
+    // Process each position
+    let lastTimestamp = 0;
+    allPositions.forEach((position, index) => {
+      const pnlPercent = position.pnl || 0;
+      const pnlDollar = (pnlPercent / 100) * accountSize;
 
-      // Process closed positions for actual P&L progression
-      closedPositions.forEach((position) => {
-        const pnlPercent = position.pnl || 0;
-        const pnlDollar = (pnlPercent / 100) * accountSize;
+      // For open positions, calculate current PnL
+      if (position.status === 'open') {
         runningBalance += pnlDollar;
+      } else {
+        runningBalance += pnlDollar;
+      }
 
-        const exitTimestamp = getExitTimestamp(position);
-        const entryTimestamp = getEntryTimestamp(position);
-        const finalTimestamp = exitTimestamp || entryTimestamp;
+      const exitTimestamp = getExitTimestamp(position);
+      const entryTimestamp = getEntryTimestamp(position);
+      const finalTimestamp = exitTimestamp || entryTimestamp;
 
+      // Only add point if timestamp is different or it's the last position
+      if (
+        finalTimestamp !== lastTimestamp ||
+        index === allPositions.length - 1
+      ) {
         balanceData.push({
           date: getDateFromTimestamp(exitTimestamp, entryTimestamp),
           balance: runningBalance,
           timestamp: finalTimestamp * 1000,
-          type: 'exit',
+          type: position.status === 'closed' ? 'exit' : 'entry',
           position
         });
-      });
-    }
-
-    // Calculate statistics
-    const totalClosedPnL = closedPositions.reduce(
-      (sum, pos) => sum + (pos.pnl || 0),
-      0
-    );
-    const totalReturn = (totalClosedPnL / 100) * accountSize;
-    const totalReturnPercent = totalClosedPnL;
-
-    const winningTrades = closedPositions.filter(
-      (p) => (p.pnl || 0) > 0
-    ).length;
-    const winRate =
-      closedPositions.length > 0
-        ? (winningTrades / closedPositions.length) * 100
-        : 0;
-
-    // Calculate max drawdown
-    let peak = accountSize;
-    let maxDrawdown = 0;
-    let currentBalance = accountSize;
-
-    closedPositions.forEach((position) => {
-      const pnlDollar = ((position.pnl || 0) / 100) * accountSize;
-      currentBalance += pnlDollar;
-
-      if (currentBalance > peak) {
-        peak = currentBalance;
-      }
-      const drawdown = ((peak - currentBalance) / peak) * 100;
-      if (drawdown > maxDrawdown) {
-        maxDrawdown = drawdown;
+        lastTimestamp = finalTimestamp;
       }
     });
 
-    // Chart options with better handling for minimal data
-    const chartOptions = {
+    // Add current point for open positions if we have any
+    const hasOpenPositions = allPositions.some((p) => p.status === 'open');
+    if (hasOpenPositions) {
+      const currentBalance = runningBalance;
+      balanceData.push({
+        date: new Date().toLocaleDateString(),
+        balance: currentBalance,
+        timestamp: Date.now(),
+        type: 'entry',
+        position: allPositions[allPositions.length - 1]
+      });
+    }
+
+    // Calculate stats
+    const stats = {
+      currentBalance: runningBalance,
+      totalReturn: runningBalance - accountSize,
+      totalReturnPercent: ((runningBalance - accountSize) / accountSize) * 100,
+      winRate:
+        closedPositions.length > 0
+          ? (closedPositions.filter((p) => (p.pnl || 0) > 0).length /
+              closedPositions.length) *
+            100
+          : 0,
+      totalTrades: positions.length,
+      maxDrawdown: calculateMaxDrawdown(balanceData.map((d) => d.balance)),
+      openPositions: openPositions.length,
+      totalPositions: positions.length
+    };
+
+    // Chart options
+    const chartOptions: ApexOptions = {
       chart: {
         type: 'area' as const,
         height: 350,
         toolbar: {
           show: false
         },
-        background: 'transparent',
-        fontFamily: 'Inter, sans-serif'
-      },
-      theme: {
-        mode: 'dark' as const
+        zoom: {
+          enabled: false
+        },
+        background: 'transparent'
       },
       dataLabels: {
         enabled: false
       },
       stroke: {
-        curve: 'smooth' as const,
+        curve: 'smooth',
         width: 2
       },
       fill: {
         type: 'gradient',
         gradient: {
           shadeIntensity: 1,
-          opacityFrom: 0.3,
-          opacityTo: 0.1,
-          stops: [0, 100]
-        }
-      },
-      grid: {
-        show: true,
-        borderColor: '#374151',
-        strokeDashArray: 3,
-        padding: {
-          left: 20,
-          right: 20
+          opacityFrom: 0.45,
+          opacityTo: 0.05,
+          stops: [50, 100, 100]
         }
       },
       xaxis: {
-        type: 'datetime' as const,
-        categories:
-          balanceData.length > 0
-            ? balanceData.map((d: BalanceDataPoint) => d.timestamp)
-            : [],
+        type: 'datetime',
+        categories: balanceData.map((d) => d.timestamp),
         labels: {
           style: {
-            colors: '#9CA3AF'
+            colors: '#9ca3af'
           }
         },
         axisBorder: {
@@ -292,61 +292,55 @@ export default function BalanceChart({
       yaxis: {
         labels: {
           style: {
-            colors: '#9CA3AF'
+            colors: '#9ca3af'
           },
-          formatter: (value: number) => `$${value.toLocaleString()}`
+          formatter: function (value: number) {
+            return '$' + value.toFixed(2);
+          }
         }
       },
-      colors: [totalReturn >= 0 ? '#10B981' : '#EF4444'],
       tooltip: {
-        theme: 'dark',
         x: {
           format: 'dd MMM yyyy'
         },
         y: {
-          formatter: (
-            value: number,
-            { dataPointIndex }: { dataPointIndex: number }
-          ) => {
-            if (dataPointIndex > 0 && balanceData[dataPointIndex]) {
-              const currentPoint = balanceData[dataPointIndex];
-              const prevBalance =
-                balanceData[dataPointIndex - 1]?.balance || accountSize;
-              const change = value - prevBalance;
-              const changePercent =
-                prevBalance > 0 ? (change / prevBalance) * 100 : 0;
-
-              return `$${value.toLocaleString()}<br/>
-                     Symbol: ${currentPoint.position?.symbol || 'N/A'}<br/>
-                     Side: ${currentPoint.position?.side || 'N/A'}<br/>
-                     Type: ${currentPoint.type}<br/>
-                     Change: ${change >= 0 ? '+' : ''}$${change.toFixed(2)} (${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%)`;
-            }
-            return `$${value.toLocaleString()}<br/>Starting Balance`;
+          formatter: function (value: number) {
+            return '$' + value.toFixed(2);
           }
         }
+      },
+      grid: {
+        borderColor: '#374151',
+        xaxis: {
+          lines: {
+            show: false
+          }
+        },
+        yaxis: {
+          lines: {
+            show: true
+          }
+        }
+      },
+      theme: {
+        mode: 'dark'
       }
     };
 
+    // Series data
     const series = [
       {
-        name: 'Account Balance',
-        data: balanceData.map((d: BalanceDataPoint) => d.balance)
+        name: 'Balance',
+        data: balanceData.map((d) => ({
+          x: d.timestamp,
+          y: d.balance
+        }))
       }
     ];
 
     return {
       balanceData,
-      stats: {
-        currentBalance: runningBalance,
-        totalReturn,
-        totalReturnPercent,
-        winRate,
-        totalTrades: closedPositions.length,
-        maxDrawdown,
-        openPositions: openPositions.length,
-        totalPositions: relevantPositions.length
-      },
+      stats,
       chartOptions,
       series
     };
