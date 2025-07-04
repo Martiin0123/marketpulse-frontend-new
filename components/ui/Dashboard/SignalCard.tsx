@@ -4,16 +4,35 @@ import { Tables } from '@/types_db';
 import { TrendingUp, TrendingDown, Clock, Target, X } from 'lucide-react';
 
 type Signal = Tables<'signals'>;
+type Position = Tables<'positions'>;
 
 interface Props {
-  signal: Signal;
+  signal?: Signal;
+  position?: Position;
 }
 
-export default function SignalCard({ signal }: Props) {
-  const isBuy = signal.typ === 'buy';
-  const isSell = signal.typ === 'sell';
-  const isClose = signal.typ === 'close';
-  const riskLevel = signal.risk || 1;
+export default function SignalCard({ signal, position }: Props) {
+  // Handle both signals and positions
+  const isBuy = signal ? signal.typ === 'buy' : position?.side === 'BUY';
+  const isSell = signal ? signal.typ === 'sell' : position?.side === 'SELL';
+  const isClose = signal
+    ? signal.typ === 'close'
+    : position?.status === 'closed';
+  const riskLevel = signal?.risk || position?.risk || 1;
+  const price =
+    signal?.price ||
+    (position?.status === 'closed'
+      ? position?.exit_price
+      : position?.entry_price);
+  const symbol = signal?.symbol || position?.symbol;
+  const timestamp =
+    (signal?.timestamp || position?.status === 'closed'
+      ? position?.exit_timestamp
+      : position?.entry_timestamp) || Date.now() / 1000;
+  const rsi = signal?.rsi || position?.rsi;
+  const macd = signal?.macd || position?.macd;
+  const reason = signal?.reason || position?.reason;
+  const id = signal?.id || position?.id;
 
   const getRiskColor = (risk: number) => {
     if (risk <= 0.3) return 'text-green-400 bg-green-400/10';
@@ -76,11 +95,9 @@ export default function SignalCard({ signal }: Props) {
             {getSignalIcon()}
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">
-              {signal.symbol}
-            </h3>
+            <h3 className="text-lg font-semibold text-white">{symbol}</h3>
             <span className={`text-sm font-medium ${getSignalTextColor()}`}>
-              {signal.typ.toUpperCase()}
+              {isClose ? 'CLOSED' : isBuy ? 'BUY' : 'SELL'}
             </span>
           </div>
         </div>
@@ -96,33 +113,33 @@ export default function SignalCard({ signal }: Props) {
         <div className="flex items-center justify-between">
           <span className="text-gray-400 text-sm">{getPriceLabel()}</span>
           <span className="text-white font-mono text-lg">
-            ${Number(signal.price).toFixed(2)}
+            ${Number(price).toFixed(2)}
           </span>
         </div>
 
-        {signal.rsi && (
+        {rsi && (
           <div className="flex items-center justify-between">
             <span className="text-gray-400 text-sm">RSI</span>
             <span className="text-white font-mono">
-              {Number(signal.rsi).toFixed(2)}
+              {Number(rsi).toFixed(2)}
             </span>
           </div>
         )}
 
-        {signal.macd && (
+        {macd && (
           <div className="flex items-center justify-between">
             <span className="text-gray-400 text-sm">MACD</span>
             <span className="text-white font-mono">
-              {Number(signal.macd).toFixed(4)}
+              {Number(macd).toFixed(4)}
             </span>
           </div>
         )}
 
-        {signal.reason && (
+        {reason && (
           <div className="pt-2 border-t border-gray-700">
             <div className="flex items-start space-x-2">
               <Target className="w-4 h-4 text-gray-400 mt-0.5" />
-              <span className="text-gray-300 text-sm">{signal.reason}</span>
+              <span className="text-gray-300 text-sm">{reason}</span>
             </div>
           </div>
         )}
@@ -130,9 +147,9 @@ export default function SignalCard({ signal }: Props) {
         <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-700">
           <div className="flex items-center space-x-1">
             <Clock className="w-3 h-3" />
-            <span>{formatTime(signal.timestamp)}</span>
+            <span>{formatTime(timestamp)}</span>
           </div>
-          <span>ID: {signal.id}</span>
+          <span>ID: {id}</span>
         </div>
       </div>
     </div>

@@ -45,7 +45,7 @@ export type Database = {
           reason: string | null
           risk: number | null
           rsi: number | null
-          side: string
+          type: string
           source: string | null
           status: string | null
           stop_loss: number | null

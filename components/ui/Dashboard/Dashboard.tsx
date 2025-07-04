@@ -69,9 +69,9 @@ export default function Dashboard({
     };
   }, [supabase]);
 
-  const buyPositions = positions.filter((position) => position.side === 'BUY');
+  const buyPositions = positions.filter((position) => position.type === 'BUY');
   const sellPositions = positions.filter(
-    (position) => position.side === 'SELL'
+    (position) => position.type === 'SELL'
   );
   const openPositions = positions.filter(
     (position) => position.status === 'open'
@@ -81,6 +81,7 @@ export default function Dashboard({
   );
   const totalPositions = positions.length;
   const recentPositions = positions.slice(0, 10);
+  console.log('recentPositions', recentPositions);
 
   // Calculate total PnL based on account size
   const totalPnLPercentage = closedPositions.reduce(
@@ -328,17 +329,17 @@ export default function Dashboard({
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              position.side === 'BUY'
+                              position.type === 'buy'
                                 ? 'bg-green-100 text-green-800'
                                 : 'bg-red-100 text-red-800'
                             }`}
                           >
-                            {position.side === 'BUY' ? (
+                            {position.type === 'buy' ? (
                               <TrendingUp className="w-3 h-3 mr-1" />
                             ) : (
                               <TrendingDown className="w-3 h-3 mr-1" />
                             )}
-                            {position.side}
+                            {position.type}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">

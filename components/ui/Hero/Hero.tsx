@@ -23,6 +23,7 @@ interface HeroProps {
     totalPnL: number;
     profitablePositions: number;
     totalPositions: number;
+    monthlyData: { timestamp: number; value: number }[];
   };
 }
 
@@ -74,17 +75,38 @@ export default function Hero({ user, monthlyPnL }: HeroProps) {
         stops: [0, 100]
       }
     },
-    tooltip: { enabled: false },
+    tooltip: {
+      enabled: true,
+      x: {
+        show: false
+      },
+      y: {
+        formatter: function (value: number) {
+          return `$${value.toFixed(2)}`;
+        }
+      }
+    },
     grid: { show: false },
     xaxis: {
+      type: 'datetime',
       labels: { show: false },
       axisBorder: { show: false },
       axisTicks: { show: false }
     },
     yaxis: {
       labels: { show: false },
-      min: monthlyPnL?.totalPnL ? Math.min(0, monthlyPnL.totalPnL * 0.8) : 0,
-      max: monthlyPnL?.totalPnL ? Math.max(0, monthlyPnL.totalPnL * 1.2) : 100
+      min: monthlyPnL?.monthlyData?.length
+        ? Math.min(
+            0,
+            Math.min(...monthlyPnL.monthlyData.map((d) => d.value)) * 1.1
+          )
+        : 0,
+      max: monthlyPnL?.monthlyData?.length
+        ? Math.max(
+            0,
+            Math.max(...monthlyPnL.monthlyData.map((d) => d.value)) * 1.1
+          )
+        : 100
     },
     colors: [
       monthlyPnL?.totalPnL && monthlyPnL.totalPnL > 0 ? '#10B981' : '#EF4444'
@@ -93,15 +115,11 @@ export default function Hero({ user, monthlyPnL }: HeroProps) {
 
   const series = [
     {
-      name: 'Performance',
-      data: monthlyPnL?.totalPnL
-        ? [
-            0,
-            monthlyPnL.totalPnL * 0.3,
-            monthlyPnL.totalPnL * 0.7,
-            monthlyPnL.totalPnL
-          ]
-        : [0]
+      name: 'Balance',
+      data: monthlyPnL?.monthlyData?.map((d) => ({
+        x: d.timestamp,
+        y: d.value
+      })) || [{ x: new Date().getTime(), y: 0 }]
     }
   ];
 
