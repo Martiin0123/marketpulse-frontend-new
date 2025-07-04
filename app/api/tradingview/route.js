@@ -93,7 +93,7 @@ export async function POST(request) {
       .single()
 
     if (existingPosition) {
-      // If existing position is a sell, close it and don't create new position
+      // If existing position is a sell, close it and create buy signal for reporting
       if (existingPosition.type === 'sell') {
         const entryPrice = Number(existingPosition.entry_price)
         const exitPrice = Number(price)
@@ -117,9 +117,29 @@ export async function POST(request) {
           }), { status: 500 })
         }
 
+        // Create buy signal for reporting (but don't create position)
+        const { data: signal, error: signalError } = await supabase
+          .from('signals')
+          .insert([{
+            symbol: symbolUpper,
+            type: 'buy',
+            entry_price: price,
+            created_at: validTimestamp
+          }])
+          .select()
+          .single()
+
+        if (signalError) {
+          return new Response(JSON.stringify({ 
+            error: 'Failed to create signal', 
+            details: signalError.message 
+          }), { status: 500 })
+        }
+
         return new Response(JSON.stringify({ 
-          message: 'Sell position closed successfully',
+          message: 'Sell position closed and buy signal created',
           position_id: existingPosition.id,
+          signal_id: signal.id,
           symbol: symbolUpper,
           exit_price: price
         }), { status: 200 })
@@ -194,7 +214,7 @@ export async function POST(request) {
       .single()
 
     if (existingPosition) {
-      // If existing position is a buy, close it and don't create new position
+      // If existing position is a buy, close it and create sell signal for reporting
       if (existingPosition.type === 'buy') {
         const entryPrice = Number(existingPosition.entry_price)
         const exitPrice = Number(price)
@@ -218,9 +238,29 @@ export async function POST(request) {
           }), { status: 500 })
         }
 
+        // Create sell signal for reporting (but don't create position)
+        const { data: signal, error: signalError } = await supabase
+          .from('signals')
+          .insert([{
+            symbol: symbolUpper,
+            type: 'sell',
+            entry_price: price,
+            created_at: validTimestamp
+          }])
+          .select()
+          .single()
+
+        if (signalError) {
+          return new Response(JSON.stringify({ 
+            error: 'Failed to create signal', 
+            details: signalError.message 
+          }), { status: 500 })
+        }
+
         return new Response(JSON.stringify({ 
-          message: 'Buy position closed successfully',
+          message: 'Buy position closed and sell signal created',
           position_id: existingPosition.id,
+          signal_id: signal.id,
           symbol: symbolUpper,
           exit_price: price
         }), { status: 200 })
