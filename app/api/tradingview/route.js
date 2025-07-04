@@ -84,19 +84,45 @@ export async function POST(request) {
 
   // Handle BUY action
   if (action.toUpperCase() === 'BUY') {
-    // Check for existing open position
+    // Check for existing open position and close it if it's a sell position
     const { data: existingPosition } = await supabase
       .from('positions')
-      .select('id')
+      .select('*')
       .eq('symbol', symbolUpper)
       .eq('status', 'open')
       .single()
 
     if (existingPosition) {
-      return new Response(JSON.stringify({ 
-        message: 'Open position already exists',
-        position_id: existingPosition.id
-      }), { status: 200 })
+      // If existing position is a sell, close it first
+      if (existingPosition.type === 'sell') {
+        const entryPrice = Number(existingPosition.entry_price)
+        const exitPrice = Number(price)
+        const pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100 // For sell positions, profit when price goes down
+
+        // Close the sell position
+        const { error: updateError } = await supabase
+          .from('positions')
+          .update({
+            status: 'closed',
+            exit_price: exitPrice,
+            exit_timestamp: validTimestamp,
+            pnl: pnlPercentage
+          })
+          .eq('id', existingPosition.id)
+
+        if (updateError) {
+          return new Response(JSON.stringify({ 
+            error: 'Failed to close existing sell position', 
+            details: updateError.message 
+          }), { status: 500 })
+        }
+      } else {
+        // If existing position is already a buy, return without creating new
+        return new Response(JSON.stringify({ 
+          message: 'Buy position already exists',
+          position_id: existingPosition.id
+        }), { status: 200 })
+      }
     }
 
     // Create new signal first
@@ -149,7 +175,100 @@ export async function POST(request) {
     }), { status: 200 })
   }
 
+  // Handle SELL action
+  if (action.toUpperCase() === 'SELL') {
+    // Check for existing open position and close it if it's a buy position
+    const { data: existingPosition } = await supabase
+      .from('positions')
+      .select('*')
+      .eq('symbol', symbolUpper)
+      .eq('status', 'open')
+      .single()
+
+    if (existingPosition) {
+      // If existing position is a buy, close it first
+      if (existingPosition.type === 'buy') {
+        const entryPrice = Number(existingPosition.entry_price)
+        const exitPrice = Number(price)
+        const pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100 // For buy positions, profit when price goes up
+
+        // Close the buy position
+        const { error: updateError } = await supabase
+          .from('positions')
+          .update({
+            status: 'closed',
+            exit_price: exitPrice,
+            exit_timestamp: validTimestamp,
+            pnl: pnlPercentage
+          })
+          .eq('id', existingPosition.id)
+
+        if (updateError) {
+          return new Response(JSON.stringify({ 
+            error: 'Failed to close existing buy position', 
+            details: updateError.message 
+          }), { status: 500 })
+        }
+      } else {
+        // If existing position is already a sell, return without creating new
+        return new Response(JSON.stringify({ 
+          message: 'Sell position already exists',
+          position_id: existingPosition.id
+        }), { status: 200 })
+      }
+    }
+
+    // Create new signal first
+    const { data: signal, error: signalError } = await supabase
+      .from('signals')
+      .insert([{
+        symbol: symbolUpper,
+        type: 'sell',
+        entry_price: price,
+        created_at: validTimestamp
+      }])
+      .select()
+      .single()
+
+    if (signalError) {
+      return new Response(JSON.stringify({ 
+        error: 'Failed to create signal', 
+        details: signalError.message 
+      }), { status: 500 })
+    }
+
+    // Create new position
+    const { data: position, error: positionError } = await supabase
+      .from('positions')
+      .insert([{
+        symbol: symbolUpper,
+        signal_id: signal.id,
+        type: 'sell',
+        entry_price: price,
+        entry_timestamp: validTimestamp,
+        quantity: 1, // Default quantity
+        status: 'open'
+      }])
+      .select()
+      .single()
+
+    if (positionError) {
+      return new Response(JSON.stringify({ 
+        error: 'Failed to create position', 
+        details: positionError.message 
+      }), { status: 500 })
+    }
+
+    return new Response(JSON.stringify({ 
+      message: 'Signal and position created successfully',
+      signal_id: signal.id,
+      position_id: position.id,
+      symbol: symbolUpper,
+      entry_price: price
+    }), { status: 200 })
+  }
+
   return new Response(JSON.stringify({ 
-    error: 'Invalid action. Must be BUY or CLOSE' 
+    error: 'Invalid action. Must be BUY, SELL, or CLOSE' 
   }), { status: 400 })
 }

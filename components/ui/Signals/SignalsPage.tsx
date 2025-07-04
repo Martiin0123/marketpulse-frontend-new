@@ -103,9 +103,9 @@ export default function SignalsPage({
 
       // Find pairs of open/close signals
       const openSignals = symbolSignals.filter(
-        (s) => s.typ === 'buy' || s.typ === 'sell'
+        (s) => s.type === 'buy' || s.type === 'sell'
       );
-      const closeSignals = symbolSignals.filter((s) => s.typ === 'close');
+      const closeSignals = symbolSignals.filter((s) => s.type === 'close');
 
       // If we have both open and close signals, try to pair them
       if (openSignals.length > 0 && closeSignals.length > 0) {
@@ -382,9 +382,9 @@ export default function SignalsPage({
             <div className="flex-1">
               <div className="flex items-center justify-between">
                 <span
-                  className={`font-medium ${openSignal.typ === 'buy' ? 'text-green-400' : 'text-red-400'}`}
+                  className={`font-medium ${openSignal.type === 'buy' ? 'text-green-400' : 'text-red-400'}`}
                 >
-                  {openSignal.typ.toUpperCase()} ENTRY
+                  {openSignal.type.toUpperCase()} ENTRY
                 </span>
                 <span className="text-white font-mono">
                   ${entryPrice.toFixed(2)}

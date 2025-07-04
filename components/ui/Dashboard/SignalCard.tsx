@@ -13,10 +13,10 @@ interface Props {
 
 export default function SignalCard({ signal, position }: Props) {
   // Handle both signals and positions
-  const isBuy = signal ? signal.typ === 'buy' : position?.side === 'BUY';
-  const isSell = signal ? signal.typ === 'sell' : position?.side === 'SELL';
+  const isBuy = signal ? signal.type === 'buy' : position?.type === 'BUY';
+  const isSell = signal ? signal.type === 'sell' : position?.type === 'SELL';
   const isClose = signal
-    ? signal.typ === 'close'
+    ? signal.type === 'close'
     : position?.status === 'closed';
   const riskLevel = signal?.risk || position?.risk || 1;
   const price =
