@@ -95,3 +95,13 @@ export const getErrorRedirect = (
     disableButton,
     arbitraryParams
   );
+
+export const calculateTrialEndUnixTimestamp = (trialPeriodDays: number | null) => {
+  if (!trialPeriodDays) {
+    return undefined;
+  }
+  
+  const trialEnd = new Date();
+  trialEnd.setDate(trialEnd.getDate() + trialPeriodDays);
+  return Math.floor(trialEnd.getTime() / 1000);
+};
