@@ -113,7 +113,6 @@ export default function ReferralDashboard({
   const referralUrl = referralCode
     ? `${baseUrl}/signin/signup?ref=${referralCode.code}`
     : '';
-
   const createReferralCode = async () => {
     setLoading(true);
     try {

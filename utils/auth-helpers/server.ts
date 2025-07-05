@@ -169,6 +169,12 @@ export async function signUp(formData: FormData) {
   const email = String(formData.get('email')).trim();
   const password = String(formData.get('password')).trim();
   const referralCode = String(formData.get('referralCode') || '').trim();
+  
+  console.log('🔍 Form data received:');
+  console.log('🔍 - Email:', email);
+  console.log('🔍 - Password:', password ? '[HIDDEN]' : '[EMPTY]');
+  console.log('🔍 - Referral Code:', referralCode || '[EMPTY]');
+  
   let redirectPath: string;
 
   if (!isValidEmail(email)) {
@@ -185,6 +191,7 @@ export async function signUp(formData: FormData) {
   let validReferralCode = false;
   let referrerId = null;
   if (referralCode) {
+    console.log('🔍 Validating referral code:', referralCode);
     try {
       const { data: referralData, error: referralError } = await supabase
         .from('referral_codes')
@@ -193,15 +200,20 @@ export async function signUp(formData: FormData) {
         .eq('is_active', true)
         .single();
 
+      console.log('🔍 Referral validation result:', { referralData, referralError });
+
       if (!referralError && referralData) {
         validReferralCode = true;
         referrerId = referralData.user_id;
+        console.log('✅ Valid referral code found, referrer ID:', referrerId);
       } else {
-        console.error('Invalid referral code during signup:', referralError);
+        console.error('❌ Invalid referral code during signup:', referralError);
       }
     } catch (error) {
-      console.error('Error validating referral code:', error);
+      console.error('❌ Error validating referral code:', error);
     }
+  } else {
+    console.log('🔍 No referral code provided');
   }
 
   const { data: authData, error: signUpError } = await supabase.auth.signUp({
@@ -226,6 +238,10 @@ export async function signUp(formData: FormData) {
   } else if (authData.user) {
     // If there's a valid referral code, create the referral record
     if (validReferralCode && referrerId) {
+      console.log('🔍 Creating referral record for user:', authData.user.id);
+      console.log('🔍 Referrer ID:', referrerId);
+      console.log('🔍 Referral code:', referralCode);
+      
       try {
         const { error: referralError } = await supabase
           .from('referrals')
@@ -233,13 +249,14 @@ export async function signUp(formData: FormData) {
             referrer_id: referrerId,
             referee_id: authData.user.id,
             referral_code: referralCode,
-            status: 'pending', // Start with pending status
-            converted_at: null // Will be set when the referral is completed
+            status: 'pending' // Start with pending status
           });
 
         if (referralError) {
-          console.error('Error creating referral record:', referralError);
+          console.error('❌ Error creating referral record:', referralError);
         } else {
+          console.log('✅ Referral record created successfully');
+          
           // Get current clicks count and increment
           const { data: currentData } = await supabase
             .from('referral_codes')
@@ -249,14 +266,22 @@ export async function signUp(formData: FormData) {
 
           const newClicks = (currentData?.clicks || 0) + 1;
           
-          await supabase
+          const { error: updateError } = await supabase
             .from('referral_codes')
             .update({ clicks: newClicks })
             .eq('code', referralCode);
+            
+          if (updateError) {
+            console.error('❌ Error updating click count:', updateError);
+          } else {
+            console.log('✅ Click count updated successfully');
+          }
         }
       } catch (error) {
-        console.error('Error handling referral:', error);
+        console.error('❌ Error handling referral:', error);
       }
+    } else {
+      console.log('🔍 No valid referral code provided or referrer not found');
     }
 
     redirectPath = getStatusRedirect(

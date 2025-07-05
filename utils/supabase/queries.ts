@@ -329,17 +329,28 @@ export const getReferralStats = cache(async (supabase: SupabaseClient) => {
     getReferralRewards(supabase)
   ]);
 
+  console.log('🔍 Debug referral stats:');
+  console.log('🔍 - Referrals:', referrals);
+  console.log('🔍 - Rewards:', rewards);
+  console.log('🔍 - Referral code clicks:', referralCode?.clicks);
+
   const totalEarnings = rewards
     .filter(r => r.status === 'paid')
     .reduce((sum, r) => sum + Number(r.amount), 0);
 
   const pendingAmount = rewards
-    .filter(r => r.status === 'eligible')
+    .filter(r => r.status === 'eligible' || r.status === 'pending')
     .reduce((sum, r) => sum + Number(r.amount), 0);
 
   const pendingReferrals = referrals.filter(r => r.status === 'pending').length;
   const activeReferrals = referrals.filter(r => r.status === 'active').length;
   const totalClicks = referralCode?.clicks || 0;
+
+  console.log('🔍 - Total earnings:', totalEarnings);
+  console.log('🔍 - Pending amount:', pendingAmount);
+  console.log('🔍 - Pending referrals:', pendingReferrals);
+  console.log('🔍 - Active referrals:', activeReferrals);
+  console.log('🔍 - Total clicks:', totalClicks);
 
   return {
     totalEarnings,
@@ -554,3 +565,79 @@ export const ensureUserReferralCodeClient = async (supabase: SupabaseClient) => 
 
   return newReferralCode;
 };
+
+// New function to calculate pro-rated monthly performance for performance guarantee
+export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClient) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    return null;
+  }
+
+  // Get user's active subscription
+  const { data: subscription } = await supabase
+    .from('subscriptions')
+    .select('current_period_start, current_period_end, created')
+    .eq('user_id', user.id)
+    .in('status', ['active', 'trialing'])
+    .order('created', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!subscription) {
+    return null;
+  }
+
+  const now = new Date();
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  
+  // Determine the effective start date for this month's performance calculation
+  let effectiveStartDate: Date;
+  
+  if (new Date(subscription.created) >= currentMonthStart) {
+    // User subscribed this month - use subscription start date
+    effectiveStartDate = new Date(subscription.created);
+  } else {
+    // User subscribed before this month - use month start
+    effectiveStartDate = currentMonthStart;
+  }
+
+  // Get positions closed during the effective period
+  const { data: positions, error } = await supabase
+    .from('positions')
+    .select('*')
+    .eq('status', 'closed')
+    .not('exit_timestamp', 'is', null)
+    .gte('exit_timestamp', effectiveStartDate.toISOString())
+    .lte('exit_timestamp', currentMonthEnd.toISOString())
+    .order('exit_timestamp', { ascending: true });
+
+  if (error || !positions) {
+    return {
+      totalPnL: 0,
+      totalPositions: 0,
+      profitablePositions: 0,
+      effectiveStartDate: effectiveStartDate.toISOString(),
+      effectiveEndDate: currentMonthEnd.toISOString(),
+      isProRated: new Date(subscription.created) >= currentMonthStart,
+      subscriptionStartDate: subscription.created
+    };
+  }
+
+  // Calculate performance
+  const totalPnL = positions.reduce((sum, pos) => sum + (pos.pnl || 0), 0);
+  const profitablePositions = positions.filter(pos => (pos.pnl || 0) > 0).length;
+  const totalPositions = positions.length;
+
+  return {
+    totalPnL,
+    totalPositions,
+    profitablePositions,
+    effectiveStartDate: effectiveStartDate.toISOString(),
+    effectiveEndDate: currentMonthEnd.toISOString(),
+    isProRated: new Date(subscription.created) >= currentMonthStart,
+    subscriptionStartDate: subscription.created,
+    positions
+  };
+});

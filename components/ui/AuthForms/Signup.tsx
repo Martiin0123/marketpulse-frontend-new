@@ -104,9 +104,10 @@ export default function SignUp({ allowEmail, redirectMethod }: SignUpProps) {
     try {
       const formData = new FormData(e.currentTarget);
 
-      // Only add referral code if it's valid
-      if (referralValid && referralCode) {
+      // Always add referral code if it's provided (server will validate it)
+      if (referralCode) {
         formData.append('referralCode', referralCode);
+        console.log('🔍 Adding referral code to form:', referralCode);
       }
 
       await handleRequest(e, signUp, router);
@@ -216,6 +217,7 @@ export default function SignUp({ allowEmail, redirectMethod }: SignUpProps) {
             </div>
             <input
               id="referralCode"
+              name="referralCode"
               placeholder="Enter referral code"
               type="text"
               value={referralCode}
