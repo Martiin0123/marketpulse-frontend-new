@@ -1,5 +1,5 @@
 import { createClient } from '@/utils/supabase/server';
-import { getSubscription } from '@/utils/supabase/queries';
+import { getUser, getSubscription } from '@/utils/supabase/queries';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import Logo from '@/components/icons/Logo';
@@ -7,11 +7,7 @@ import NavbarClient from './NavbarClient';
 
 export default async function Navbar() {
   const supabase = createClient();
-
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
+  const user = await getUser(supabase);
   const subscription = user ? await getSubscription(supabase) : null;
 
   return (
