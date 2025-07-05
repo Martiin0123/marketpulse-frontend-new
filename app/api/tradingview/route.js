@@ -83,7 +83,6 @@ export async function POST(request) {
         symbol: symbolUpper,
         type: 'close',
         price: price,
-        timestamp: unixTimestamp,
         created_at: validTimestamp
       }])
       .select()
@@ -150,7 +149,6 @@ export async function POST(request) {
             symbol: symbolUpper,
             type: 'buy',
             price: price,
-            timestamp: unixTimestamp,
             created_at: validTimestamp
           }])
           .select()
@@ -187,7 +185,6 @@ export async function POST(request) {
         symbol: symbolUpper,
         type: 'buy',
         price: price,
-        timestamp: unixTimestamp,
         created_at: validTimestamp
       }])
       .select()
@@ -273,7 +270,6 @@ export async function POST(request) {
             symbol: symbolUpper,
             type: 'sell',
             price: price,
-            timestamp: unixTimestamp,
             created_at: validTimestamp
           }])
           .select()
@@ -293,7 +289,6 @@ export async function POST(request) {
             symbol: symbolUpper,
             type: 'close',
             price: price,
-            timestamp: unixTimestamp,
             created_at: validTimestamp
           }])
           .select()
@@ -330,7 +325,6 @@ export async function POST(request) {
         symbol: symbolUpper,
         type: 'sell',
         price: price,
-        timestamp: unixTimestamp,
         created_at: validTimestamp
       }])
       .select()

@@ -17,6 +17,8 @@ import Logo from '@/components/icons/Logo';
 import TabSwitcher from './TabSwitcher';
 import SignalsTab from './SignalsTab';
 import PositionsTab from './PositionsTab';
+import StatsOverview from './StatsOverview';
+import PerformanceGuaranteeWidget from '../PerformanceGuarantee/PerformanceGuaranteeWidget';
 
 type Position = Tables<'positions'>;
 type Signal = Tables<'signals'>;
@@ -27,13 +29,15 @@ interface Props {
   subscription: Subscription;
   positions: Position[];
   signals: Signal[];
+  stats: any;
 }
 
 export default function Dashboard({
   user,
   subscription,
   positions: initialPositions,
-  signals: initialSignals
+  signals: initialSignals,
+  stats
 }: Props) {
   const [positions, setPositions] = useState<Position[]>(initialPositions);
   const [signals, setSignals] = useState<Signal[]>(initialSignals);
@@ -106,29 +110,29 @@ export default function Dashboard({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-cyan-600/20"></div>
-        <div className="relative max-w-7xl mx-auto px-4 py-16 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-900">
+      {/* Header */}
+      <div className="pt-20 pb-12 bg-gradient-to-b from-slate-900 to-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <p className="mt-4 text-xl text-slate-300">
-              Welcome back, {user.email?.split('@')[0]}
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">
+              Dashboard
+            </h1>
+            <p className="text-xl text-slate-400 max-w-3xl mx-auto">
+              Welcome back, {user?.user_metadata?.full_name || user?.email}
             </p>
-            <div className="mt-6 inline-flex items-center px-4 py-2 bg-emerald-500/20 rounded-full">
-              <div className="w-2 h-2 bg-emerald-400 rounded-full mr-2"></div>
-              <span className="text-emerald-400 text-sm font-medium">
-                {subscription.status === 'active'
-                  ? 'Active Subscription'
-                  : 'Trial Period'}
-              </span>
-            </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        {/* Tab Switcher */}
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Performance Guarantee Widget */}
+        <div className="mb-8">
+          <PerformanceGuaranteeWidget />
+        </div>
+
+        {/* Tabs */}
         <TabSwitcher activeTab={activeTab} onTabChange={setActiveTab} />
 
         {/* Tab Content */}

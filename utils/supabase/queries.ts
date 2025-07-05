@@ -53,7 +53,6 @@ export const getSubscription = cache(async (supabase: SupabaseClient) => {
     .eq('user_id', user.user.id);
 
   if (listError) {
-    console.error('[SERVER] Error checking subscriptions:', listError);
     return null;
   }
 
@@ -109,7 +108,6 @@ export const getSubscription = cache(async (supabase: SupabaseClient) => {
     .single();
 
   if (error) {
-    console.error('[SERVER] Error fetching subscription with relations:', error);
     return null;
   }
 
@@ -145,7 +143,6 @@ export const getProducts = cache(async (supabase: SupabaseClient) => {
     .order('metadata->index');
 
   if (error) {
-    console.error('Error fetching products:', error);
     return [];
   }
 
@@ -188,7 +185,6 @@ export const getSignals = cache(async (supabase: SupabaseClient) => {
     .limit(50);
 
   if (error) {
-    console.error('Error fetching signals:', error);
     return [];
   }
 
@@ -202,7 +198,6 @@ export const getPositions = cache(async (supabase: SupabaseClient) => {
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching positions:', error);
     return [];
   }
 
@@ -319,7 +314,6 @@ export const getReferralStats = cache(async (supabase: SupabaseClient) => {
       };
     }
   } catch (error) {
-    console.error('Error calling get_referral_stats:', error);
   }
 
   // Fallback: calculate manually
@@ -328,11 +322,6 @@ export const getReferralStats = cache(async (supabase: SupabaseClient) => {
     getReferrals(supabase),
     getReferralRewards(supabase)
   ]);
-
-  console.log('🔍 Debug referral stats:');
-  console.log('🔍 - Referrals:', referrals);
-  console.log('🔍 - Rewards:', rewards);
-  console.log('🔍 - Referral code clicks:', referralCode?.clicks);
 
   const totalEarnings = rewards
     .filter(r => r.status === 'paid')
@@ -345,12 +334,6 @@ export const getReferralStats = cache(async (supabase: SupabaseClient) => {
   const pendingReferrals = referrals.filter(r => r.status === 'pending').length;
   const activeReferrals = referrals.filter(r => r.status === 'active').length;
   const totalClicks = referralCode?.clicks || 0;
-
-  console.log('🔍 - Total earnings:', totalEarnings);
-  console.log('🔍 - Pending amount:', pendingAmount);
-  console.log('🔍 - Pending referrals:', pendingReferrals);
-  console.log('🔍 - Active referrals:', activeReferrals);
-  console.log('🔍 - Total clicks:', totalClicks);
 
   return {
     totalEarnings,
@@ -376,8 +359,10 @@ export const getReferralRewards = cache(async (supabase: SupabaseClient) => {
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching referral rewards:', error);
-    return [];
+    return rewards.map(reward => ({
+      ...reward,
+      referral: null
+    }));
   }
 
   if (!rewards || rewards.length === 0) {
@@ -392,7 +377,6 @@ export const getReferralRewards = cache(async (supabase: SupabaseClient) => {
     .in('id', referralIds);
 
   if (referralsError) {
-    console.error('Error fetching referrals for rewards:', referralsError);
     return rewards.map(reward => ({
       ...reward,
       referral: null
@@ -424,7 +408,6 @@ export const validateReferralCode = async (supabase: SupabaseClient, code: strin
     });
 
     if (error) {
-      console.error('Error validating referral code:', error);
       return { valid: false, error: 'Invalid referral code' };
     }
 
@@ -439,7 +422,6 @@ export const validateReferralCode = async (supabase: SupabaseClient, code: strin
 
     return { valid: false, error: 'Invalid referral code' };
   } catch (error) {
-    console.error('Error calling validate_referral_code:', error);
     return { valid: false, error: 'Invalid referral code' };
   }
 };
@@ -459,13 +441,11 @@ export const createReferral = async (
     });
 
     if (error) {
-      console.error('Error creating referral:', error);
       return null;
     }
 
     return { id: data };
   } catch (error) {
-    console.error('Error calling create_referral:', error);
     return null;
   }
 };
@@ -476,12 +456,7 @@ export const updateReferralCodeClicks = async (supabase: SupabaseClient, code: s
     const { error } = await supabase.rpc('update_referral_code_clicks', {
       code_param: code
     });
-
-    if (error) {
-      console.error('Error updating referral code clicks:', error);
-    }
   } catch (error) {
-    console.error('Error calling update_referral_code_clicks:', error);
   }
 };
 
@@ -507,7 +482,6 @@ export const ensureUserReferralCode = async (supabase: SupabaseClient) => {
   });
 
   if (error) {
-    console.error('Error creating referral code:', error);
     return null;
   }
 
@@ -531,7 +505,6 @@ export const ensureUserReferralCodeClient = async (supabase: SupabaseClient) => 
     .single();
 
   if (error && error.code !== 'PGRST116') {
-    console.error('Error fetching existing referral code:', error);
     return null;
   }
 
@@ -547,7 +520,6 @@ export const ensureUserReferralCodeClient = async (supabase: SupabaseClient) => 
   });
 
   if (createError) {
-    console.error('Error creating referral code:', createError);
     return null;
   }
 
@@ -559,7 +531,6 @@ export const ensureUserReferralCodeClient = async (supabase: SupabaseClient) => 
     .single();
 
   if (fetchError) {
-    console.error('Error fetching new referral code:', fetchError);
     return null;
   }
 
@@ -587,8 +558,8 @@ export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClie
   if (!subscription) {
     return null;
   }
-
-  const now = new Date();
+  const now = new Date('2025-08-05T12:00:00Z');
+  //const now = new Date();
   const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
   
