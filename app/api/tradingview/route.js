@@ -130,7 +130,7 @@ export async function POST(request) {
           .update({
             status: 'closed',
             exit_price: exitPrice,
-            exit_timestamp: unixTimestamp,
+            exit_timestamp: validTimestamp,
             pnl: pnlPercentage
           })
           .eq('id', existingPosition.id)
@@ -251,7 +251,7 @@ export async function POST(request) {
           .update({
             status: 'closed',
             exit_price: exitPrice,
-            exit_timestamp: unixTimestamp,
+            exit_timestamp: validTimestamp,
             pnl: pnlPercentage
           })
           .eq('id', existingPosition.id)
@@ -345,7 +345,7 @@ export async function POST(request) {
         signal_id: signal.id,
         type: 'sell',
         entry_price: price,
-        entry_timestamp: unixTimestamp,
+        entry_timestamp: validTimestamp,
         quantity: 1, // Default quantity
         status: 'open'
       }])
