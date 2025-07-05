@@ -2,6 +2,7 @@
 
 import { User } from '@supabase/supabase-js';
 import { Tables, Database } from '@/types_db';
+import { UserDetails } from '@/utils/supabase/queries';
 import { useState } from 'react';
 import {
   User as UserIcon,
@@ -25,7 +26,6 @@ import { handleRequest } from '@/utils/auth-helpers/client';
 import { useRouter } from 'next/navigation';
 import CustomerPortalForm from '@/components/ui/AccountForms/CustomerPortalForm';
 
-type UserDetails = Tables<'users'>;
 type Subscription = Tables<'subscriptions'>;
 type Price = Database['public']['Tables']['prices']['Row'];
 type Product = Database['public']['Tables']['products']['Row'];

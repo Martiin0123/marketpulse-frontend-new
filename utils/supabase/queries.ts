@@ -152,18 +152,32 @@ export const getProducts = cache(async (supabase: SupabaseClient) => {
   return products;
 });
 
-export const getUserDetails = cache(async (supabase: SupabaseClient) => {
-  const { data: userDetails, error } = await supabase
-    .from('users')
-    .select('*')
-    .single();
-    
-  if (error) {
-    console.error('Error fetching user details:', error);
+// Custom type for user details from auth.users
+export type UserDetails = {
+  id: string;
+  full_name: string;
+  avatar_url: string | null;
+  billing_address: any | null;
+  payment_method: any | null;
+  metadata: any | null;
+};
+
+export const getUserDetails = cache(async (supabase: SupabaseClient): Promise<UserDetails | null> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user?.id) {
     return null;
   }
-    
-  return userDetails;
+
+  // Return user data from auth.users instead of public.users
+  return {
+    id: user.id,
+    full_name: user.user_metadata?.full_name || '',
+    avatar_url: user.user_metadata?.avatar_url || null,
+    billing_address: user.user_metadata?.billing_address || null,
+    payment_method: user.user_metadata?.payment_method || null,
+    metadata: user.user_metadata || null
+  };
 });
 
 export const getSignals = cache(async (supabase: SupabaseClient) => {
