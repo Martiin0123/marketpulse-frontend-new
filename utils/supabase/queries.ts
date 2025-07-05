@@ -199,42 +199,10 @@ export const getPositions = cache(async (supabase: SupabaseClient) => {
   const { data: positions, error } = await supabase
     .from('positions')
     .select('*')
-    .order('created_at', { ascending: false })
-    .limit(100);
-
-  if (error) {
-    console.error('Error fetching positions:', error);
-    return [];
-  }
-
-  return positions;
-});
-
-export const getOpenPositions = cache(async (supabase: SupabaseClient) => {
-  const { data: positions, error } = await supabase
-    .from('positions')
-    .select('*')
-    .eq('status', 'open')
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching open positions:', error);
-    return [];
-  }
-
-  return positions;
-});
-
-export const getClosedPositions = cache(async (supabase: SupabaseClient) => {
-  const { data: positions, error } = await supabase
-    .from('positions')
-    .select('*')
-    .eq('status', 'closed')
-    .order('exit_timestamp', { ascending: false })
-    .limit(50);
-
-  if (error) {
-    console.error('Error fetching closed positions:', error);
+    console.error('Error fetching positions:', error);
     return [];
   }
 
