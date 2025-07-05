@@ -1,241 +1,373 @@
 'use client';
 
-import { useState } from 'react';
-import Button from '@/components/ui/Button';
-import {
-  Shield,
-  AlertTriangle,
-  CheckCircle,
-  DollarSign,
-  Calendar
-} from 'lucide-react';
+import { useState, useEffect } from 'react';
+import Card from '../Card';
+import Button from '../Button';
 
-interface PerformanceGuaranteeData {
-  performance: number;
-  isNegative: boolean;
+interface PerformanceData {
+  totalPnL: number;
+  totalPositions: number;
+  profitablePositions: number;
+  effectiveStartDate: string;
+  effectiveEndDate: string;
   isProRated: boolean;
-  effectivePeriod: {
-    start: string;
-    end: string;
-  };
-  stats: {
-    totalPositions: number;
-    profitablePositions: number;
-    winRate: string;
-  };
-  refundEligible: boolean;
+  subscriptionStartDate: string;
+  monthKey: string;
+  isCurrentMonth: boolean;
+  isPeriodEnded: boolean;
+}
+
+interface PerformanceResponse {
+  performance: PerformanceData;
+  isCurrentMonth: boolean;
+  isEligible: boolean;
+  refundAmount: number;
+  existingRefund: any;
+  isPeriodEnded: boolean;
+  requestId?: string;
   message: string;
 }
 
-interface Props {
-  initialData?: PerformanceGuaranteeData;
-}
-
-export default function PerformanceGuaranteeWidget({ initialData }: Props) {
-  const [data, setData] = useState<PerformanceGuaranteeData | null>(
-    initialData || null
+export default function PerformanceGuaranteeWidget() {
+  const [performance, setPerformance] = useState<PerformanceResponse | null>(
+    null
   );
-  const [loading, setLoading] = useState(false);
-  const [refundLoading, setRefundLoading] = useState(false);
-  const [refundResult, setRefundResult] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [requesting, setRequesting] = useState(false);
+  const [message, setMessage] = useState('');
 
-  const fetchPerformanceData = async () => {
-    setLoading(true);
+  const checkPerformance = async () => {
     try {
+      setLoading(true);
       const response = await fetch('/api/performance-guarantee');
-      const result = await response.json();
+      const data = await response.json();
 
       if (response.ok) {
-        setData(result);
+        setPerformance(data);
+        setMessage('');
       } else {
-        console.error('Error fetching performance data:', result);
+        setMessage(data.error || 'Failed to load performance data');
+        setPerformance(null);
       }
     } catch (error) {
-      console.error('Error fetching performance data:', error);
+      setMessage('Error loading performance data');
+      setPerformance(null);
     } finally {
       setLoading(false);
     }
   };
 
   const requestRefund = async () => {
-    setRefundLoading(true);
+    if (!performance?.isEligible) return;
+
     try {
+      setRequesting(true);
       const response = await fetch('/api/performance-guarantee', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}) // Don't pass targetMonth for default refund requests
       });
-      const result = await response.json();
-      setRefundResult(result);
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage(`Refund request successful! ${data.message}`);
+        // Refresh performance data
+        await checkPerformance();
+      } else {
+        setMessage(data.error || 'Failed to request refund');
+      }
     } catch (error) {
-      console.error('Error requesting refund:', error);
+      setMessage('Error requesting refund');
     } finally {
-      setRefundLoading(false);
+      setRequesting(false);
     }
   };
 
-  if (!data) {
+  useEffect(() => {
+    checkPerformance();
+  }, []);
+
+  if (loading) {
     return (
-      <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <Shield className="w-6 h-6 text-blue-400" />
-            <h3 className="text-lg font-semibold text-white">
-              Performance Guarantee
-            </h3>
-          </div>
-          <Button
-            variant="slim"
-            onClick={fetchPerformanceData}
-            disabled={loading}
-          >
-            {loading ? 'Loading...' : 'Check Status'}
-          </Button>
+      <div className="w-full bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl shadow-2xl p-8">
+        <div className="text-center mb-8">
+          <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 bg-clip-text text-transparent mb-2">
+            Performance Guarantee
+          </h3>
         </div>
-        <p className="text-slate-400">
-          Click to check your current month's performance guarantee status.
-        </p>
+        <div className="animate-pulse space-y-4">
+          <div className="h-4 bg-slate-700 rounded w-3/4 mx-auto"></div>
+          <div className="h-4 bg-slate-700 rounded w-1/2 mx-auto"></div>
+          <div className="h-4 bg-slate-700 rounded w-2/3 mx-auto"></div>
+        </div>
       </div>
     );
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
-
-  const formatPerformance = (performance: number) => {
-    const sign = performance >= 0 ? '+' : '';
-    const color = performance >= 0 ? 'text-green-400' : 'text-red-400';
+  if (!performance) {
     return (
-      <span className={color}>
-        {sign}
-        {performance.toFixed(2)}%
-      </span>
-    );
-  };
-
-  return (
-    <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-3">
-          <Shield className="w-6 h-6 text-blue-400" />
-          <h3 className="text-lg font-semibold text-white">
+      <div className="w-full bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl shadow-2xl p-8">
+        <div className="text-center mb-8">
+          <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 bg-clip-text text-transparent mb-2">
             Performance Guarantee
           </h3>
         </div>
-        <Button
-          variant="slim"
-          onClick={fetchPerformanceData}
-          disabled={loading}
-        >
-          {loading ? 'Loading...' : 'Refresh'}
-        </Button>
-      </div>
-
-      {/* Performance Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div className="bg-slate-700/30 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-slate-400 text-sm">Monthly Performance</span>
-            {data.isNegative ? (
-              <AlertTriangle className="w-4 h-4 text-red-400" />
-            ) : (
-              <CheckCircle className="w-4 h-4 text-green-400" />
-            )}
-          </div>
-          <div className="text-2xl font-bold">
-            {formatPerformance(data.performance)}
-          </div>
-          <div className="text-slate-400 text-sm mt-1">
-            {data.isProRated
-              ? 'Pro-rated calculation'
-              : 'Full month calculation'}
-          </div>
-        </div>
-
-        <div className="bg-slate-700/30 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-slate-400 text-sm">Win Rate</span>
-            <DollarSign className="w-4 h-4 text-blue-400" />
-          </div>
-          <div className="text-2xl font-bold text-blue-400">
-            {data.stats.winRate}%
-          </div>
-          <div className="text-slate-400 text-sm mt-1">
-            {data.stats.profitablePositions}/{data.stats.totalPositions} trades
-          </div>
-        </div>
-      </div>
-
-      {/* Effective Period */}
-      <div className="bg-slate-700/30 rounded-lg p-4 mb-6">
-        <div className="flex items-center space-x-2 mb-3">
-          <Calendar className="w-4 h-4 text-slate-400" />
-          <span className="text-slate-300 font-medium">Calculation Period</span>
-        </div>
-        <div className="text-sm text-slate-400">
-          {formatDate(data.effectivePeriod.start)} -{' '}
-          {formatDate(data.effectivePeriod.end)}
-        </div>
-        {data.isProRated && (
-          <div className="text-xs text-blue-400 mt-1">
-            Pro-rated based on your subscription start date
-          </div>
-        )}
-      </div>
-
-      {/* Refund Status */}
-      <div className="border-t border-slate-700 pt-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h4 className="text-white font-medium mb-1">
-              {data.refundEligible ? 'Refund Eligible' : 'No Refund Needed'}
-            </h4>
-            <p className="text-slate-400 text-sm">{data.message}</p>
-          </div>
-          {data.refundEligible && (
-            <Button
-              variant="slim"
-              onClick={requestRefund}
-              disabled={refundLoading}
-              className="bg-red-500 hover:bg-red-600"
+        <div className="text-center py-8">
+          <div className="text-slate-400 mb-4">
+            <svg
+              className="w-16 h-16 mx-auto"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              {refundLoading ? 'Processing...' : 'Request Refund'}
-            </Button>
-          )}
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+          <p className="text-slate-300 font-medium text-lg">
+            No active subscription found
+          </p>
+          <p className="text-slate-500 mt-2">
+            Subscribe to access performance guarantee
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const {
+    performance: perf,
+    isCurrentMonth,
+    isEligible,
+    refundAmount,
+    existingRefund,
+    isPeriodEnded,
+    requestId
+  } = performance;
+
+  const getStatusColor = () => {
+    if (!isPeriodEnded) return 'border-yellow-500/30 bg-yellow-500/5';
+    if (isCurrentMonth) return 'border-blue-500/30 bg-blue-500/5';
+    if (isEligible) return 'border-emerald-500/30 bg-emerald-500/5';
+    if (existingRefund) return 'border-purple-500/30 bg-purple-500/5';
+    return 'border-slate-700';
+  };
+
+  const getStatusIcon = () => {
+    if (!isPeriodEnded) return '⏳';
+    if (isCurrentMonth) return '📊';
+    if (isEligible) return '💰';
+    if (existingRefund) return '✅';
+    return '📈';
+  };
+
+  return (
+    <div
+      className={`w-full bg-slate-800/50 backdrop-blur-sm border rounded-xl shadow-2xl ${getStatusColor()}`}
+    >
+      <div className="p-8">
+        <div className="text-center mb-8">
+          <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 bg-clip-text text-transparent mb-2">
+            <span className="mr-2">{getStatusIcon()}</span>
+            Performance Guarantee
+          </h3>
         </div>
 
-        {refundResult && (
+        <div className="space-y-6">
+          {/* Status Badge */}
+          <div className="flex items-center justify-center">
+            <span
+              className={`px-4 py-2 rounded-full text-sm font-medium ${
+                !isPeriodEnded
+                  ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                  : isCurrentMonth
+                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                    : isEligible
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : existingRefund
+                        ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                        : 'bg-slate-500/20 text-slate-400 border border-slate-500/30'
+              }`}
+            >
+              {!isPeriodEnded
+                ? 'Period Active'
+                : isCurrentMonth
+                  ? 'Current Month'
+                  : isEligible
+                    ? 'Eligible for Refund'
+                    : existingRefund
+                      ? 'Refund Processed'
+                      : 'No Refund Available'}
+            </span>
+          </div>
+
+          {/* Performance Summary */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-6 bg-slate-700/30 rounded-xl border border-slate-600/50">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-white mb-1">
+                ${perf.totalPnL.toFixed(2)}
+              </div>
+              <div className="text-sm text-slate-400">Total P&L</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-white mb-1">
+                {perf.totalPositions}
+              </div>
+              <div className="text-sm text-slate-400">Positions</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white mb-1">
+                {perf.totalPositions > 0
+                  ? (
+                      (perf.profitablePositions / perf.totalPositions) *
+                      100
+                    ).toFixed(1)
+                  : 0}
+                %
+              </div>
+              <div className="text-sm text-slate-400">Win Rate</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-white mb-1">
+                {perf.isProRated ? 'Pro-rated' : 'Full'}
+              </div>
+              <div className="text-sm text-slate-400">Period</div>
+            </div>
+          </div>
+
+          {/* Calculation Period */}
+          <div className="bg-slate-700/30 p-6 rounded-xl border border-slate-600/50">
+            <div className="text-center">
+              <span className="text-slate-300 font-medium text-sm">
+                Calculation Period:
+              </span>
+              <div className="mt-2 text-white font-semibold text-lg">
+                {new Date(perf.effectiveStartDate).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric'
+                })}{' '}
+                -{' '}
+                {new Date(perf.effectiveEndDate).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric'
+                })}
+              </div>
+              {perf.isProRated && (
+                <div className="text-sm text-cyan-400 mt-2 flex items-center justify-center">
+                  <span className="mr-1">⚡</span>
+                  Pro-rated based on subscription start date
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Refund Amount */}
+          {refundAmount > 0 && (
+            <div className="bg-emerald-500/10 p-6 rounded-xl border border-emerald-500/30">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-emerald-400 font-medium text-lg">
+                    Refund Amount
+                  </div>
+                  <div className="text-emerald-500/70 text-sm">
+                    Available for processing
+                  </div>
+                </div>
+                <div className="text-3xl font-bold text-emerald-400">
+                  ${refundAmount.toFixed(2)}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Refund Request Status */}
+          {requestId && (
+            <div className="bg-blue-500/10 p-6 rounded-xl border border-blue-500/30">
+              <div className="flex items-center space-x-3">
+                <span className="text-blue-400 text-xl">📋</span>
+                <div className="flex-1">
+                  <div className="text-blue-400 font-medium text-lg">
+                    Refund Request Submitted
+                  </div>
+                  <div className="text-blue-500/70 text-sm">
+                    ID: {requestId}
+                  </div>
+                  <div className="text-blue-500/70 text-sm mt-1">
+                    Your request is under review
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Status Message */}
           <div
-            className={`mt-4 p-4 rounded-lg ${
-              refundResult.eligible
-                ? 'bg-green-500/20 border border-green-500/30'
-                : 'bg-red-500/20 border border-red-500/30'
+            className={`p-4 rounded-xl text-sm ${
+              !isPeriodEnded
+                ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/30'
+                : isCurrentMonth
+                  ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
+                  : isEligible
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                    : existingRefund
+                      ? 'bg-purple-500/10 text-purple-400 border border-purple-500/30'
+                      : 'bg-slate-500/10 text-slate-400 border border-slate-500/30'
             }`}
           >
-            <div className="flex items-center space-x-2 mb-2">
-              {refundResult.eligible ? (
-                <CheckCircle className="w-5 h-5 text-green-400" />
-              ) : (
-                <AlertTriangle className="w-5 h-5 text-red-400" />
-              )}
-              <span className="font-medium text-white">
-                {refundResult.eligible
-                  ? 'Refund Request Submitted'
-                  : 'Refund Not Eligible'}
-              </span>
-            </div>
-            <p className="text-sm text-slate-300">{refundResult.message}</p>
-            {refundResult.note && (
-              <p className="text-xs text-slate-400 mt-2">{refundResult.note}</p>
-            )}
+            {performance.message}
           </div>
-        )}
+
+          {/* Action Button */}
+          {isEligible &&
+            !isCurrentMonth &&
+            isPeriodEnded &&
+            !existingRefund &&
+            !requestId && (
+              <div className="text-center">
+                <Button
+                  onClick={requestRefund}
+                  disabled={requesting}
+                  className="bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white font-medium py-4 px-8 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg"
+                >
+                  {requesting ? (
+                    <div className="flex items-center space-x-3">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      <span>Submitting Request...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-3">
+                      <span className="text-xl">💰</span>
+                      <span>Request Refund</span>
+                    </div>
+                  )}
+                </Button>
+              </div>
+            )}
+
+          {/* Period Not Ended Notice */}
+          {!isPeriodEnded && (
+            <div className="text-center py-4">
+              <div className="text-sm text-yellow-400 bg-yellow-500/10 px-4 py-3 rounded-xl border border-yellow-500/30">
+                <span className="font-medium text-lg">⏰ Period Active</span>
+                <div className="mt-2">
+                  Check back after{' '}
+                  {new Date(perf.effectiveEndDate).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

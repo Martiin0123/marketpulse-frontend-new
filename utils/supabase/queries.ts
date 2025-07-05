@@ -107,9 +107,7 @@ export const getSubscription = cache(async (supabase: SupabaseClient) => {
     .limit(1)
     .single();
 
-  if (error) {
-    return null;
-  }
+
 
   return subscription;
 });
@@ -538,7 +536,7 @@ export const ensureUserReferralCodeClient = async (supabase: SupabaseClient) => 
 };
 
 // New function to calculate pro-rated monthly performance for performance guarantee
-export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClient) => {
+export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClient, targetMonth?: string) => {
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
@@ -546,9 +544,9 @@ export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClie
   }
 
   // Get user's active subscription
-  const { data: subscription } = await supabase
+  const { data: subscription, error: subscriptionError } = await supabase
     .from('subscriptions')
-    .select('current_period_start, current_period_end, created')
+    .select('current_period_start, current_period_end, created, status')
     .eq('user_id', user.id)
     .in('status', ['active', 'trialing'])
     .order('created', { ascending: false })
@@ -556,33 +554,110 @@ export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClie
     .single();
 
   if (!subscription) {
+    // Let's check what subscriptions exist for this user
+    const { data: allSubscriptions, error: allSubsError } = await supabase
+      .from('subscriptions')
+      .select('id, status, created, current_period_start, current_period_end')
+      .eq('user_id', user.id)
+      .order('created', { ascending: false });
+
+    console.log('User subscriptions:', allSubscriptions);
+    console.log('Subscription error:', subscriptionError);
     return null;
   }
-  const now = new Date('2025-08-05T12:00:00Z');
-  //const now = new Date();
-  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-  
-  // Determine the effective start date for this month's performance calculation
+
+  // Determine which month to analyze
+  let analysisDate: Date;
   let effectiveStartDate: Date;
+  let effectiveEndDate: Date;
+  let isPeriodEnded: boolean;
   
-  if (new Date(subscription.created) >= currentMonthStart) {
-    // User subscribed this month - use subscription start date
-    effectiveStartDate = new Date(subscription.created);
+  if (targetMonth) {
+    // Parse target month (YYYY-MM format)
+    const [year, month] = targetMonth.split('-').map(Number);
+    analysisDate = new Date(year, month - 1, 1); // month is 0-indexed
   } else {
-    // User subscribed before this month - use month start
-    effectiveStartDate = currentMonthStart;
+    // For default (previous month), use the previous subscription period
+    const subscriptionStart = new Date(subscription.created);
+    const now = new Date(); // Use real current date
+    
+    // Calculate the previous subscription period
+    // If subscription started July 4, previous period is June 4 - July 4
+    effectiveStartDate = new Date(subscriptionStart);
+    effectiveStartDate.setMonth(effectiveStartDate.getMonth() - 1);
+    
+    effectiveEndDate = new Date(subscriptionStart);
+    
+    // Check if the previous subscription period has ended
+    isPeriodEnded = now > effectiveEndDate;
+    
+    // Adjust analysis date to match the subscription period
+    // For month key calculation, use the month of the effective start date
+    analysisDate = new Date(effectiveStartDate);
+
+    console.log('📅 Subscription Period Debug:', {
+      subscriptionCreated: subscription.created,
+      subscriptionStart: subscriptionStart.toISOString(),
+      analysisDate: analysisDate.toISOString(),
+      effectiveStartDate: effectiveStartDate.toISOString(),
+      effectiveEndDate: effectiveEndDate.toISOString(),
+      isPeriodEnded,
+      now: now.toISOString()
+    });
   }
 
-  // Get positions closed during the effective period
+  // Only recalculate dates if targetMonth is provided
+  if (targetMonth) {
+    const monthStart = new Date(analysisDate.getFullYear(), analysisDate.getMonth(), 1);
+    const monthEnd = new Date(analysisDate.getFullYear(), analysisDate.getMonth() + 1, 0, 23, 59, 59);
+    
+    // If a specific month is requested, use calendar month boundaries
+    if (new Date(subscription.created) >= monthStart) {
+      // User subscribed this month - use subscription start date
+      effectiveStartDate = new Date(subscription.created);
+    } else {
+      // User subscribed before this month - use month start
+      effectiveStartDate = monthStart;
+    }
+    effectiveEndDate = monthEnd;
+    isPeriodEnded = new Date() > monthEnd;
+  }
+  
+  // Debug: Log the final dates before querying positions
+  console.log('🔍 Final date calculation:', {
+    targetMonth,
+    effectiveStartDate: effectiveStartDate.toISOString(),
+    effectiveEndDate: effectiveEndDate.toISOString(),
+    analysisDate: analysisDate.toISOString(),
+    isPeriodEnded
+  });
+
+  // Get positions that both entered AND exited during the effective period
   const { data: positions, error } = await supabase
     .from('positions')
     .select('*')
     .eq('status', 'closed')
     .not('exit_timestamp', 'is', null)
+    .not('entry_timestamp', 'is', null)
+    .gte('entry_timestamp', effectiveStartDate.toISOString())
+    .lte('entry_timestamp', effectiveEndDate.toISOString())
     .gte('exit_timestamp', effectiveStartDate.toISOString())
-    .lte('exit_timestamp', currentMonthEnd.toISOString())
+    .lte('exit_timestamp', effectiveEndDate.toISOString())
     .order('exit_timestamp', { ascending: true });
+
+  console.log('🔍 Performance Analysis Debug:', {
+    effectiveStartDate: effectiveStartDate.toISOString(),
+    effectiveEndDate: effectiveEndDate.toISOString(),
+    positionsFound: positions?.length || 0,
+    totalPnL: positions?.reduce((sum, p) => sum + (p.pnl || 0), 0) || 0,
+    positions: positions?.map(p => ({
+      id: p.id,
+      pnl: p.pnl,
+      entry_timestamp: p.entry_timestamp,
+      exit_timestamp: p.exit_timestamp,
+      symbol: p.symbol
+    }))
+  });
 
   if (error || !positions) {
     return {
@@ -590,9 +665,12 @@ export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClie
       totalPositions: 0,
       profitablePositions: 0,
       effectiveStartDate: effectiveStartDate.toISOString(),
-      effectiveEndDate: currentMonthEnd.toISOString(),
-      isProRated: new Date(subscription.created) >= currentMonthStart,
-      subscriptionStartDate: subscription.created
+      effectiveEndDate: effectiveEndDate.toISOString(),
+      isProRated: !targetMonth, // Pro-rated when using subscription period, not calendar month
+      subscriptionStartDate: subscription.created,
+      monthKey: targetMonth || `${analysisDate.getFullYear()}-${String(analysisDate.getMonth() + 1).padStart(2, '0')}`,
+      isCurrentMonth: false,
+      isPeriodEnded
     };
   }
 
@@ -606,9 +684,12 @@ export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClie
     totalPositions,
     profitablePositions,
     effectiveStartDate: effectiveStartDate.toISOString(),
-    effectiveEndDate: currentMonthEnd.toISOString(),
-    isProRated: new Date(subscription.created) >= currentMonthStart,
+    effectiveEndDate: effectiveEndDate.toISOString(),
+    isProRated: !targetMonth, // Pro-rated when using subscription period, not calendar month
     subscriptionStartDate: subscription.created,
+    monthKey: targetMonth || `${analysisDate.getFullYear()}-${String(analysisDate.getMonth() + 1).padStart(2, '0')}`,
+    isCurrentMonth: false,
+    isPeriodEnded,
     positions
   };
 });

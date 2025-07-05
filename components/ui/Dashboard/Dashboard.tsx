@@ -43,7 +43,7 @@ export default function Dashboard({
   const [signals, setSignals] = useState<Signal[]>(initialSignals);
   const [accountSize, setAccountSize] = useState<number>(10000);
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'signals' | 'positions'
+    'overview' | 'signals' | 'positions' | 'performance-guarantee'
   >('overview');
   const supabase = createClient();
 
@@ -127,11 +127,6 @@ export default function Dashboard({
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Performance Guarantee Widget */}
-        <div className="mb-8">
-          <PerformanceGuaranteeWidget />
-        </div>
-
         {/* Tabs */}
         <TabSwitcher activeTab={activeTab} onTabChange={setActiveTab} />
 
@@ -369,6 +364,12 @@ export default function Dashboard({
         {activeTab === 'signals' && <SignalsTab signals={signals} />}
 
         {activeTab === 'positions' && <PositionsTab positions={positions} />}
+
+        {activeTab === 'performance-guarantee' && (
+          <div className="space-y-6">
+            <PerformanceGuaranteeWidget />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,15 +1,24 @@
 import { ReactNode } from 'react';
 
 interface Props {
-  title: string;
+  title: ReactNode;
   description?: string;
   footer?: ReactNode;
   children: ReactNode;
+  className?: string;
 }
 
-export default function Card({ title, description, footer, children }: Props) {
+export default function Card({
+  title,
+  description,
+  footer,
+  children,
+  className = ''
+}: Props) {
   return (
-    <div className="w-full max-w-md mx-auto bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl shadow-2xl">
+    <div
+      className={`w-full max-w-md mx-auto bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl shadow-2xl ${className}`}
+    >
       <div className="p-8">
         <div className="text-center mb-8">
           <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 bg-clip-text text-transparent mb-2">

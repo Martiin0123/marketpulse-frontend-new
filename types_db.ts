@@ -31,6 +31,49 @@ export type Database = {
           },
         ]
       }
+      performance_refunds: {
+        Row: {
+          id: number
+          user_id: string
+          month_key: string
+          refund_amount: number
+          stripe_refund_id: string | null
+          status: string | null
+          created_at: string
+          processed_at: string | null
+          notes: string | null
+        }
+        Insert: {
+          id?: number
+          user_id: string
+          month_key: string
+          refund_amount: number
+          stripe_refund_id?: string | null
+          status?: string | null
+          created_at?: string
+          processed_at?: string | null
+          notes?: string | null
+        }
+        Update: {
+          id?: number
+          user_id?: string
+          month_key?: string
+          refund_amount?: number
+          stripe_refund_id?: string | null
+          status?: string | null
+          created_at?: string
+          processed_at?: string | null
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "performance_refunds_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       positions: {
         Row: {
           created_at: string
@@ -407,7 +450,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["subscription_status"] | null
           trial_end?: string | null
           trial_start?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -538,7 +581,7 @@ export type TablesUpdate<
     | keyof Database["public"]["Tables"]
     | { schema: keyof Database },
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+    ? keyof Database["public"]["Tables"]
     : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof Database }
   ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
@@ -562,7 +605,7 @@ export type Enums<
     ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
 > = PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][PublicEnumNameOrOptions]
   : PublicEnumNameOrOptions extends keyof Database["public"]["Enums"]
     ? Database["public"]["Enums"][PublicEnumNameOrOptions]
     : never

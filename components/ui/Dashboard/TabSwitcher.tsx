@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Activity, TrendingUp, BarChart3 } from 'lucide-react';
+import { Activity, TrendingUp, BarChart3, Shield } from 'lucide-react';
 
 interface TabSwitcherProps {
-  activeTab: 'overview' | 'signals' | 'positions';
-  onTabChange: (tab: 'overview' | 'signals' | 'positions') => void;
+  activeTab: 'overview' | 'signals' | 'positions' | 'performance-guarantee';
+  onTabChange: (
+    tab: 'overview' | 'signals' | 'positions' | 'performance-guarantee'
+  ) => void;
 }
 
 export default function TabSwitcher({
@@ -27,6 +29,11 @@ export default function TabSwitcher({
       id: 'positions' as const,
       label: 'Positions',
       icon: <Activity className="w-4 h-4" />
+    },
+    {
+      id: 'performance-guarantee' as const,
+      label: 'Performance Guarantee',
+      icon: <Shield className="w-4 h-4" />
     }
   ];
 

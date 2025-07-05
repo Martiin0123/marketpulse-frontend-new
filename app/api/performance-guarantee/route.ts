@@ -1,154 +1,212 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { getProRatedMonthlyPerformance, getSubscription } from '@/utils/supabase/queries';
-import { stripe } from '@/utils/stripe/config';
+import { getProRatedMonthlyPerformance } from '@/utils/supabase/queries';
+import { sendRefundRequestEmail } from '@/utils/email';
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = createClient();
-    
-    // Get user
     const { data: { user } } = await supabase.auth.getUser();
+    
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's subscription
-    const subscription = await getSubscription(supabase);
-    if (!subscription) {
+    const body = await request.json();
+    const { targetMonth } = body; // Optional: YYYY-MM format
+
+    // Get performance for the specified month or previous month
+    const performance = await getProRatedMonthlyPerformance(supabase, targetMonth);
+    
+    if (!performance) {
       return NextResponse.json({ error: 'No active subscription found' }, { status: 400 });
     }
 
-    // Get pro-rated monthly performance
-    const performance = await getProRatedMonthlyPerformance(supabase);
-    if (!performance) {
-      return NextResponse.json({ error: 'Could not calculate performance' }, { status: 500 });
-    }
-
-    // Check if performance is negative
-    const isNegative = performance.totalPnL < 0;
+    // Check if this is the current month (should not allow refunds for current month)
+    const now = new Date(); // Use real current date
+    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     
-    if (!isNegative) {
-      return NextResponse.json({
-        eligible: false,
-        reason: 'Performance is not negative',
-        performance: performance.totalPnL,
-        message: 'Your performance guarantee only applies when monthly performance is negative.'
-      });
+    if (performance.monthKey === currentMonthKey) {
+      return NextResponse.json({ 
+        error: 'Cannot request refund for current month. Only completed months are eligible.',
+        performance,
+        isCurrentMonth: true
+      }, { status: 400 });
     }
 
-    // Calculate refund amount (pro-rated if user subscribed mid-month)
-    let refundAmount = 0;
-    let refundReason = '';
-
-    if (performance.isProRated) {
-      // Calculate pro-rated refund based on subscription days in the month
-      const subscriptionDate = new Date(performance.subscriptionStartDate);
-      const monthStart = new Date(subscriptionDate.getFullYear(), subscriptionDate.getMonth(), 1);
-      const monthEnd = new Date(subscriptionDate.getFullYear(), subscriptionDate.getMonth() + 1, 0);
-      
-      const daysInMonth = monthEnd.getDate();
-      const subscriptionDay = subscriptionDate.getDate();
-      const daysSubscribed = daysInMonth - subscriptionDay + 1;
-      
-      const subscriptionPrice = (subscription.prices as any)?.unit_amount || 0;
-      const dailyRate = subscriptionPrice / daysInMonth;
-      refundAmount = dailyRate * daysSubscribed;
-      
-      refundReason = `Pro-rated refund for ${daysSubscribed} days of subscription`;
-    } else {
-      // Full month refund
-      refundAmount = (subscription.prices as any)?.unit_amount || 0;
-      refundReason = 'Full month refund';
+    // Check if the subscription period has ended
+    if (!performance.isPeriodEnded) {
+      return NextResponse.json({ 
+        error: 'Cannot request refund yet. Your subscription period has not ended.',
+        performance,
+        isPeriodEnded: false
+      }, { status: 400 });
     }
 
-    // Convert from cents to dollars
-    refundAmount = refundAmount / 100;
+    // Check if performance was negative
+    if (performance.totalPnL >= 0) {
+      return NextResponse.json({ 
+        error: 'No refund available. Performance was positive or neutral.',
+        performance,
+        isEligible: false
+      }, { status: 400 });
+    }
 
-    // For now, just return the calculation without processing the refund
-    // TODO: Implement actual refund processing once database schema is updated
-    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+    // Check if refund was already processed for this month
+    const { data: existingRefund } = await supabase
+      .from('performance_refunds')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('month_key', performance.monthKey)
+      .single();
+
+    if (existingRefund) {
+      return NextResponse.json({ 
+        error: 'Refund already processed for this month.',
+        performance,
+        existingRefund
+      }, { status: 400 });
+    }
+
+    // Calculate refund amount (negative PnL becomes positive refund)
+    const refundAmount = Math.abs(performance.totalPnL);
     
-    return NextResponse.json({
-      eligible: true,
-      refundAmount,
-      refundReason,
-      performance: performance!.totalPnL,
-      isProRated: performance!.isProRated,
-      effectivePeriod: {
-        start: performance!.effectiveStartDate,
-        end: performance!.effectiveEndDate
-      },
-      message: `You are eligible for a ${performance!.isProRated ? 'pro-rated' : 'full'} refund of $${refundAmount.toFixed(2)} for your negative performance month. Please contact support to process this refund.`,
-      note: 'Automatic refund processing will be implemented soon. For now, please contact support with this information.'
+    // Create a refund request record instead of processing immediately
+    const { data: refundRequest, error: refundError } = await supabase
+      .from('performance_refunds')
+      .insert({
+        user_id: user.id,
+        month_key: performance.monthKey,
+        refund_amount: refundAmount,
+        status: 'pending',
+        notes: `Performance guarantee refund request. P&L: ${performance.totalPnL}, Positions: ${performance.totalPositions}, Win Rate: ${performance.totalPositions > 0 ? ((performance.profitablePositions / performance.totalPositions) * 100).toFixed(1) : 0}%`
+      })
+      .select()
+      .single();
+
+    if (refundError) {
+      console.error('Error creating refund request:', refundError);
+      return NextResponse.json({ 
+        error: 'Failed to create refund request. Please try again.',
+        details: refundError.message
+      }, { status: 500 });
+    }
+
+    // TODO: Send notification to admin (email, Slack, etc.)
+    console.log('🔔 PERFORMANCE GUARANTEE REFUND REQUEST:', {
+      user_id: user.id,
+      month: performance.monthKey,
+      refund_amount: refundAmount,
+      performance: performance.totalPnL,
+      positions: performance.totalPositions,
+      win_rate: performance.totalPositions > 0 ? ((performance.profitablePositions / performance.totalPositions) * 100).toFixed(1) : 0,
+      request_id: refundRequest.id
     });
 
-    return NextResponse.json({
-      eligible: true,
-      refundProcessed: true,
+    // Send email notification
+    const emailSent = await sendRefundRequestEmail({
+      requestId: refundRequest.id.toString(),
+      userId: user.id,
+      month: performance.monthKey,
       refundAmount,
-      refundReason,
       performance: performance.totalPnL,
-      isProRated: performance.isProRated,
-      effectivePeriod: {
-        start: performance.effectiveStartDate,
-        end: performance.effectiveEndDate
-      },
-      message: `Refund of $${refundAmount.toFixed(2)} has been processed for your negative performance month.`
+      positions: performance.totalPositions,
+      winRate: performance.totalPositions > 0 ? ((performance.profitablePositions / performance.totalPositions) * 100).toFixed(1) : '0'
+    });
+
+    if (!emailSent) {
+      console.warn('⚠️ Failed to send email notification for refund request:', refundRequest.id);
+    }
+
+    // For now, just return the calculated refund amount
+    // In production, this would trigger Stripe refund and create refund record
+    return NextResponse.json({
+      success: true,
+      performance,
+      refundAmount,
+      isEligible: true,
+      requestId: refundRequest.id,
+      message: `Refund request submitted for $${refundAmount.toFixed(2)} for ${performance.monthKey}. You will be notified when the refund is processed.`
     });
 
   } catch (error) {
     console.error('Performance guarantee error:', error);
-    return NextResponse.json({
-      error: 'Internal server error',
-      details: 'Please contact support for assistance.'
-    }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = createClient();
-    
-    // Get user
     const { data: { user } } = await supabase.auth.getUser();
+    
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get current month's performance
-    const performance = await getProRatedMonthlyPerformance(supabase);
+    // Debug: Check what subscriptions exist
+    const { data: allSubscriptions, error: subsError } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', user.id);
+
+    console.log('All user subscriptions:', allSubscriptions);
+    console.log('Subscription error:', subsError);
+
+    const { searchParams } = new URL(request.url);
+    const targetMonth = searchParams.get('month'); // Optional: YYYY-MM format
+
+    // Get performance for the specified month or previous month
+    const performance = await getProRatedMonthlyPerformance(supabase, targetMonth || undefined);
+    
     if (!performance) {
-      return NextResponse.json({ error: 'Could not calculate performance' }, { status: 500 });
+      return NextResponse.json({ 
+        error: 'No active subscription found',
+        debug: {
+          user_id: user.id,
+          subscriptions: allSubscriptions,
+          subscription_error: subsError
+        }
+      }, { status: 400 });
     }
 
-    // Check if refund is eligible
-    const isNegative = performance.totalPnL < 0;
+    // Check if this is the current month
+    // TEMPORARY: For testing, pretend it's August 6th, 2025
+    const now = new Date(); // Use real current date
+    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const isCurrentMonth = performance.monthKey === currentMonthKey;
+
+    // Check if refund was already processed for this month
+    const { data: existingRefund } = await supabase
+      .from('performance_refunds')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('month_key', performance.monthKey)
+      .single();
+
+    const isEligible = !isCurrentMonth && performance.totalPnL < 0 && !existingRefund && performance.isPeriodEnded;
+    const refundAmount = isEligible ? Math.abs(performance.totalPnL) : 0;
 
     return NextResponse.json({
-      performance: performance.totalPnL,
-      isNegative,
-      isProRated: performance.isProRated,
-      effectivePeriod: {
-        start: performance.effectiveStartDate,
-        end: performance.effectiveEndDate
-      },
-      stats: {
-        totalPositions: performance.totalPositions,
-        profitablePositions: performance.profitablePositions,
-        winRate: performance.totalPositions > 0 ? 
-          (performance.profitablePositions / performance.totalPositions * 100).toFixed(1) : 0
-      },
-      refundEligible: isNegative,
-      message: isNegative ? 
-        'You are eligible for a performance guarantee refund this month.' : 
-        'Your performance is positive this month. No refund is needed.'
+      performance,
+      isCurrentMonth,
+      isEligible,
+      refundAmount,
+      existingRefund,
+      isPeriodEnded: performance.isPeriodEnded,
+      message: !performance.isPeriodEnded
+        ? 'Subscription period has not ended yet. Check back after your period ends.'
+        : isCurrentMonth 
+          ? 'Current month - refunds not available until month ends'
+          : isEligible 
+            ? `Eligible for refund of $${refundAmount.toFixed(2)}`
+            : existingRefund
+              ? 'Refund already processed for this month'
+              : 'No negative performance for this month'
     });
 
   } catch (error) {
-    console.error('Performance guarantee status error:', error);
-    return NextResponse.json({
-      error: 'Internal server error'
-    }, { status: 500 });
+    console.error('Performance guarantee check error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 
