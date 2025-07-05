@@ -12,10 +12,7 @@
   "crons": [
     {
       "path": "/api/cron/check-referral-payouts",
-      "schedule": "0 9 * * *",
-      "headers": {
-        "Authorization": "Bearer db80b804-4b56-4227-99ee-bdb33b2ddd59"
-      }
+      "schedule": "0 9 * * *"
     }
   ]
 }
