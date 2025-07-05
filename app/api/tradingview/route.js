@@ -58,16 +58,16 @@ export async function POST(request) {
     const exitPrice = Number(price)
     const pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100
 
-    // Close the position
-    const { error: updateError } = await supabase
-      .from('positions')
-      .update({
-        status: 'closed',
-        exit_price: exitPrice,
-        exit_timestamp: unixTimestamp,
-        pnl: pnlPercentage
-      })
-      .eq('id', openPosition.id)
+            // Close the position
+        const { error: updateError } = await supabase
+          .from('positions')
+          .update({
+            status: 'closed',
+            exit_price: exitPrice,
+            exit_timestamp: validTimestamp, // Use ISO string for timestamptz
+            pnl: pnlPercentage
+          })
+          .eq('id', openPosition.id)
 
     if (updateError) {
       return new Response(JSON.stringify({ 
@@ -205,7 +205,7 @@ export async function POST(request) {
         signal_id: signal.id,
         type: 'buy',
         entry_price: price,
-        entry_timestamp: unixTimestamp,
+        entry_timestamp: validTimestamp, // Use ISO string for timestamptz
         quantity: 1, // Default quantity
         status: 'open'
       }])

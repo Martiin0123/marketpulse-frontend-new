@@ -28,13 +28,8 @@ export default function PositionsTab({ positions }: Props) {
     return position.pnl; // Return the percentage directly
   };
 
-  const formatTime = (timestamp: string | number) => {
-    let date: Date;
-    if (typeof timestamp === 'number') {
-      date = new Date(timestamp * 1000);
-    } else {
-      date = new Date(timestamp);
-    }
+  const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp);
     const now = new Date();
     const diffInMinutes = Math.floor(
       (now.getTime() - date.getTime()) / (1000 * 60)

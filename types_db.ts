@@ -35,9 +35,9 @@ export type Database = {
         Row: {
           created_at: string
           entry_price: number
-          entry_timestamp: number
+          entry_timestamp: string
           exit_price: number | null
-          exit_timestamp: number | null
+          exit_timestamp: string | null
           id: number
           macd: number | null
           pnl: number | null
@@ -57,9 +57,9 @@ export type Database = {
         Insert: {
           created_at?: string
           entry_price: number
-          entry_timestamp: number
+          entry_timestamp: string
           exit_price?: number | null
-          exit_timestamp?: number | null
+          exit_timestamp?: string | null
           id?: number
           macd?: number | null
           pnl?: number | null
@@ -79,9 +79,9 @@ export type Database = {
         Update: {
           created_at?: string
           entry_price?: number
-          entry_timestamp?: number
+          entry_timestamp?: string
           exit_price?: number | null
-          exit_timestamp?: number | null
+          exit_timestamp?: string | null
           id?: number
           macd?: number | null
           pnl?: number | null

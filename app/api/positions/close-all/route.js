@@ -30,7 +30,7 @@ export async function POST() {
         ? (exitPrice - position.entry_price) / position.entry_price
         : (position.entry_price - exitPrice) / position.entry_price
 
-      const exitTimestamp = Math.floor(Date.now() / 1000) // Unix timestamp
+      const exitTimestamp = new Date().toISOString() // ISO string for timestamptz
 
       return {
         id: position.id,

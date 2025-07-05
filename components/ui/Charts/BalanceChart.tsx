@@ -150,19 +150,12 @@ export default function BalanceChart({
 
     // Helper function to get entry timestamp
     const getEntryTimestamp = (position: Position) => {
-      // Handle ISO string timestamps
+      // Handle ISO string timestamps (database format)
       if (
         position.entry_timestamp &&
         typeof position.entry_timestamp === 'string'
       ) {
         return Math.floor(new Date(position.entry_timestamp).getTime() / 1000);
-      }
-      // Handle Unix timestamps
-      if (
-        position.entry_timestamp &&
-        typeof position.entry_timestamp === 'number'
-      ) {
-        return position.entry_timestamp;
       }
       // Fallback to created_at
       return position.created_at
@@ -172,19 +165,12 @@ export default function BalanceChart({
 
     // Helper function to get exit timestamp
     const getExitTimestamp = (position: Position) => {
-      // Handle ISO string timestamps
+      // Handle ISO string timestamps (database format)
       if (
         position.exit_timestamp &&
         typeof position.exit_timestamp === 'string'
       ) {
         return Math.floor(new Date(position.exit_timestamp).getTime() / 1000);
-      }
-      // Handle Unix timestamps
-      if (
-        position.exit_timestamp &&
-        typeof position.exit_timestamp === 'number'
-      ) {
-        return position.exit_timestamp;
       }
       return null;
     };
