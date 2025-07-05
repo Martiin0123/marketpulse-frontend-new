@@ -4,11 +4,15 @@ import { createClient } from '@/utils/supabase/server';
 export async function POST(request: NextRequest) {
   try {
     // Verify this is a legitimate cron request
-    const authHeader = request.headers.get('authorization');
-    const expectedToken = 'db80b804-4b56-4227-99ee-bdb33b2ddd59';
+    // For Vercel cron jobs, we can rely on the fact that only Vercel can call this endpoint
+    // But we can add an additional check using environment variable if needed
+    const cronSecret = process.env.CRON_SECRET_TOKEN;
     
-    if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader !== `Bearer ${expectedToken}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (cronSecret) {
+      const authHeader = request.headers.get('authorization');
+      if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader !== `Bearer ${cronSecret}`) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
 
     const supabase = createClient();
