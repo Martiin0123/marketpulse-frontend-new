@@ -9,7 +9,8 @@ import {
   TrendingUp,
   TrendingDown,
   DollarSign,
-  Settings
+  Settings,
+  MessageCircle
 } from 'lucide-react';
 import { Database } from '@/types_db';
 import BalanceChart from '@/components/ui/Charts/BalanceChart';
@@ -118,9 +119,22 @@ export default function Dashboard({
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">
               Dashboard
             </h1>
-            <p className="text-xl text-slate-400 max-w-3xl mx-auto">
+            <p className="text-xl text-slate-400 max-w-3xl mx-auto mb-6">
               Welcome back, {user?.user_metadata?.full_name || user?.email}
             </p>
+
+            {/* Discord Join Button */}
+            <div className="flex justify-center">
+              <a
+                href="https://discord.gg/N7taGVuz"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 group"
+              >
+                <MessageCircle className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-200" />
+                Join Discord Community
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -340,6 +354,7 @@ export default function Dashboard({
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
                               {position.entry_timestamp &&
+                              typeof position.entry_timestamp === 'number' &&
                               position.entry_timestamp > 0
                                 ? new Date(
                                     position.entry_timestamp * 1000

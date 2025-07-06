@@ -36,13 +36,13 @@ async function sendTradingSignalToDiscord(signal, webhookUrl) {
       ],
       timestamp: signal.timestamp,
       footer: {
-        text: 'MarketPulse Trading Signals'
+        text: 'Primescope Trading Signals'
       }
     };
 
     const webhookData = {
-      username: 'MarketPulse Trading Bot',
-      avatar_url: 'https://marketpulse.com/logo.png',
+      username: 'Primescope Trading Bot',
+      avatar_url: 'https://primescope.com/logo.png',
       embeds: [embed]
     };
 
