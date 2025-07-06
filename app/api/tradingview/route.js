@@ -5,6 +5,76 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+// Discord webhook function
+async function sendTradingSignalToDiscord(signal, webhookUrl) {
+  try {
+    if (!webhookUrl || !webhookUrl.includes('discord.com/api/webhooks/')) {
+      console.error('❌ Invalid Discord webhook URL');
+      return false;
+    }
+
+    const embed = {
+      title: `🔔 Trading Signal: ${signal.symbol}`,
+      description: `New ${signal.action} signal for ${signal.symbol}`,
+      color: signal.action === 'BUY' ? 0x00ff00 : 0xff0000, // Green for BUY, Red for SELL
+      fields: [
+        {
+          name: 'Action',
+          value: signal.action,
+          inline: true
+        },
+        {
+          name: 'Symbol',
+          value: signal.symbol,
+          inline: true
+        },
+        {
+          name: 'Price',
+          value: `$${signal.price.toFixed(2)}`,
+          inline: true
+        }
+      ],
+      timestamp: signal.timestamp,
+      footer: {
+        text: 'MarketPulse Trading Signals'
+      }
+    };
+
+    const webhookData = {
+      username: 'MarketPulse Trading Bot',
+      avatar_url: 'https://marketpulse.com/logo.png',
+      embeds: [embed]
+    };
+
+    console.log('📡 Sending trading signal to Discord:', {
+      symbol: signal.symbol,
+      action: signal.action,
+      price: signal.price,
+      webhookUrl: webhookUrl.substring(0, 50) + '...'
+    });
+
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(webhookData)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Discord webhook failed: ${response.status} ${errorText}`);
+    }
+
+    console.log('✅ Trading signal sent to Discord successfully');
+    return true;
+
+  } catch (error) {
+    console.error('❌ Error sending trading signal to Discord:', error);
+    return false;
+  }
+}
+
 export async function POST(request) {
   const body = await request.json()
   const { symbol, action, price, timestamp } = body
@@ -161,6 +231,17 @@ export async function POST(request) {
           }), { status: 500 })
         }
 
+        // Send Discord notification for BUY signal
+        const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
+        if (discordWebhookUrl) {
+          await sendTradingSignalToDiscord({
+            symbol: symbolUpper,
+            action: 'BUY',
+            price: price,
+            timestamp: validTimestamp
+          }, discordWebhookUrl);
+        }
+
         return new Response(JSON.stringify({ 
           message: 'Sell position closed and buy signal created',
           position_id: existingPosition.id,
@@ -195,6 +276,17 @@ export async function POST(request) {
         error: 'Failed to create signal', 
         details: signalError.message 
       }), { status: 500 })
+    }
+
+    // Send Discord notification for BUY signal
+    const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
+    if (discordWebhookUrl) {
+      await sendTradingSignalToDiscord({
+        symbol: symbolUpper,
+        action: 'BUY',
+        price: price,
+        timestamp: validTimestamp
+      }, discordWebhookUrl);
     }
 
     // Create new position
@@ -282,6 +374,17 @@ export async function POST(request) {
           }), { status: 500 })
         }
 
+        // Send Discord notification for SELL signal
+        const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
+        if (discordWebhookUrl) {
+          await sendTradingSignalToDiscord({
+            symbol: symbolUpper,
+            action: 'SELL',
+            price: price,
+            timestamp: validTimestamp
+          }, discordWebhookUrl);
+        }
+
         // Create close signal for reporting
         const { data: closeSignal, error: closeSignalError } = await supabase
           .from('signals')
@@ -335,6 +438,17 @@ export async function POST(request) {
         error: 'Failed to create signal', 
         details: signalError.message 
       }), { status: 500 })
+    }
+
+    // Send Discord notification for SELL signal
+    const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
+    if (discordWebhookUrl) {
+      await sendTradingSignalToDiscord({
+        symbol: symbolUpper,
+        action: 'SELL',
+        price: price,
+        timestamp: validTimestamp
+      }, discordWebhookUrl);
     }
 
     // Create new position

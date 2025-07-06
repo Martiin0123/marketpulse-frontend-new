@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import { Recipient, EmailParams, MailerSend, Sender } from 'mailersend';
 
 interface RefundRequestEmailData {
   requestId: string;
@@ -11,100 +11,154 @@ interface RefundRequestEmailData {
   userEmail?: string;
 }
 
+// Initialize MailerSend
+const mailersend = new MailerSend({
+  apiKey: process.env.MAILERSEND_API_KEY || '',
+});
+
 export async function sendRefundRequestEmail(data: RefundRequestEmailData) {
   try {
-    // Create transporter (you'll need to configure this with your email service)
-    const transporter = nodemailer.createTransporter({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: false, // true for 465, false for other ports
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
+    // Debug logging for MailerSend configuration
+    console.log('🔧 MailerSend Configuration Debug:', {
+      hasApiKey: !!process.env.MAILERSEND_API_KEY,
+      apiKeyLength: process.env.MAILERSEND_API_KEY?.length || 0,
+      apiKeyPrefix: process.env.MAILERSEND_API_KEY?.substring(0, 10) + '...' || 'none',
+      nodeEnv: process.env.NODE_ENV
     });
 
-    const emailHtml = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #dc2626;">🔔 New Performance Guarantee Refund Request</h2>
-        
-        <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3 style="margin-top: 0;">Request Details</h3>
-          <table style="width: 100%; border-collapse: collapse;">
-            <tr>
-              <td style="padding: 8px 0; font-weight: bold;">Request ID:</td>
-              <td style="padding: 8px 0;">${data.requestId}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; font-weight: bold;">User ID:</td>
-              <td style="padding: 8px 0;">${data.userId}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; font-weight: bold;">Month:</td>
-              <td style="padding: 8px 0;">${data.month}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; font-weight: bold;">Refund Amount:</td>
-              <td style="padding: 8px 0; color: #dc2626; font-weight: bold;">$${data.refundAmount.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; font-weight: bold;">Performance:</td>
-              <td style="padding: 8px 0; color: ${data.performance >= 0 ? '#059669' : '#dc2626'};">
-                ${data.performance >= 0 ? '+' : ''}$${data.performance.toFixed(2)}
-              </td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; font-weight: bold;">Total Positions:</td>
-              <td style="padding: 8px 0;">${data.positions}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; font-weight: bold;">Win Rate:</td>
-              <td style="padding: 8px 0;">${data.winRate}%</td>
-            </tr>
-          </table>
-        </div>
+    // Check if MailerSend is properly configured
+    if (!process.env.MAILERSEND_API_KEY) {
+      console.error('❌ MAILERSEND_API_KEY is not set in environment variables');
+      return false;
+    }
 
-        <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b;">
-          <p style="margin: 0; color: #92400e;">
-            <strong>Action Required:</strong> Please review this refund request and process it manually if approved.
-          </p>
-        </div>
+    // Create sender and recipients
+    const sender = new Sender('noreply@marketpulse.com', 'MarketPulse');
+    const recipients = [
+      new Recipient(data.userEmail || 'zangerl.martin@hotmail.com', 'Admin')
+    ];
 
-        <div style="margin-top: 20px; padding: 15px; background-color: #f9fafb; border-radius: 8px;">
-          <p style="margin: 0; font-size: 14px; color: #6b7280;">
-            This is an automated notification from your MarketPulse performance guarantee system.
-          </p>
-        </div>
-      </div>
-    `;
-
-    const emailText = `
-🔔 New Performance Guarantee Refund Request
+    // Create email parameters
+    const emailParams = new EmailParams()
+      .setFrom(sender)
+      .setTo(recipients)
+      .setSubject(`🔔 Performance Guarantee Refund Request - $${data.refundAmount.toFixed(2)}`)
+      .setHtml(`
+        <h2>Performance Guarantee Refund Request</h2>
+        <p><strong>Request ID:</strong> ${data.requestId}</p>
+        <p><strong>User ID:</strong> ${data.userId}</p>
+        <p><strong>Refund Amount:</strong> $${data.refundAmount.toFixed(2)}</p>
+        <p><strong>Performance:</strong> $${data.performance.toFixed(2)}</p>
+        <p><strong>Positions:</strong> ${data.positions}</p>
+        <p><strong>Win Rate:</strong> ${data.winRate}%</p>
+        <p>This is a basic email test from MailerSend.</p>
+      `)
+      .setText(`
+Performance Guarantee Refund Request
 
 Request ID: ${data.requestId}
 User ID: ${data.userId}
-Month: ${data.month}
 Refund Amount: $${data.refundAmount.toFixed(2)}
-Performance: ${data.performance >= 0 ? '+' : ''}$${data.performance.toFixed(2)}
-Total Positions: ${data.positions}
+Performance: $${data.performance.toFixed(2)}
+Positions: ${data.positions}
 Win Rate: ${data.winRate}%
 
-Action Required: Please review this refund request and process it manually if approved.
-    `;
+This is a basic email test from MailerSend.
+      `);
 
-    // Send email
-    const info = await transporter.sendMail({
-      from: process.env.SMTP_FROM || '"MarketPulse" <noreply@marketpulse.com>',
-      to: 'zangerl.martin@hotmail.com',
-      subject: `🔔 Performance Guarantee Refund Request - $${data.refundAmount.toFixed(2)}`,
-      text: emailText,
-      html: emailHtml,
+    console.log('📧 Attempting to send email with MailerSend:', {
+      from: 'noreply@marketpulse.com',
+      to: data.userEmail || 'admin@marketpulse.com',
+      subject: `🔔 Performance Guarantee Refund Request - $${data.refundAmount.toFixed(2)}`
     });
 
-    console.log('📧 Refund request email sent:', info.messageId);
+    const result = await mailersend.email.send(emailParams);
+    
+    console.log('📧 Refund request email sent via MailerSend:', result);
     return true;
-  } catch (error) {
-    console.error('❌ Error sending refund request email:', error);
+
+  } catch (error: any) {
+    console.error('❌ Error sending refund request email via MailerSend:', error);
+    console.error('🔍 Full error details:', {
+      message: error.message,
+      status: error.status,
+      response: error.response
+    });
+    
     return false;
   }
-} 
+}
+
+export async function sendWelcomeEmail(userEmail: string, userName?: string) {
+  try {
+    const sender = new Sender('noreply@marketpulse.com', 'MarketPulse');
+    const recipients = [
+      new Recipient(userEmail, userName || 'User')
+    ];
+
+    const emailParams = new EmailParams()
+      .setFrom(sender)
+      .setTo(recipients)
+      .setSubject('🎉 Welcome to MarketPulse!')
+      .setHtml(`
+        <h2>Welcome to MarketPulse!</h2>
+        <p>Hi ${userName || 'there'},</p>
+        <p>Welcome to MarketPulse! We're excited to have you on board.</p>
+        <p>This is a basic welcome email test from MailerSend.</p>
+      `)
+      .setText(`
+Welcome to MarketPulse!
+
+Hi ${userName || 'there'},
+
+Welcome to MarketPulse! We're excited to have you on board.
+
+This is a basic welcome email test from MailerSend.
+      `);
+
+    const result = await mailersend.email.send(emailParams);
+    console.log('📧 Welcome email sent via MailerSend:', result);
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending welcome email via MailerSend:', error);
+    return false;
+  }
+}
+
+export async function sendRefundProcessedEmail(userEmail: string, refundAmount: number, month: string) {
+  try {
+    const sender = new Sender('noreply@marketpulse.com', 'MarketPulse');
+    const recipients = [
+      new Recipient(userEmail, 'User')
+    ];
+
+    const emailParams = new EmailParams()
+      .setFrom(sender)
+      .setTo(recipients)
+      .setSubject(`✅ Refund Processed - $${refundAmount.toFixed(2)}`)
+      .setHtml(`
+        <h2>Refund Processed</h2>
+        <p>Good news! Your performance guarantee refund has been processed.</p>
+        <p><strong>Amount:</strong> $${refundAmount.toFixed(2)}</p>
+        <p><strong>Period:</strong> ${month}</p>
+        <p>This is a basic refund processed email test from MailerSend.</p>
+      `)
+      .setText(`
+Refund Processed
+
+Good news! Your performance guarantee refund has been processed.
+
+Amount: $${refundAmount.toFixed(2)}
+Period: ${month}
+
+This is a basic refund processed email test from MailerSend.
+      `);
+
+    const result = await mailersend.email.send(emailParams);
+    console.log('📧 Refund processed email sent via MailerSend:', result);
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending refund processed email via MailerSend:', error);
+    return false;
+  }
+}
