@@ -271,219 +271,231 @@ export default function Pricing({ user, products, subscription }: Props) {
           {/* Pricing Cards */}
           <div className="flex justify-center">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl w-full">
-              {products.map((product, index) => {
-                const price = product?.prices?.find(
-                  (price) => price.interval === billingInterval
-                );
-                if (!price) return null;
+              {products
+                .map((product) => {
+                  const price = product?.prices?.find(
+                    (price) => price.interval === billingInterval
+                  );
+                  if (!price) return null;
 
-                const priceString = new Intl.NumberFormat('en-US', {
-                  style: 'currency',
-                  currency: price.currency!,
-                  minimumFractionDigits: 0
-                }).format((price?.unit_amount || 0) / 100);
+                  return {
+                    product,
+                    price,
+                    priceAmount: price.unit_amount || 0
+                  };
+                })
+                .filter(Boolean)
+                .sort((a, b) => a!.priceAmount - b!.priceAmount)
+                .map((item, index) => {
+                  const { product, price } = item!;
+                  const priceString = new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: price.currency!,
+                    minimumFractionDigits: 0
+                  }).format((price?.unit_amount || 0) / 100);
 
-                const isPopular =
-                  index === 1 || product.name?.toLowerCase().includes('pro');
-                const isCurrentPlan =
-                  subscription?.prices?.products?.name === product.name;
+                  const isPopular =
+                    index === 1 || product.name?.toLowerCase().includes('pro');
+                  const isCurrentPlan =
+                    subscription?.prices?.products?.name === product.name;
 
-                return (
-                  <div
-                    key={product.id}
-                    className={cn(
-                      'relative bg-slate-800/30 backdrop-blur-sm rounded-3xl border p-8 transition-all duration-500 hover:scale-105 hover:shadow-2xl group',
-                      {
-                        'border-blue-500/50 shadow-2xl shadow-blue-500/25 bg-slate-800/40':
-                          isPopular,
-                        'border-emerald-500/50 shadow-2xl shadow-emerald-500/25 bg-slate-800/40':
-                          isCurrentPlan,
-                        'border-purple-500/50 shadow-2xl shadow-purple-500/25 bg-slate-800/40':
-                          index === 2,
-                        'border-slate-700/50 hover:border-slate-600/50 bg-slate-800/20':
-                          !isPopular && !isCurrentPlan && index !== 2
-                      }
-                    )}
-                  >
-                    {/* Popular Badge */}
-                    {isPopular && (
-                      <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
-                        <div className="bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
-                          <Star className="w-4 h-4 mr-2" />
-                          Most Popular
+                  return (
+                    <div
+                      key={product.id}
+                      className={cn(
+                        'relative bg-slate-800/30 backdrop-blur-sm rounded-3xl border p-8 transition-all duration-500 hover:scale-105 hover:shadow-2xl group',
+                        {
+                          'border-blue-500/50 shadow-2xl shadow-blue-500/25 bg-slate-800/40':
+                            isPopular,
+                          'border-emerald-500/50 shadow-2xl shadow-emerald-500/25 bg-slate-800/40':
+                            isCurrentPlan,
+                          'border-purple-500/50 shadow-2xl shadow-purple-500/25 bg-slate-800/40':
+                            index === 2,
+                          'border-slate-700/50 hover:border-slate-600/50 bg-slate-800/20':
+                            !isPopular && !isCurrentPlan && index !== 2
+                        }
+                      )}
+                    >
+                      {/* Popular Badge */}
+                      {isPopular && (
+                        <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
+                          <div className="bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
+                            <Star className="w-4 h-4 mr-2" />
+                            Most Popular
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Current Plan Badge */}
-                    {isCurrentPlan && (
-                      <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
-                        <div className="bg-gradient-to-r from-emerald-500 to-green-500 px-6 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
-                          <Check className="w-4 h-4 mr-2" />
-                          Current Plan
+                      {/* Current Plan Badge */}
+                      {isCurrentPlan && (
+                        <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
+                          <div className="bg-gradient-to-r from-emerald-500 to-green-500 px-6 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
+                            <Check className="w-4 h-4 mr-2" />
+                            Current Plan
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Limited Badge for 3rd option */}
-                    {index === 2 && (
-                      <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
-                        <div className="bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
-                          <AlertTriangle className="w-4 h-4 mr-2" />
-                          only 10 Spots
+                      {/* Limited Badge for 3rd option */}
+                      {index === 2 && (
+                        <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
+                          <div className="bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
+                            <AlertTriangle className="w-4 h-4 mr-2" />
+                            only 10 Spots
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Plan Header */}
-                    <div className="text-center mb-8">
-                      {/* Price */}
-                      <div className="mb-6">
-                        <span className="text-5xl font-bold bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 bg-clip-text text-transparent">
-                          {priceString}
-                        </span>
-                        <span className="text-slate-400 text-lg ml-2">
-                          /{billingInterval}
-                        </span>
-                      </div>
+                      {/* Plan Header */}
+                      <div className="text-center mb-8">
+                        {/* Price */}
+                        <div className="mb-6">
+                          <span className="text-5xl font-bold bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 bg-clip-text text-transparent">
+                            {priceString}
+                          </span>
+                          <span className="text-slate-400 text-lg ml-2">
+                            /{billingInterval}
+                          </span>
+                        </div>
 
-                      <h3 className="text-2xl font-bold text-white mb-4">
-                        {product.name}
-                      </h3>
-                      <p className="text-slate-400 text-sm mb-6 leading-relaxed">
-                        {product.description}
-                      </p>
+                        <h3 className="text-2xl font-bold text-white mb-4">
+                          {product.name}
+                        </h3>
+                        <p className="text-slate-400 text-sm mb-6 leading-relaxed">
+                          {product.description}
+                        </p>
 
-                      {/* Feature Indicators */}
-                      <div className="mb-6">
-                        {index === 0 && (
-                          <div className="flex items-center space-x-2 p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                            <Bell className="w-4 h-4 text-blue-400" />
-                            <div>
-                              <p className="text-blue-200 text-sm font-medium">
-                                Free Trading Signals
-                              </p>
-                              <p className="text-slate-400 text-xs">
-                                Occasional signals (limited frequency)
-                              </p>
+                        {/* Feature Indicators */}
+                        <div className="mb-6">
+                          {index === 0 && (
+                            <div className="flex items-center space-x-2 p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                              <Bell className="w-4 h-4 text-blue-400" />
+                              <div>
+                                <p className="text-blue-200 text-sm font-medium">
+                                  Free Trading Signals
+                                </p>
+                                <p className="text-slate-400 text-xs">
+                                  Occasional signals (limited frequency)
+                                </p>
+                              </div>
                             </div>
+                          )}
+
+                          {index === 1 && (
+                            <div className="flex items-center space-x-2 p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
+                              <Zap className="w-4 h-4 text-emerald-400" />
+                              <div>
+                                <p className="text-emerald-200 text-sm font-medium">
+                                  All Discord Trading Signals
+                                </p>
+                                <p className="text-slate-400 text-xs">
+                                  Real-time signals via Discord
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {index === 2 && (
+                            <div className="flex items-center space-x-2 p-3 bg-purple-500/10 rounded-lg border border-purple-500/30">
+                              <BarChart3 className="w-4 h-4 text-purple-400" />
+                              <div>
+                                <p className="text-purple-200 text-sm font-medium">
+                                  Automatic Trading API
+                                </p>
+                                <p className="text-slate-400 text-xs">
+                                  Full automation with API access
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Additional info boxes for balance */}
+                        {index === 0 && (
+                          <div className="mb-6 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                            <p className="text-blue-200 text-sm font-medium mb-2">
+                              🎯 Perfect for Beginners
+                            </p>
+                            <p className="text-slate-400 text-xs">
+                              Try our signals risk-free and upgrade when you're
+                              ready
+                            </p>
                           </div>
                         )}
 
                         {index === 1 && (
-                          <div className="flex items-center space-x-2 p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
-                            <Zap className="w-4 h-4 text-emerald-400" />
-                            <div>
-                              <p className="text-emerald-200 text-sm font-medium">
-                                All Discord Trading Signals
-                              </p>
-                              <p className="text-slate-400 text-xs">
-                                Real-time signals via Discord
-                              </p>
-                            </div>
+                          <div className="mb-6 p-4 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
+                            <p className="text-emerald-200 text-sm font-medium mb-2">
+                              ⚡ Most Popular Choice
+                            </p>
+                            <p className="text-slate-400 text-xs">
+                              Join 500+ traders getting real-time Discord
+                              signals
+                            </p>
                           </div>
                         )}
 
+                        {/* Combined info box for 3rd option */}
                         {index === 2 && (
-                          <div className="flex items-center space-x-2 p-3 bg-purple-500/10 rounded-lg border border-purple-500/30">
-                            <BarChart3 className="w-4 h-4 text-purple-400" />
-                            <div>
-                              <p className="text-purple-200 text-sm font-medium">
-                                Automatic Trading API
-                              </p>
-                              <p className="text-slate-400 text-xs">
-                                Full automation with API access
-                              </p>
-                            </div>
+                          <div className="mb-6 p-4 bg-purple-500/10 rounded-lg border border-purple-500/30">
+                            <p className="text-purple-200 text-sm font-medium mb-2">
+                              ⚠️ Limited Availability
+                            </p>
+                            <p className="text-slate-400 text-xs">
+                              Only accepting qualified traders. Application
+                              required.
+                            </p>
+                          </div>
+                        )}
+
+                        {/* CTA Button */}
+                        {isCurrentPlan ? (
+                          <Button
+                            variant="slim"
+                            onClick={handleViewDashboard}
+                            className="w-full group-hover:scale-105 transition-transform duration-300"
+                          >
+                            View Dashboard
+                          </Button>
+                        ) : index === 2 ? (
+                          // Special handling for 3rd option (VIP tier)
+                          <Button
+                            variant="slim"
+                            type="button"
+                            loading={priceIdLoading === price.id}
+                            onClick={() => handleStripeCheckout(price)}
+                            className="w-full group-hover:scale-105 transition-transform duration-300 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                          >
+                            {subscription ? 'Upgrade to VIP' : 'Get VIP Access'}
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="slim"
+                            type="button"
+                            loading={priceIdLoading === price.id}
+                            onClick={() => handleStripeCheckout(price)}
+                            className="w-full group-hover:scale-105 transition-transform duration-300"
+                          >
+                            {subscription
+                              ? 'Change Plan'
+                              : index === 0
+                                ? 'Start Free, Upgrade Later'
+                                : 'Start Trading Smarter'}
+                          </Button>
+                        )}
+
+                        {/* Yearly price not available message */}
+                        {billingInterval === 'year' && !price && (
+                          <div className="mt-4 p-3 bg-orange-500/10 rounded-lg border border-orange-500/30">
+                            <p className="text-orange-200 text-sm text-center">
+                              Yearly pricing not available for this plan
+                            </p>
                           </div>
                         )}
                       </div>
-
-                      {/* Additional info boxes for balance */}
-                      {index === 0 && (
-                        <div className="mb-6 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                          <p className="text-blue-200 text-sm font-medium mb-2">
-                            🎯 Perfect for Beginners
-                          </p>
-                          <p className="text-slate-400 text-xs">
-                            Try our signals risk-free and upgrade when you're
-                            ready
-                          </p>
-                        </div>
-                      )}
-
-                      {index === 1 && (
-                        <div className="mb-6 p-4 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
-                          <p className="text-emerald-200 text-sm font-medium mb-2">
-                            ⚡ Most Popular Choice
-                          </p>
-                          <p className="text-slate-400 text-xs">
-                            Join 500+ traders getting real-time Discord signals
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Limited spots notice for 3rd option */}
-                      {index === 2 && (
-                        <div className="mb-6 p-4 bg-purple-500/10 rounded-lg border border-purple-500/30">
-                          <p className="text-purple-200 text-sm font-medium mb-2">
-                            ⚠️ Limited Availability
-                          </p>
-                          <p className="text-slate-400 text-xs">
-                            Only accepting qualified traders. Application
-                            required.
-                          </p>
-                        </div>
-                      )}
-
-                      {/* CTA Button */}
-                      {isCurrentPlan ? (
-                        <Button
-                          variant="slim"
-                          onClick={handleViewDashboard}
-                          className="w-full group-hover:scale-105 transition-transform duration-300"
-                        >
-                          View Dashboard
-                        </Button>
-                      ) : index === 2 ? (
-                        // Special handling for 3rd option (VIP tier)
-                        <Button
-                          variant="slim"
-                          type="button"
-                          loading={priceIdLoading === price.id}
-                          onClick={() => handleStripeCheckout(price)}
-                          className="w-full group-hover:scale-105 transition-transform duration-300 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                        >
-                          {subscription ? 'Upgrade to VIP' : 'Get VIP Access'}
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="slim"
-                          type="button"
-                          loading={priceIdLoading === price.id}
-                          onClick={() => handleStripeCheckout(price)}
-                          className="w-full group-hover:scale-105 transition-transform duration-300"
-                        >
-                          {subscription
-                            ? 'Change Plan'
-                            : index === 0
-                              ? 'Start Free, Upgrade Later'
-                              : 'Start Trading Smarter'}
-                        </Button>
-                      )}
-
-                      {/* Yearly price not available message */}
-                      {billingInterval === 'year' && !price && (
-                        <div className="mt-4 p-3 bg-orange-500/10 rounded-lg border border-orange-500/30">
-                          <p className="text-orange-200 text-sm text-center">
-                            Yearly pricing not available for this plan
-                          </p>
-                        </div>
-                      )}
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </div>
         </div>
