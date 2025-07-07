@@ -8,10 +8,6 @@ This guide will help you set up Discord OAuth2 and role assignment for your Mark
 2. Click "New Application" and give it a name (e.g., "MarketPulse Bot")
 3. Go to the "OAuth2" section in the left sidebar
 4. Copy the **Client ID** and **Client Secret**
-   1391868026839633950
-   SQa2APA2ViZ_zW9qv6-7QPs7Vo0Ukail
-
-https://discord.com/oauth2/authorize?client_id=1391868026839633950&response_type=code&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fapi%2Fauth%2Fdiscord%2Fcallback&scope=guilds.join+identify
 
 ## 2. Configure OAuth2 Redirect
 
