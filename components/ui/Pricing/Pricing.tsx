@@ -202,7 +202,7 @@ export default function Pricing({ user, products, subscription }: Props) {
       <div className="relative">
         <div className="max-w-7xl px-4 py-16 mx-auto sm:py-24 sm:px-6 lg:px-8">
           {/* Header Section */}
-          <div className="text-center mb-20">
+          <div className="text-center mb-10">
             <div className="inline-flex items-center px-4 py-2 bg-blue-500/10 backdrop-blur-sm rounded-full border border-blue-500/30 mb-6">
               <Sparkles className="w-4 h-4 text-blue-400 mr-2" />
               <span className="text-blue-200 text-sm font-medium">
@@ -220,7 +220,7 @@ export default function Pricing({ user, products, subscription }: Props) {
             </p>
 
             {/* Billing Interval Toggle */}
-            <div className="relative inline-flex bg-slate-800/50 backdrop-blur-sm rounded-full p-2 border border-slate-700/50 shadow-xl mb-12">
+            <div className="relative inline-flex bg-slate-800/50 backdrop-blur-sm rounded-full border border-slate-700/50 shadow-xl ">
               <button
                 onClick={() => setBillingInterval('month')}
                 type="button"
@@ -368,85 +368,77 @@ export default function Pricing({ user, products, subscription }: Props) {
                         {/* Feature Indicators */}
                         <div className="mb-6">
                           {index === 0 && (
-                            <div className="flex items-center space-x-2 p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                              <Bell className="w-4 h-4 text-blue-400" />
-                              <div>
-                                <p className="text-blue-200 text-sm font-medium">
-                                  Free Trading Signals
+                            <>
+                              <div className="flex items-center space-x-2 p-3 bg-blue-500/10 rounded-lg border border-blue-500/30 mb-4">
+                                <div>
+                                  <p className="text-blue-200 text-sm font-medium">
+                                    Free Trading Signals
+                                  </p>
+                                  <p className="text-slate-400 text-xs">
+                                    Occasional signals (limited frequency)
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                                <p className="text-blue-200 text-sm font-medium mb-2">
+                                  🎯 Perfect for Beginners
                                 </p>
                                 <p className="text-slate-400 text-xs">
-                                  Occasional signals (limited frequency)
+                                  Try our signals risk-free and upgrade when
+                                  you're ready
                                 </p>
                               </div>
-                            </div>
+                            </>
                           )}
 
                           {index === 1 && (
-                            <div className="flex items-center space-x-2 p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
-                              <Zap className="w-4 h-4 text-emerald-400" />
-                              <div>
-                                <p className="text-emerald-200 text-sm font-medium">
-                                  All Discord Trading Signals
+                            <>
+                              <div className="flex items-center space-x-2 p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/30 mb-4">
+                                <div className="flex flex-col justify-center items-center w-full">
+                                  <p className="text-emerald-200 text-sm font-medium">
+                                    All Discord Trading Signals
+                                  </p>
+                                  <p className="text-slate-400 text-xs">
+                                    Real-time signals via Discord
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
+                                <p className="text-emerald-200 text-sm font-medium mb-2">
+                                  ⚡ Most Popular Choice
                                 </p>
                                 <p className="text-slate-400 text-xs">
-                                  Real-time signals via Discord
+                                  Join 500+ traders getting real-time Discord
+                                  signals
                                 </p>
                               </div>
-                            </div>
+                            </>
                           )}
 
                           {index === 2 && (
-                            <div className="flex items-center space-x-2 p-3 bg-purple-500/10 rounded-lg border border-purple-500/30">
-                              <BarChart3 className="w-4 h-4 text-purple-400" />
-                              <div>
-                                <p className="text-purple-200 text-sm font-medium">
-                                  Automatic Trading API
+                            <>
+                              <div className="flex items-center space-x-2 p-3 bg-purple-500/10 rounded-lg border border-purple-500/30 mb-4">
+                                <div className="flex flex-col justify-center items-center w-full">
+                                  <p className="text-purple-200 text-sm font-medium">
+                                    Automatic Trading API
+                                  </p>
+                                  <p className="text-slate-400 text-xs">
+                                    Full automation with API access
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/30">
+                                <p className="text-purple-200 text-sm font-medium mb-2">
+                                  ⚠️ Limited Availability
                                 </p>
                                 <p className="text-slate-400 text-xs">
-                                  Full automation with API access
+                                  Only accepting qualified traders. Application
+                                  required.
                                 </p>
                               </div>
-                            </div>
+                            </>
                           )}
                         </div>
-
-                        {/* Additional info boxes for balance */}
-                        {index === 0 && (
-                          <div className="mb-6 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                            <p className="text-blue-200 text-sm font-medium mb-2">
-                              🎯 Perfect for Beginners
-                            </p>
-                            <p className="text-slate-400 text-xs">
-                              Try our signals risk-free and upgrade when you're
-                              ready
-                            </p>
-                          </div>
-                        )}
-
-                        {index === 1 && (
-                          <div className="mb-6 p-4 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
-                            <p className="text-emerald-200 text-sm font-medium mb-2">
-                              ⚡ Most Popular Choice
-                            </p>
-                            <p className="text-slate-400 text-xs">
-                              Join 500+ traders getting real-time Discord
-                              signals
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Combined info box for 3rd option */}
-                        {index === 2 && (
-                          <div className="mb-6 p-4 bg-purple-500/10 rounded-lg border border-purple-500/30">
-                            <p className="text-purple-200 text-sm font-medium mb-2">
-                              ⚠️ Limited Availability
-                            </p>
-                            <p className="text-slate-400 text-xs">
-                              Only accepting qualified traders. Application
-                              required.
-                            </p>
-                          </div>
-                        )}
 
                         {/* CTA Button */}
                         {isCurrentPlan ? (

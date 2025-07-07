@@ -307,16 +307,6 @@ export default async function HomePage() {
         <FAQ />
 
         <CTA user={user} />
-
-        {/* Floating Action Button */}
-        <div className="fixed bottom-8 right-8 z-50">
-          <a
-            href="/pricing"
-            className="group bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white p-4 rounded-full shadow-2xl hover:shadow-blue-500/25 transition-all duration-300 hover:scale-110"
-          >
-            <Target className="w-6 h-6" />
-          </a>
-        </div>
       </div>
     </>
   );
