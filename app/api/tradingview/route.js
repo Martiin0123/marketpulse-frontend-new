@@ -13,7 +13,7 @@ const supabase = createClient(
 )
 
 // Parse Pine Script alert message to extract signal data
-function parsePineScriptAlert(alertMessage) {
+function parseAIAlgorithmAlert(alertMessage) {
   console.log('🔍 Parsing Pine Script alert:', alertMessage);
   
   // Extract symbol and price from alert message
@@ -196,7 +196,7 @@ export async function POST(request) {
   
   if (body.alert_message) {
     // Parse Pine Script alert message
-    signalData = parsePineScriptAlert(body.alert_message);
+    signalData = parseAIAlgorithmAlert(body.alert_message);
     console.log('📨 Received Pine Script alert:', signalData);
   } else {
     // Direct API call format
@@ -317,7 +317,7 @@ export async function POST(request) {
           entry_price: price,
           created_at: validTimestamp,
           strategy_name: 'Primescope Crypto',
-          signal_source: 'pinescript',
+          signal_source: 'ai_algorithm',
           exit_reason: exitReason || 'ma_cross',
           status: 'closed',
           rsi_value: strategy_metadata.rsi_value,
@@ -389,7 +389,7 @@ export async function POST(request) {
           entry_price: price,
           created_at: validTimestamp,
           strategy_name: 'Primescope Crypto',
-          signal_source: 'pinescript',
+          signal_source: 'ai_algorithm',
           status: 'active',
           rsi_value: strategy_metadata.rsi_value,
           technical_metadata: strategy_metadata
@@ -478,7 +478,7 @@ export async function POST(request) {
           entry_price: price,
           created_at: validTimestamp,
           strategy_name: 'Primescope Crypto',
-          signal_source: 'pinescript',
+          signal_source: 'ai_algorithm',
           status: 'active',
           rsi_value: strategy_metadata.rsi_value,
           technical_metadata: strategy_metadata

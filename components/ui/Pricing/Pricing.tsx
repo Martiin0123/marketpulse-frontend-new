@@ -446,19 +446,15 @@ export default function Pricing({ user, products, subscription }: Props) {
                           View Dashboard
                         </Button>
                       ) : index === 2 ? (
-                        // Special handling for 3rd option (limited spots)
+                        // Special handling for 3rd option (VIP tier)
                         <Button
                           variant="slim"
                           type="button"
-                          onClick={() =>
-                            window.open(
-                              'mailto:apply@marketpulse.com?subject=Application for Premium Plan',
-                              '_blank'
-                            )
-                          }
+                          loading={priceIdLoading === price.id}
+                          onClick={() => handleStripeCheckout(price)}
                           className="w-full group-hover:scale-105 transition-transform duration-300 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
                         >
-                          Apply Now
+                          {subscription ? 'Upgrade to VIP' : 'Get VIP Access'}
                         </Button>
                       ) : (
                         <Button

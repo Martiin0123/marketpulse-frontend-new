@@ -80,6 +80,7 @@ export const getSubscription = cache(async (supabase: SupabaseClient) => {
       user_id,
       metadata,
       quantity,
+      role,
       prices:price_id (
         id,
         unit_amount,
@@ -638,9 +639,8 @@ export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClie
     .select('*')
     .eq('status', 'closed')
     .not('exit_timestamp', 'is', null)
-    .not('entry_timestamp', 'is', null)
-    .gte('entry_timestamp', effectiveStartDate.toISOString())
-    .lte('entry_timestamp', effectiveEndDate.toISOString())
+    .gte('created_at', effectiveStartDate.toISOString())
+    .lte('created_at', effectiveEndDate.toISOString())
     .gte('exit_timestamp', effectiveStartDate.toISOString())
     .lte('exit_timestamp', effectiveEndDate.toISOString())
     .order('exit_timestamp', { ascending: true });
@@ -670,7 +670,8 @@ export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClie
       subscriptionStartDate: subscription.created,
       monthKey: targetMonth || `${analysisDate.getFullYear()}-${String(analysisDate.getMonth() + 1).padStart(2, '0')}`,
       isCurrentMonth: false,
-      isPeriodEnded
+      isPeriodEnded,
+      signals: []
     };
   }
 
@@ -690,7 +691,7 @@ export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClie
     monthKey: targetMonth || `${analysisDate.getFullYear()}-${String(analysisDate.getMonth() + 1).padStart(2, '0')}`,
     isCurrentMonth: false,
     isPeriodEnded,
-    positions
+    signals
   };
 });
 

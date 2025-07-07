@@ -22,7 +22,7 @@ marketpulse_db/
 │   │   ├── created_at (TIMESTAMPTZ)
 │   │   ├── exit_timestamp (TIMESTAMPTZ)
 │   │   ├── exchange (VARCHAR) - 'alpaca', 'bybit'
-│   │   ├── signal_source (VARCHAR) - 'pinescript', 'manual'
+│   │   ├── signal_source (VARCHAR) - 'ai_algorithm', 'manual'
 │   │   ├── strategy_name (VARCHAR) - 'Primescope Crypto'
 │   │   ├── timeframe (VARCHAR) - '1m', '5m', '1h', etc.
 │   │   ├── rsi_value (DECIMAL)
@@ -158,7 +158,7 @@ marketpulse_db/
 
 ### **Pine Script Integration**
 
-- **`signal_source`**: Tracks signal origin ('pinescript', 'manual')
+- **`signal_source`**: Tracks signal origin ('ai_algorithm', 'manual')
 - **`strategy_name`**: Identifies Pine Script strategy
 - **`technical_metadata`**: Stores RSI, MA values, divergence data
 - **`alert_message`**: Original TradingView alert message

@@ -47,7 +47,35 @@ export default function Dashboard({
   const [activeTab, setActiveTab] = useState<
     'overview' | 'signals' | 'strategy-analysis' | 'performance-guarantee'
   >('overview');
+  const [notification, setNotification] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
   const supabase = createClient();
+
+  // Check for URL parameters on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const discordStatus = urlParams.get('discord');
+    const error = urlParams.get('error');
+
+    if (discordStatus === 'connected') {
+      setNotification({
+        type: 'success',
+        message:
+          'Successfully connected to Discord! You can now receive notifications and join our community.'
+      });
+      // Clean up URL
+      window.history.replaceState({}, '', '/dashboard');
+    } else if (error) {
+      setNotification({
+        type: 'error',
+        message: 'Failed to connect Discord account. Please try again.'
+      });
+      // Clean up URL
+      window.history.replaceState({}, '', '/dashboard');
+    }
+  }, []);
 
   // Real-time updates for signals
   useEffect(() => {
@@ -124,7 +152,7 @@ export default function Dashboard({
 
   // Calculate signal source distribution
   const pinescriptSignals = signals.filter(
-    (signal) => signal.signal_source === 'pinescript'
+    (signal) => signal.signal_source === 'ai_algorithm'
   );
   const manualSignals = signals.filter(
     (signal) => signal.signal_source === 'manual'
@@ -132,6 +160,32 @@ export default function Dashboard({
 
   return (
     <div className="min-h-screen bg-slate-900">
+      {/* Notification */}
+      {notification && (
+        <div
+          className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg transition-all duration-300 ${
+            notification.type === 'success'
+              ? 'bg-emerald-600 text-white'
+              : 'bg-red-600 text-white'
+          }`}
+        >
+          <div className="flex items-center">
+            {notification.type === 'success' ? (
+              <CheckCircle className="w-5 h-5 mr-2" />
+            ) : (
+              <XCircle className="w-5 h-5 mr-2" />
+            )}
+            <span className="text-sm font-medium">{notification.message}</span>
+            <button
+              onClick={() => setNotification(null)}
+              className="ml-4 text-white/80 hover:text-white"
+            >
+              <XCircle className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="pt-20 pb-12 bg-gradient-to-b from-slate-900 to-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -143,13 +197,64 @@ export default function Dashboard({
               Welcome back, {user?.user_metadata?.full_name || user?.email}
             </p>
 
-            {/* Discord Join Button */}
-            <div className="flex justify-center">
+            {/* Discord Connection Status */}
+            <div className="flex justify-center items-center space-x-4">
+              {user?.user_metadata?.discord_user_id ? (
+                <div className="flex items-center space-x-2">
+                  <div className="inline-flex items-center px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg">
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Connected to Discord
+                  </div>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const response = await fetch(
+                          '/api/discord/assign-role',
+                          {
+                            method: 'POST'
+                          }
+                        );
+                        const data = await response.json();
+                        if (data.success) {
+                          setNotification({
+                            type: 'success',
+                            message: `Discord role assigned successfully! (${data.debug?.plan || 'unknown'} plan)`
+                          });
+                        } else {
+                          setNotification({
+                            type: 'error',
+                            message:
+                              data.error || 'Failed to assign Discord role'
+                          });
+                        }
+                      } catch (error) {
+                        setNotification({
+                          type: 'error',
+                          message: 'Failed to assign Discord role'
+                        });
+                      }
+                    }}
+                    className="inline-flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors duration-200"
+                  >
+                    <Target className="w-3 h-3 mr-1" />
+                    Assign Role
+                  </button>
+                </div>
+              ) : (
+                <a
+                  href="/api/auth/discord"
+                  className="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 group"
+                >
+                  <MessageCircle className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-200" />
+                  Connect Discord Account
+                </a>
+              )}
+
               <a
                 href="https://discord.gg/N7taGVuz"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 group"
+                className="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-lg transition-colors duration-200 group"
               >
                 <MessageCircle className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-200" />
                 Join Discord Community

@@ -455,6 +455,7 @@ export type Database = {
           metadata: Json | null
           price_id: string | null
           quantity: number | null
+          role: string | null
           status: Database["public"]["Enums"]["subscription_status"] | null
           trial_end: string | null
           trial_start: string | null
@@ -472,6 +473,7 @@ export type Database = {
           metadata?: Json | null
           price_id?: string | null
           quantity?: number | null
+          role?: string | null
           status?: Database["public"]["Enums"]["subscription_status"] | null
           trial_end?: string | null
           trial_start?: string | null
@@ -489,6 +491,7 @@ export type Database = {
           metadata?: Json | null
           price_id?: string | null
           quantity?: number | null
+          role?: string | null
           status?: Database["public"]["Enums"]["subscription_status"] | null
           trial_end?: string | null
           trial_start?: string | null

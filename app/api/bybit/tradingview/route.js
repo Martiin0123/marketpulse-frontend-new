@@ -66,7 +66,7 @@ async function closeSignalManually(signalId, exitPrice, exitReason = 'manual') {
 }
 
 // Parse Pine Script alert message to extract signal data
-function parsePineScriptAlert(alertMessage) {
+function parseAIAlgorithmAlert(alertMessage) {
   console.log('🔍 Parsing Pine Script alert for Bybit:', alertMessage);
   
   // Extract symbol and price from alert message
@@ -331,7 +331,7 @@ export async function POST(request) {
   
   if (body.alert_message) {
     // Parse Pine Script alert message
-    signalData = parsePineScriptAlert(body.alert_message);
+    signalData = parseAIAlgorithmAlert(body.alert_message);
     console.log('📨 Received Pine Script alert for Bybit:', signalData);
   } else {
     // Direct API call format
@@ -525,7 +525,7 @@ export async function POST(request) {
             entry_price: currentPrice,
             created_at: validTimestamp,
             strategy_name: 'Primescope Crypto',
-            signal_source: 'pinescript',
+            signal_source: 'ai_algorithm',
             exchange: 'bybit',
             exit_reason: exitReason || 'ma_cross',
             status: 'closed',
@@ -633,7 +633,7 @@ export async function POST(request) {
             entry_price: currentPrice,
             created_at: validTimestamp,
             strategy_name: 'Primescope Crypto',
-            signal_source: 'pinescript',
+            signal_source: 'ai_algorithm',
             exchange: 'bybit',
             status: 'active',
             rsi_value: strategy_metadata.rsi_value,
@@ -729,7 +729,7 @@ export async function POST(request) {
             entry_price: currentPrice,
             created_at: validTimestamp,
             strategy_name: 'Primescope Crypto',
-            signal_source: 'pinescript',
+            signal_source: 'ai_algorithm',
             exchange: 'bybit',
             status: 'active',
             rsi_value: strategy_metadata.rsi_value,

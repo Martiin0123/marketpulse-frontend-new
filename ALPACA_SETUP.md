@@ -119,11 +119,11 @@ ALTER TABLE signals ADD COLUMN signal_source VARCHAR(50);
      }'
    ```
 
-## Pine Script Integration
+## ai_algorithm Integration
 
-Update your Pine Script alerts to include strategy metadata:
+Update your ai_algorithm alerts to include strategy metadata:
 
-```pinescript
+```ai_algorithm
 // Enhanced alert message with technical data
 alert("Primescope LONG Entry! Symbol: " + syminfo.ticker +
       ", Price: " + str.tostring(close) +

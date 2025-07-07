@@ -43,12 +43,48 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Find the user's subscription active during the period
+    const { data: periodSub } = await supabase
+      .from('subscriptions')
+      .select('price_id, status, current_period_start, current_period_end, prices:price_id(id, unit_amount, currency, interval, interval_count, products:product_id(name))')
+      .eq('user_id', user.id)
+      .lte('current_period_start', performance.effectiveEndDate)
+      .gte('current_period_start', performance.effectiveStartDate)
+      .in('status', ['active', 'trialing', 'past_due', 'incomplete'])
+      .order('created', { ascending: false })
+      .limit(1)
+      .single();
+
+    let refundAmount = 0;
+    let refundPlan = '';
+    let refundCurrency = 'usd';
+    if (periodSub && periodSub.prices) {
+      const unitAmount = periodSub.prices.unit_amount || 0;
+      const interval = periodSub.prices.interval || 'month';
+      const intervalCount = periodSub.prices.interval_count || 1;
+      // Calculate monthly equivalent rate
+      if (interval === 'year') {
+        refundAmount = (unitAmount / 12) / 100;
+      } else if (interval === 'month') {
+        refundAmount = unitAmount / 100;
+      } else {
+        // For other intervals, calculate monthly equivalent
+        const monthsInInterval = interval === 'week' ? intervalCount / 4 : intervalCount;
+        refundAmount = (unitAmount / monthsInInterval) / 100;
+      }
+      refundPlan = periodSub.prices.products?.name || '';
+      refundCurrency = periodSub.prices.currency || 'usd';
+    }
+
     // Check if performance was negative
     if (performance.totalPnL >= 0) {
       return NextResponse.json({ 
         error: 'No refund available. Performance was positive or neutral.',
         performance,
-        isEligible: false
+        isEligible: false,
+        refundAmount,
+        refundPlan,
+        refundCurrency
       }, { status: 400 });
     }
 
@@ -64,13 +100,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ 
         error: 'Refund already processed for this month.',
         performance,
-        existingRefund
+        existingRefund,
+        refundAmount,
+        refundPlan,
+        refundCurrency
       }, { status: 400 });
     }
 
-    // Calculate refund amount (negative PnL becomes positive refund)
-    const refundAmount = Math.abs(performance.totalPnL);
-    
+    // Use the subscription fee as the refund amount
     // Create a refund request record instead of processing immediately
     const { data: refundRequest, error: refundError } = await supabase
       .from('performance_refunds')
@@ -79,7 +116,7 @@ export async function POST(request: NextRequest) {
         month_key: performance.monthKey,
         refund_amount: refundAmount,
         status: 'pending',
-        notes: `No Loss Guarantee refund request. P&L: ${performance.totalPnL}, Signals: ${performance.totalPositions}, Win Rate: ${performance.totalPositions > 0 ? ((performance.profitablePositions / performance.totalPositions) * 100).toFixed(1) : 0}%`
+        notes: `No Loss Guarantee refund request. P&L: ${performance.totalPnL}, Signals: ${performance.totalPositions}, Plan: ${refundPlan}, Subscription Fee: ${refundAmount} ${refundCurrency}`
       })
       .select()
       .single();
@@ -124,9 +161,11 @@ export async function POST(request: NextRequest) {
       success: true,
       performance,
       refundAmount,
+      refundPlan,
+      refundCurrency,
       isEligible: true,
       requestId: refundRequest.id,
-      message: `Refund request submitted for $${refundAmount.toFixed(2)} for ${performance.monthKey}. You will be notified when the refund is processed.`
+      message: `Refund request submitted for $${refundAmount.toFixed(2)} (${refundPlan}) for ${performance.monthKey}. You will be notified when the refund is processed.`
     });
 
   } catch (error) {
@@ -144,6 +183,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const allRefunds = searchParams.get('all_refunds');
+    if (allRefunds) {
+      // Return all refund requests for this user
+      const { data: refunds, error } = await supabase
+        .from('performance_refunds')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (error) {
+        return NextResponse.json({ error: 'Failed to fetch refunds', details: error.message }, { status: 500 });
+      }
+      return NextResponse.json({ refunds });
+    }
+
     // Debug: Check what subscriptions exist
     const { data: allSubscriptions, error: subsError } = await supabase
       .from('subscriptions')
@@ -153,7 +207,6 @@ export async function GET(request: NextRequest) {
     console.log('All user subscriptions:', allSubscriptions);
     console.log('Subscription error:', subsError);
 
-    const { searchParams } = new URL(request.url);
     const targetMonth = searchParams.get('month'); // Optional: YYYY-MM format
 
     // Get performance for the specified month or previous month
@@ -184,14 +237,48 @@ export async function GET(request: NextRequest) {
       .eq('month_key', performance.monthKey)
       .single();
 
+    // Find the user's subscription active during the period
+    const { data: periodSub } = await supabase
+      .from('subscriptions')
+      .select('price_id, status, current_period_start, current_period_end, prices:price_id(id, unit_amount, currency, interval, interval_count, products:product_id(name))')
+      .eq('user_id', user.id)
+      .lte('current_period_start', performance.effectiveEndDate)
+      .gte('current_period_start', performance.effectiveStartDate)
+      .in('status', ['active', 'trialing', 'past_due', 'incomplete'])
+      .order('created', { ascending: false })
+      .limit(1)
+      .single();
+
+    let refundAmount = 0;
+    let refundPlan = '';
+    let refundCurrency = 'usd';
+    if (periodSub && periodSub.prices) {
+      const unitAmount = periodSub.prices.unit_amount || 0;
+      const interval = periodSub.prices.interval || 'month';
+      const intervalCount = periodSub.prices.interval_count || 1;
+      // Calculate monthly equivalent rate
+      if (interval === 'year') {
+        refundAmount = (unitAmount / 12) / 100;
+      } else if (interval === 'month') {
+        refundAmount = unitAmount / 100;
+      } else {
+        // For other intervals, calculate monthly equivalent
+        const monthsInInterval = interval === 'week' ? intervalCount / 4 : intervalCount;
+        refundAmount = (unitAmount / monthsInInterval) / 100;
+      }
+      refundPlan = periodSub.prices.products?.name || '';
+      refundCurrency = periodSub.prices.currency || 'usd';
+    }
+
     const isEligible = !isCurrentMonth && performance.totalPnL < 0 && !existingRefund && performance.isPeriodEnded;
-    const refundAmount = isEligible ? Math.abs(performance.totalPnL) : 0;
 
     return NextResponse.json({
       performance,
       isCurrentMonth,
       isEligible,
       refundAmount,
+      refundPlan,
+      refundCurrency,
       existingRefund,
       isPeriodEnded: performance.isPeriodEnded,
       message: !performance.isPeriodEnded
@@ -199,7 +286,7 @@ export async function GET(request: NextRequest) {
         : isCurrentMonth 
           ? 'Current month - refunds not available until month ends'
           : isEligible 
-            ? `Eligible for refund of $${refundAmount.toFixed(2)}`
+            ? `Eligible for ${refundPlan} refund of $${refundAmount.toFixed(2)}`
             : existingRefund
               ? 'Refund already processed for this month'
               : 'No negative performance for this month'
