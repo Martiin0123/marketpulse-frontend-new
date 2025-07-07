@@ -29,8 +29,6 @@ This guide will help you set up Discord OAuth2 and role assignment for your Mark
    - Send Messages
    - Use Slash Commands
 
-MTM5MTg2ODAyNjgzOTYzMzk1MA.GDTDMY.g3xpL_Aqlg9mSnreQxAtySPlfNibKa4PRfX8xo
-
 ## 4. Add Bot to Your Discord Server
 
 1. Go to the "OAuth2" → "URL Generator" section
