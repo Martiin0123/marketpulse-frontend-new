@@ -7,6 +7,22 @@
         "Access-Control-Allow-Origin": "*"
       },
       "dest": "/api/webhook"
+    },
+    {
+      "src": "/api/tradingview",
+      "methods": ["POST"],
+      "headers": {
+        "Access-Control-Allow-Origin": "*"
+      },
+      "dest": "/api/tradingview"
+    },
+    {
+      "src": "/api/bybit/tradingview",
+      "methods": ["POST"],
+      "headers": {
+        "Access-Control-Allow-Origin": "*"
+      },
+      "dest": "/api/bybit/tradingview"
     }
   ],
   "crons": [
