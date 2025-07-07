@@ -8,27 +8,9 @@ import Features from '@/components/ui/Features/Features';
 import { createClient } from '@/utils/supabase/server';
 import { getUser } from '@/utils/supabase/queries';
 import { getSubscription } from '@/utils/supabase/queries';
-import {
-  getClosedBybitSignalsCurrentMonth,
-  getPositions
-} from '@/utils/supabase/queries';
+import { getPositions } from '@/utils/supabase/queries';
 import { Metadata } from 'next';
-import {
-  ArrowUpRight,
-  TrendingUp,
-  Shield,
-  Zap,
-  Target,
-  X,
-  CheckCircle
-} from 'lucide-react';
-
-interface MonthlyPnL {
-  totalPnL: number;
-  profitableSignals: number;
-  totalSignals: number;
-  monthlyData: { timestamp: number; value: number }[];
-}
+import { Zap, Target, X, CheckCircle } from 'lucide-react';
 
 // SEO Metadata
 export const metadata: Metadata = {
@@ -77,70 +59,6 @@ export const metadata: Metadata = {
     canonical: 'https://marketpulse.com'
   }
 };
-
-async function getMonthlyBybitPnL(
-  supabase: any
-): Promise<MonthlyPnL | undefined> {
-  // Get the start and end of the current month
-  const now = new Date();
-  const startOfMonth = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    1
-  ).toISOString();
-  const endOfMonth = new Date(
-    now.getFullYear(),
-    now.getMonth() + 1,
-    0
-  ).toISOString();
-
-  const signals = await getClosedBybitSignalsCurrentMonth(supabase);
-
-  // Calculate total PnL and count profitable signals
-  let runningBalance = 0;
-  const monthlyData = [];
-  const accountSize = 10000; // Default account size
-
-  // Add initial point at start of month
-  monthlyData.push({
-    timestamp: Math.floor(new Date(startOfMonth).getTime()),
-    value: 0
-  });
-
-  // Process each signal
-  signals.forEach((sig: any) => {
-    const pnlPercent = sig.pnl_percentage || 0;
-    const pnlDollar = (pnlPercent / 100) * accountSize;
-    runningBalance += pnlDollar;
-    const exitTimestamp = sig.exit_timestamp
-      ? new Date(sig.exit_timestamp).getTime()
-      : Date.now();
-    monthlyData.push({
-      timestamp: exitTimestamp,
-      value: runningBalance
-    });
-  });
-
-  // Calculate stats
-  const result = signals.reduce(
-    (acc: MonthlyPnL, sig: { pnl_percentage: number }) => ({
-      ...acc,
-      totalPnL: acc.totalPnL + (sig.pnl_percentage || 0),
-      profitableSignals:
-        acc.profitableSignals + ((sig.pnl_percentage || 0) > 0 ? 1 : 0)
-    }),
-    { totalPnL: 0, profitableSignals: 0, totalSignals: 0, monthlyData: [] }
-  );
-
-  return {
-    ...result,
-    totalSignals: signals.length,
-    monthlyData,
-    // For compatibility with old prop names
-    profitablePositions: result.profitableSignals,
-    totalPositions: signals.length
-  };
-}
 
 export default async function HomePage() {
   const supabase = createClient();

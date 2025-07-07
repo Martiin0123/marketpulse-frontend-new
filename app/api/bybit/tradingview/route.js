@@ -66,6 +66,7 @@ async function closeSignalManually(signalId, exitPrice, exitReason = 'manual') {
 }
 
 // Parse Pine Script alert message to extract signal data
+function parsePineScriptAlert(alertMessage) {
   console.log('🔍 Parsing Pine Script alert for Bybit:', alertMessage);
   
   // Extract symbol and price from alert message
