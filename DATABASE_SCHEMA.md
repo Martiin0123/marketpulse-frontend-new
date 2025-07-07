@@ -21,7 +21,7 @@ marketpulse_db/
 │   │   ├── status (VARCHAR) - 'active', 'closed', 'cancelled'
 │   │   ├── created_at (TIMESTAMPTZ)
 │   │   ├── exit_timestamp (TIMESTAMPTZ)
-│   │   ├── exchange (VARCHAR) - 'alpaca', 'bybit'
+│   │   ├── exchange (VARCHAR) - 'bybit'
 │   │   ├── signal_source (VARCHAR) - 'ai_algorithm', 'manual'
 │   │   ├── strategy_name (VARCHAR) - 'Primescope Crypto'
 │   │   ├── timeframe (VARCHAR) - '1m', '5m', '1h', etc.
@@ -45,7 +45,7 @@ marketpulse_db/
 │   │   ├── quantity (DECIMAL)
 │   │   ├── status (VARCHAR) - 'open', 'closed'
 │   │   ├── pnl (DECIMAL)
-│   │   ├── exchange (VARCHAR) - 'alpaca', 'bybit'
+│   │   ├── exchange (VARCHAR) - 'bybit'
 │   │   ├── strategy_name (VARCHAR)
 │   │   ├── timeframe (VARCHAR)
 │   │   ├── entry_reason (VARCHAR) - 'rsi_ma_cross', 'divergence'
@@ -153,7 +153,7 @@ marketpulse_db/
 ### **Multi-Exchange Support**
 
 - **`exchange`** field in both `signals` and `positions` tables
-- Supports 'alpaca' and 'bybit' exchanges
+- Supports 'bybit' exchange
 - Indexed for optimal performance
 
 ### **Pine Script Integration**

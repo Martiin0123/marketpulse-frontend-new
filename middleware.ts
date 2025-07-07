@@ -5,8 +5,7 @@ export async function middleware(request: NextRequest) {
   // Bypass authentication for API routes that need to be accessed externally
   const { pathname } = request.nextUrl;
   
-  if (pathname.startsWith('/api/tradingview') || 
-      pathname.startsWith('/api/bybit/tradingview') ||
+  if (pathname.startsWith('/api/bybit/tradingview') ||
       pathname.startsWith('/api/webhook')) {
     return new Response(null, { status: 200 });
   }

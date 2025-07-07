@@ -39,9 +39,7 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'closed'>(
     'all'
   );
-  const [filterExchange, setFilterExchange] = useState<
-    'all' | 'bybit' | 'alpaca'
-  >('all');
+  const [filterExchange, setFilterExchange] = useState<'all' | 'bybit'>('all');
   const supabase = createClient();
 
   useEffect(() => {
@@ -320,7 +318,6 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
             >
               <option value="all">All Exchanges</option>
               <option value="bybit">Bybit</option>
-              <option value="alpaca">Alpaca</option>
             </select>
           </div>
         </div>

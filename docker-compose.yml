@@ -21,9 +21,7 @@ services:
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
 
-      # Alpaca Configuration
-      ALPACA_API_KEY: ${ALPACA_API_KEY}
-      ALPACA_SECRET_KEY: ${ALPACA_SECRET_KEY}
+      
 
       # Discord Configuration
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
