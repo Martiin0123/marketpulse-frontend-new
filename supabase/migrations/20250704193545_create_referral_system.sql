@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS public.referrals (
   referee_id uuid NOT NULL,
   referral_code text NOT NULL,
   status text DEFAULT 'pending',
-  reward_amount numeric DEFAULT 39.00,
+  reward_amount numeric DEFAULT 19.00,
   reward_currency text DEFAULT 'EUR' CHECK (char_length(reward_currency) = 3),
   subscribed_at timestamp with time zone,
   eligible_at timestamp with time zone,

@@ -446,7 +446,7 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
                 <div>
                   <h3 className="text-white font-medium">Get Rewarded</h3>
                   <p className="text-gray-400 text-sm">
-                    Receive $25 commission for each successful referral
+                    Receive €19 commission for each successful referral
                   </p>
                 </div>
               </div>
@@ -533,7 +533,7 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
                               : 'text-gray-400'
                           }`}
                         >
-                          {referral.status === 'active' ? '$25.00' : 'Pending'}
+                          {referral.status === 'active' ? '€19.00' : 'Pending'}
                         </span>
                       </td>
                     </tr>

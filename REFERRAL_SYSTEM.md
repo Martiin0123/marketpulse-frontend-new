@@ -74,7 +74,7 @@ This document describes the complete referral system implementation for the Mark
 
 1. Stripe webhook `checkout.session.completed` triggers
 2. Referral status updated to 'subscribed'
-3. Pending reward created with €39 amount
+3. Pending reward created with €19 amount
 
 ### 3. 1-Month Waiting Period
 
