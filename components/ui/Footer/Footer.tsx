@@ -108,7 +108,7 @@ export default function Footer({ user, subscription }: FooterProps) {
                   href="/performance-guarantee"
                   className="text-slate-400 hover:text-white transition-colors"
                 >
-                  Performance Guarantee
+                  No Loss Guarantee
                 </Link>
               </li>
             </ul>

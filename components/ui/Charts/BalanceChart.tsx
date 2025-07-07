@@ -16,11 +16,11 @@ const Chart = dynamic(() => import('react-apexcharts'), {
   )
 });
 
-type Position = Database['public']['Tables']['positions']['Row'];
+type Signal = Database['public']['Tables']['signals']['Row'];
 
 interface BalanceChartProps {
-  positions: Position[];
-  accountSize?: number;
+  signals?: Signal[];
+  customData?: { timestamp: number; value: number }[];
   showContainer?: boolean;
 }
 
@@ -29,7 +29,7 @@ interface BalanceDataPoint {
   balance: number;
   timestamp: number;
   type: 'entry' | 'exit';
-  position: Position;
+  signal: Signal;
 }
 
 // Helper function to calculate maximum drawdown
@@ -52,8 +52,8 @@ const calculateMaxDrawdown = (balances: number[]): number => {
 };
 
 export default function BalanceChart({
-  positions,
-  accountSize = 10000,
+  signals = [],
+  customData,
   showContainer = true
 }: BalanceChartProps) {
   const [isMounted, setIsMounted] = useState(false);
@@ -63,29 +63,35 @@ export default function BalanceChart({
   }, []);
 
   const { balanceData, stats, chartOptions, series } = useMemo(() => {
-    if (!positions || positions.length === 0) {
-      // Add default datapoint at 100%
-      const defaultData = [
-        {
-          date: new Date().toLocaleDateString(),
-          balance: 100,
-          timestamp: Date.now(),
-          type: 'entry' as const,
-          position: {} as Position
-        }
-      ];
-
+    // If customData is provided, use it directly
+    if (customData && customData.length > 0) {
+      const balanceData = customData.map((d) => ({
+        date: new Date(d.timestamp).toLocaleDateString(),
+        balance: d.value,
+        timestamp: d.timestamp,
+        type: 'entry',
+        signal: {} as Signal
+      }));
       return {
-        balanceData: defaultData,
+        balanceData,
         stats: {
-          currentBalance: accountSize,
-          totalReturn: 0,
-          totalReturnPercent: 0,
+          currentBalance:
+            balanceData.length > 0
+              ? balanceData[balanceData.length - 1].balance
+              : 100,
+          totalReturn:
+            balanceData.length > 0
+              ? balanceData[balanceData.length - 1].balance
+              : 0,
+          totalReturnPercent:
+            balanceData.length > 0
+              ? balanceData[balanceData.length - 1].balance
+              : 0,
           winRate: 0,
-          totalTrades: 0,
-          maxDrawdown: 0,
-          openPositions: 0,
-          totalPositions: 0
+          totalTrades: balanceData.length,
+          maxDrawdown: calculateMaxDrawdown(balanceData.map((d) => d.balance)),
+          activeSignals: 0,
+          totalSignals: balanceData.length
         },
         chartOptions: {
           chart: {
@@ -108,7 +114,82 @@ export default function BalanceChart({
           },
           xaxis: {
             type: 'datetime' as const,
-            categories: defaultData.map((d) => d.timestamp),
+            labels: { show: false },
+            axisBorder: { show: false },
+            axisTicks: { show: false }
+          },
+          yaxis: {
+            min: Math.max(
+              0,
+              Math.min(...balanceData.map((d) => d.balance)) - 10
+            ),
+            max: Math.max(...balanceData.map((d) => d.balance)) + 10,
+            tickAmount: 4,
+            labels: {
+              style: { colors: '#9ca3af' },
+              formatter: function (value: number) {
+                return value.toFixed(0) + '%';
+              }
+            }
+          },
+          tooltip: {
+            x: { format: 'dd MMM yyyy' },
+            y: {
+              formatter: function (value: number) {
+                return value.toFixed(1) + '%';
+              }
+            }
+          },
+          grid: {
+            borderColor: '#374151',
+            xaxis: { lines: { show: false } },
+            yaxis: { lines: { show: true } }
+          },
+          theme: { mode: 'dark' as const }
+        },
+        series: [
+          {
+            name: 'Performance',
+            data: balanceData.map((d) => ({ x: d.timestamp, y: d.balance }))
+          }
+        ]
+      };
+    }
+
+    if (!signals || signals.length === 0) {
+      return {
+        balanceData: [],
+        stats: {
+          currentBalance: 100,
+          totalReturn: 0,
+          totalReturnPercent: 0,
+          winRate: 0,
+          totalTrades: 0,
+          maxDrawdown: 0,
+          activeSignals: 0,
+          totalSignals: 0
+        },
+        chartOptions: {
+          chart: {
+            type: 'area' as const,
+            height: '100%',
+            toolbar: { show: false },
+            zoom: { enabled: false },
+            background: 'transparent'
+          },
+          dataLabels: { enabled: false },
+          stroke: { curve: 'smooth' as const, width: 2 },
+          fill: {
+            type: 'gradient',
+            gradient: {
+              shadeIntensity: 1,
+              opacityFrom: 0.45,
+              opacityTo: 0.05,
+              stops: [50, 100, 100]
+            }
+          },
+          xaxis: {
+            type: 'datetime' as const,
             labels: { show: false },
             axisBorder: { show: false },
             axisTicks: { show: false }
@@ -141,48 +222,35 @@ export default function BalanceChart({
         },
         series: [
           {
-            name: 'Balance',
-            data: defaultData.map((d) => ({ x: d.timestamp, y: d.balance }))
+            name: 'Performance',
+            data: []
           }
         ]
       };
     }
 
     // Helper function to get entry timestamp
-    const getEntryTimestamp = (position: Position) => {
-      // Handle ISO string timestamps (database format)
-      if (
-        position.entry_timestamp &&
-        typeof position.entry_timestamp === 'string'
-      ) {
-        return Math.floor(new Date(position.entry_timestamp).getTime() / 1000);
-      }
-      // Fallback to created_at
-      return position.created_at
-        ? Math.floor(new Date(position.created_at).getTime() / 1000)
-        : Date.now() / 1000;
+    const getEntryTimestamp = (signal: Signal) => {
+      return signal.created_at
+        ? new Date(signal.created_at).getTime()
+        : Date.now();
     };
 
     // Helper function to get exit timestamp
-    const getExitTimestamp = (position: Position) => {
-      // Handle ISO string timestamps (database format)
-      if (
-        position.exit_timestamp &&
-        typeof position.exit_timestamp === 'string'
-      ) {
-        return Math.floor(new Date(position.exit_timestamp).getTime() / 1000);
-      }
-      return null;
+    const getExitTimestamp = (signal: Signal) => {
+      return signal.exit_timestamp
+        ? new Date(signal.exit_timestamp).getTime()
+        : null;
     };
 
-    // Filter and sort positions by entry time - only closed positions
-    const relevantPositions = positions
-      .filter((pos) => pos.status === 'closed')
+    // Filter and sort signals by entry time - include all BUY signals (both active and closed)
+    const relevantSignals = signals
+      .filter((signal) => signal.type === 'buy')
       .sort((a, b) => getEntryTimestamp(a) - getEntryTimestamp(b));
 
     // Build comprehensive balance progression
     const balanceData: BalanceDataPoint[] = [];
-    let runningBalance = accountSize;
+    let runningBalance = 100; // Start at 100%
 
     // Helper function to get date string from timestamp
     const getDateFromTimestamp = (
@@ -190,107 +258,96 @@ export default function BalanceChart({
       fallback: number
     ) => {
       const ts = timestamp || fallback;
-      return new Date(ts * 1000).toLocaleDateString();
+      return new Date(ts).toLocaleDateString();
     };
 
-    // Process all closed positions chronologically
-    const allPositions = [...relevantPositions].sort((a, b) => {
+    // Process all closed signals chronologically
+    const allSignals = [...relevantSignals].sort((a, b) => {
       const aTime = getExitTimestamp(a) || getEntryTimestamp(a);
       const bTime = getExitTimestamp(b) || getEntryTimestamp(b);
       return aTime - bTime;
     });
 
-    // Add initial balance point at 100% (account size)
-    if (allPositions.length > 0) {
-      const firstEntryTimestamp = getEntryTimestamp(allPositions[0]);
+    // Add initial balance point if we have signals
+    if (allSignals.length > 0) {
+      const firstSignal = allSignals[0];
+      const firstTimestamp = getEntryTimestamp(firstSignal);
       balanceData.push({
-        date: new Date(firstEntryTimestamp * 1000).toLocaleDateString(),
-        balance: 100, // 100% represents the initial account size
-        timestamp: firstEntryTimestamp * 1000,
+        date: getDateFromTimestamp(firstTimestamp, firstTimestamp),
+        balance: runningBalance,
+        timestamp: firstTimestamp,
         type: 'entry',
-        position: allPositions[0]
+        signal: firstSignal
       });
     }
 
-    // Process each closed position
-    let lastTimestamp = 0;
-    allPositions.forEach((position, index) => {
-      const pnlPercent = position.pnl || 0;
-      const pnlDollar = (pnlPercent / 100) * accountSize;
+    // Process each signal
+    allSignals.forEach((signal) => {
+      const entryTime = getEntryTimestamp(signal);
+      const exitTime = getExitTimestamp(signal);
 
-      // Add PnL to running balance
-      runningBalance += pnlDollar;
+      // Add entry point for all signals
+      balanceData.push({
+        date: getDateFromTimestamp(entryTime, entryTime),
+        balance: runningBalance,
+        timestamp: entryTime,
+        type: 'entry',
+        signal
+      });
 
-      const exitTimestamp = getExitTimestamp(position);
-      const entryTimestamp = getEntryTimestamp(position);
-      const finalTimestamp = exitTimestamp || entryTimestamp;
-
-      // Only add point if timestamp is different or it's the last position
+      // If signal is closed or executed, add exit point with P&L
       if (
-        finalTimestamp !== lastTimestamp ||
-        index === allPositions.length - 1
+        (signal.status === 'closed' || signal.status === 'executed') &&
+        exitTime &&
+        signal.pnl_percentage !== null
       ) {
-        // Convert balance to percentage (100% = initial account size)
-        const balancePercent = (runningBalance / accountSize) * 100;
+        const pnlPercentage = signal.pnl_percentage || 0;
+        const newBalance = runningBalance * (1 + pnlPercentage / 100);
 
         balanceData.push({
-          date: getDateFromTimestamp(exitTimestamp, entryTimestamp),
-          balance: balancePercent,
-          timestamp: finalTimestamp * 1000,
+          date: getDateFromTimestamp(exitTime, entryTime),
+          balance: newBalance,
+          timestamp: exitTime,
           type: 'exit',
-          position
+          signal
         });
-        lastTimestamp = finalTimestamp;
+
+        runningBalance = newBalance;
       }
     });
 
-    // Calculate stats
-    const stats = {
-      currentBalance: runningBalance,
-      totalReturn: runningBalance - accountSize,
-      totalReturnPercent: ((runningBalance - accountSize) / accountSize) * 100,
-      winRate:
-        relevantPositions.length > 0
-          ? (relevantPositions.filter((p) => (p.pnl || 0) > 0).length /
-              relevantPositions.length) *
-            100
-          : 0,
-      totalTrades: relevantPositions.length,
-      maxDrawdown: calculateMaxDrawdown(balanceData.map((d) => d.balance)),
-      openPositions: 0,
-      totalPositions: relevantPositions.length
-    };
-
-    // Calculate dynamic y-axis range
-    const balanceValues = balanceData.map((d) => d.balance);
-    const minBalance = Math.min(...balanceValues, 100); // Include 100% as minimum
-    const maxBalance = Math.max(...balanceValues, 100); // Include 100% as maximum
-
-    // Add some padding to the range (10% on each side)
-    const padding = Math.max((maxBalance - minBalance) * 0.1, 5);
-    const yMin = Math.max(minBalance - padding, 0); // Don't go below 0%
-    const yMax = maxBalance + padding;
+    // Calculate statistics
+    const completedTrades = relevantSignals.filter(
+      (signal) =>
+        (signal.status === 'closed' || signal.status === 'executed') &&
+        signal.pnl_percentage !== null
+    );
+    const totalTrades = relevantSignals.length;
+    const winningTrades = completedTrades.filter(
+      (signal) => (signal.pnl_percentage || 0) > 0
+    ).length;
+    const winRate =
+      completedTrades.length > 0
+        ? (winningTrades / completedTrades.length) * 100
+        : 0;
+    const totalReturn = runningBalance - 100;
+    const totalReturnPercent = totalReturn;
+    const maxDrawdown = calculateMaxDrawdown(balanceData.map((d) => d.balance));
+    const activeSignals = signals.filter(
+      (signal) => signal.status === 'active'
+    ).length;
 
     // Chart options
     const chartOptions: ApexOptions = {
       chart: {
-        type: 'area' as const,
+        type: 'area',
         height: '100%',
-        toolbar: {
-          show: false
-        },
-        zoom: {
-          enabled: false
-        },
+        toolbar: { show: false },
+        zoom: { enabled: false },
         background: 'transparent'
       },
-      dataLabels: {
-        enabled: false
-      },
-      stroke: {
-        curve: 'smooth',
-        width: 2
-      },
+      dataLabels: { enabled: false },
+      stroke: { curve: 'smooth', width: 2 },
       fill: {
         type: 'gradient',
         gradient: {
@@ -302,34 +359,23 @@ export default function BalanceChart({
       },
       xaxis: {
         type: 'datetime',
-        categories: balanceData.map((d) => d.timestamp),
-        labels: {
-          show: false
-        },
-        axisBorder: {
-          show: false
-        },
-        axisTicks: {
-          show: false
-        }
+        labels: { show: false },
+        axisBorder: { show: false },
+        axisTicks: { show: false }
       },
       yaxis: {
-        min: yMin,
-        max: yMax,
+        min: Math.max(0, Math.min(...balanceData.map((d) => d.balance)) - 10),
+        max: Math.max(...balanceData.map((d) => d.balance)) + 10,
         tickAmount: 4,
         labels: {
-          style: {
-            colors: '#9ca3af'
-          },
+          style: { colors: '#9ca3af' },
           formatter: function (value: number) {
             return value.toFixed(0) + '%';
           }
         }
       },
       tooltip: {
-        x: {
-          format: 'dd MMM yyyy'
-        },
+        x: { format: 'dd MMM yyyy' },
         y: {
           formatter: function (value: number) {
             return value.toFixed(1) + '%';
@@ -338,84 +384,119 @@ export default function BalanceChart({
       },
       grid: {
         borderColor: '#374151',
-        xaxis: {
-          lines: {
-            show: false
-          }
-        },
-        yaxis: {
-          lines: {
-            show: true
-          }
-        }
+        xaxis: { lines: { show: false } },
+        yaxis: { lines: { show: true } }
       },
-      theme: {
-        mode: 'dark'
-      }
+      theme: { mode: 'dark' }
     };
 
-    // Series data
     const series = [
       {
-        name: 'Balance',
-        data: balanceData.map((d) => ({
-          x: d.timestamp,
-          y: d.balance
-        }))
+        name: 'Strategy Performance',
+        data: balanceData.map((d) => ({ x: d.timestamp, y: d.balance }))
       }
     ];
 
     return {
       balanceData,
-      stats,
+      stats: {
+        currentBalance: runningBalance,
+        totalReturn,
+        totalReturnPercent,
+        winRate,
+        totalTrades,
+        maxDrawdown,
+        activeSignals,
+        totalSignals: signals.length
+      },
       chartOptions,
       series
     };
-  }, [positions, accountSize]);
+  }, [signals, customData]);
 
-  const chartContent = (
-    <div className="h-full">
-      {!isMounted ? (
-        <div className="flex items-center justify-center h-full">
-          <div className="text-gray-400">Loading chart...</div>
-        </div>
-      ) : balanceData.length > 0 ? (
-        <div className="w-full h-full">
-          <Chart
-            options={chartOptions}
-            series={series}
-            type="area"
-            height="100%"
-          />
-        </div>
-      ) : (
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <div className="text-gray-400 text-lg mb-2">
-              No trading data available
-            </div>
-            <div className="text-gray-500 text-sm">
-              Generate sample data to see the chart
+  if (!isMounted) {
+    return (
+      <div className="flex items-center justify-center h-80">
+        <div className="text-gray-400">Loading chart...</div>
+      </div>
+    );
+  }
+
+  const content = (
+    <div className="space-y-6">
+      {/* Chart */}
+      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-white">
+            Strategy Performance
+          </h3>
+          <div className="flex items-center space-x-4 text-sm text-slate-400">
+            <div className="flex items-center space-x-1">
+              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+              <span>Performance</span>
             </div>
           </div>
         </div>
-      )}
+        <div className="h-80">
+          {signals && signals.length > 0 ? (
+            <Chart
+              options={chartOptions}
+              series={series}
+              type="area"
+              height="100%"
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center text-slate-400">
+                <div className="text-lg font-medium mb-2">No Trading Data</div>
+                <div className="text-sm">
+                  Start receiving signals to see performance metrics
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
+          <p className="text-sm font-medium text-slate-400">Total Return</p>
+          <p
+            className={`text-2xl font-bold ${stats.totalReturnPercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+          >
+            {stats.totalReturnPercent >= 0 ? '+' : ''}
+            {stats.totalReturnPercent.toFixed(2)}%
+          </p>
+        </div>
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
+          <p className="text-sm font-medium text-slate-400">Win Rate</p>
+          <p className="text-2xl font-bold text-white">
+            {stats.winRate.toFixed(1)}%
+          </p>
+        </div>
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
+          <p className="text-sm font-medium text-slate-400">Total Trades</p>
+          <p className="text-2xl font-bold text-white">{stats.totalTrades}</p>
+        </div>
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
+          <p className="text-sm font-medium text-slate-400">Max Drawdown</p>
+          <p className="text-2xl font-bold text-red-400">
+            {stats.maxDrawdown.toFixed(2)}%
+          </p>
+        </div>
+      </div>
     </div>
   );
 
-  if (!showContainer) {
-    return chartContent;
-  }
-
-  return (
-    <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-white">Account Balance</h2>
+  return showContainer ? (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-white">Performance Analysis</h2>
       </div>
-
-      {/* Chart */}
-      <div className="h-48">{chartContent}</div>
+      {content}
     </div>
+  ) : (
+    content
   );
 }

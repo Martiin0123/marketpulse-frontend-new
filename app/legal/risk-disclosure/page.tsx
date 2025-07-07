@@ -103,7 +103,7 @@ export default function RiskDisclosure() {
 
       <section className="mb-8">
         <h2 className="text-xl font-semibold mb-4">
-          6. Performance Guarantee and Refund Policy
+          6. No Loss Guarantee and Refund Policy
         </h2>
         <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-6 mb-4">
           <p className="font-bold mb-4 text-emerald-800">REFUND POLICY:</p>

@@ -1,24 +1,86 @@
 import Hero from '@/components/ui/Hero/Hero';
-import Features from '@/components/ui/Features/Features';
 import Testimonials from '@/components/ui/Testimonials/Testimonials';
-import Stats from '@/components/ui/Stats/Stats';
 import CTA from '@/components/ui/CTA/CTA';
+import Stats from '@/components/ui/Stats/Stats';
+import HowItWorks from '@/components/ui/HowItWorks/HowItWorks';
+import FAQ from '@/components/ui/FAQ/FAQ';
+import Features from '@/components/ui/Features/Features';
 import { createClient } from '@/utils/supabase/server';
 import { getUser } from '@/utils/supabase/queries';
 import { getSubscription } from '@/utils/supabase/queries';
 import {
-  getClosedPositionsCurrentMonth,
+  getClosedBybitSignalsCurrentMonth,
   getPositions
 } from '@/utils/supabase/queries';
+import { Metadata } from 'next';
+import {
+  ArrowUpRight,
+  TrendingUp,
+  Shield,
+  Zap,
+  Target,
+  X,
+  CheckCircle
+} from 'lucide-react';
 
 interface MonthlyPnL {
   totalPnL: number;
-  profitablePositions: number;
-  totalPositions: number;
+  profitableSignals: number;
+  totalSignals: number;
   monthlyData: { timestamp: number; value: number }[];
 }
 
-async function getMonthlyPnL(supabase: any): Promise<MonthlyPnL | undefined> {
+// SEO Metadata
+export const metadata: Metadata = {
+  title:
+    'MarketPulse - AI-Powered Trading Signals | Transform Your Trading Results',
+  description:
+    'Join 500+ successful traders using our AI-powered trading signals. Get real-time alerts with proven win rates, risk-free monthly guarantee, and instant access. Start profiting from the markets today.',
+  keywords:
+    'trading signals, AI trading, stock signals, forex signals, crypto signals, trading alerts, automated trading, trading bot, market analysis, trading strategy',
+  openGraph: {
+    title:
+      'MarketPulse - AI-Powered Trading Signals | Transform Your Trading Results',
+    description:
+      'Join 500+ successful traders using our AI-powered trading signals. Get real-time alerts with proven win rates and risk-free monthly guarantee.',
+    type: 'website',
+    url: 'https://marketpulse.com',
+    siteName: 'MarketPulse',
+    images: [
+      {
+        url: '/demo.png',
+        width: 1200,
+        height: 630,
+        alt: 'MarketPulse AI Trading Signals Dashboard'
+      }
+    ]
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'MarketPulse - AI-Powered Trading Signals',
+    description:
+      'Transform your trading with AI-powered signals. Join 500+ successful traders today.',
+    images: ['/demo.png']
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1
+    }
+  },
+  alternates: {
+    canonical: 'https://marketpulse.com'
+  }
+};
+
+async function getMonthlyBybitPnL(
+  supabase: any
+): Promise<MonthlyPnL | undefined> {
   // Get the start and end of the current month
   const now = new Date();
   const startOfMonth = new Date(
@@ -32,10 +94,9 @@ async function getMonthlyPnL(supabase: any): Promise<MonthlyPnL | undefined> {
     0
   ).toISOString();
 
-  const positions = await getClosedPositionsCurrentMonth(supabase);
-  console.log('positions', positions);
+  const signals = await getClosedBybitSignalsCurrentMonth(supabase);
 
-  // Calculate total PnL and count profitable positions
+  // Calculate total PnL and count profitable signals
   let runningBalance = 0;
   const monthlyData = [];
   const accountSize = 10000; // Default account size
@@ -46,32 +107,38 @@ async function getMonthlyPnL(supabase: any): Promise<MonthlyPnL | undefined> {
     value: 0
   });
 
-  // Process each position
-  positions.forEach((pos: any) => {
-    const pnlPercent = pos.pnl || 0;
+  // Process each signal
+  signals.forEach((sig: any) => {
+    const pnlPercent = sig.pnl_percentage || 0;
     const pnlDollar = (pnlPercent / 100) * accountSize;
     runningBalance += pnlDollar;
-
+    const exitTimestamp = sig.exit_timestamp
+      ? new Date(sig.exit_timestamp).getTime()
+      : Date.now();
     monthlyData.push({
-      timestamp: pos.exit_timestamp * 1000, // Convert to milliseconds
+      timestamp: exitTimestamp,
       value: runningBalance
     });
   });
 
   // Calculate stats
-  const result = positions.reduce(
-    (acc: MonthlyPnL, pos: { pnl: number }) => ({
+  const result = signals.reduce(
+    (acc: MonthlyPnL, sig: { pnl_percentage: number }) => ({
       ...acc,
-      totalPnL: acc.totalPnL + (pos.pnl || 0),
-      profitablePositions: acc.profitablePositions + (pos.pnl > 0 ? 1 : 0)
+      totalPnL: acc.totalPnL + (sig.pnl_percentage || 0),
+      profitableSignals:
+        acc.profitableSignals + ((sig.pnl_percentage || 0) > 0 ? 1 : 0)
     }),
-    { totalPnL: 0, profitablePositions: 0, totalPositions: 0, monthlyData: [] }
+    { totalPnL: 0, profitableSignals: 0, totalSignals: 0, monthlyData: [] }
   );
 
   return {
     ...result,
-    totalPositions: positions.length,
-    monthlyData
+    totalSignals: signals.length,
+    monthlyData,
+    // For compatibility with old prop names
+    profitablePositions: result.profitableSignals,
+    totalPositions: signals.length
   };
 }
 
@@ -79,16 +146,260 @@ export default async function HomePage() {
   const supabase = createClient();
   const user = await getUser(supabase);
   const subscription = user ? await getSubscription(supabase) : null;
-  const monthlyPnL = await getMonthlyPnL(supabase);
   const positions = await getPositions(supabase);
 
   return (
-    <div className="min-h-screen bg-slate-900">
-      <Hero user={user} monthlyPnL={monthlyPnL} positions={positions} />
-      <Stats />
-      <Features />
-      <Testimonials />
-      <CTA user={user} />
-    </div>
+    <>
+      {/* Limited Time Offer Banner */}
+      <div className="w-full bg-gradient-to-r from-emerald-500 via-blue-500 to-cyan-500 text-white text-center py-2 font-semibold tracking-wide shadow-lg relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-pulse"></div>
+        <div className="relative z-10">
+          Limited Time Offer:{' '}
+          <span className="font-bold">Get 20% Off Your First Month!</span> Use
+          code <span className="bg-white/20 px-2 py-1 rounded">TRADE20</span>
+        </div>
+      </div>
+
+      <div className="min-h-screen bg-slate-900 relative">
+        {/* Animated Background Elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl animate-pulse delay-500"></div>
+        </div>
+
+        <Hero user={user} positions={positions} />
+
+        {/* Stats Section */}
+        <Stats />
+
+        {/* How It Works Section */}
+        <HowItWorks />
+
+        {/* Features Section */}
+        <Features />
+
+        {/* Comparison Section */}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 my-20">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold text-white mb-4">
+              Why Choose{' '}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500">
+                MarketPulse
+              </span>
+              ?
+            </h2>
+            <p className="text-xl text-slate-400 max-w-3xl mx-auto">
+              See how we stack up against other trading signal services
+            </p>
+          </div>
+
+          <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* MarketPulse Column */}
+              <div className="relative">
+                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                  <div className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-4 py-2 rounded-full text-sm font-semibold">
+                    MarketPulse
+                  </div>
+                </div>
+                <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-xl p-6 mt-4">
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3">
+                      <CheckCircle className="w-5 h-5 text-emerald-500" />
+                      <span className="text-white font-medium">
+                        No Loss Guarantee
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <CheckCircle className="w-5 h-5 text-emerald-500" />
+                      <span className="text-white font-medium">
+                        Free Discord Community
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <CheckCircle className="w-5 h-5 text-emerald-500" />
+                      <span className="text-white font-medium">
+                        Real-time Signals
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <CheckCircle className="w-5 h-5 text-emerald-500" />
+                      <span className="text-white font-medium">
+                        Advanced Analytics
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <CheckCircle className="w-5 h-5 text-emerald-500" />
+                      <span className="text-white font-medium">
+                        Mobile Notifications
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <CheckCircle className="w-5 h-5 text-emerald-500" />
+                      <span className="text-white font-medium">
+                        24/7 Support
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Other Services Column */}
+              <div className="relative">
+                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                  <div className="bg-slate-600 text-white px-4 py-2 rounded-full text-sm font-semibold">
+                    Other Services
+                  </div>
+                </div>
+                <div className="bg-slate-700/50 border border-slate-600/50 rounded-xl p-6 mt-4">
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3">
+                      <X className="w-5 h-5 text-red-400" />
+                      <span className="text-slate-300">No Guarantee</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <X className="w-5 h-5 text-red-400" />
+                      <span className="text-slate-300">Paid Communities</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <CheckCircle className="w-5 h-5 text-emerald-500" />
+                      <span className="text-slate-300">Delayed Signals</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <X className="w-5 h-5 text-red-400" />
+                      <span className="text-slate-300">Basic Analytics</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <X className="w-5 h-5 text-red-400" />
+                      <span className="text-slate-300">Email Only</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <X className="w-5 h-5 text-red-400" />
+                      <span className="text-slate-300">Limited Support</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Traditional Trading Column */}
+              <div className="relative">
+                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                  <div className="bg-slate-600 text-white px-4 py-2 rounded-full text-sm font-semibold">
+                    Traditional Trading
+                  </div>
+                </div>
+                <div className="bg-slate-700/50 border border-slate-600/50 rounded-xl p-6 mt-4">
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3">
+                      <X className="w-5 h-5 text-red-400" />
+                      <span className="text-slate-300">High Risk</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <X className="w-5 h-5 text-red-400" />
+                      <span className="text-slate-300">No Guidance</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <X className="w-5 h-5 text-red-400" />
+                      <span className="text-slate-300">Manual Analysis</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <X className="w-5 h-5 text-red-400" />
+                      <span className="text-slate-300">No Analytics</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <X className="w-5 h-5 text-red-400" />
+                      <span className="text-slate-300">Miss Opportunities</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <X className="w-5 h-5 text-red-400" />
+                      <span className="text-slate-300">No Support</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Testimonials />
+
+        {/* Urgency Section */}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 my-20">
+          <div className="bg-gradient-to-r from-red-500/10 via-orange-500/10 to-yellow-500/10 backdrop-blur-sm border border-red-500/30 rounded-2xl p-8 text-center">
+            <div className="inline-flex items-center px-4 py-2 bg-red-500/20 rounded-full border border-red-500/30 mb-6">
+              <Zap className="w-4 h-4 text-red-400 mr-2" />
+              <span className="text-red-200 text-sm font-medium">
+                Limited Time Opportunity
+              </span>
+            </div>
+
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+              Don't Miss the Next Big Move
+            </h2>
+
+            <p className="text-lg text-slate-300 mb-6 max-w-2xl mx-auto">
+              Market volatility creates opportunities. Our AI is detecting
+              patterns that could lead to significant profits. Join now and
+              don't let the next profitable signal pass you by.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="bg-slate-800/30 rounded-xl p-6">
+                <div className="text-2xl font-bold text-emerald-400 mb-2">
+                  24/7
+                </div>
+                <div className="text-slate-400">Market Monitoring</div>
+              </div>
+              <div className="bg-slate-800/30 rounded-xl p-6">
+                <div className="text-2xl font-bold text-emerald-400 mb-2">
+                  Instant
+                </div>
+                <div className="text-slate-400">Signal Delivery</div>
+              </div>
+              <div className="bg-slate-800/30 rounded-xl p-6">
+                <div className="text-2xl font-bold text-emerald-400 mb-2">
+                  95%
+                </div>
+                <div className="text-slate-400">Accuracy Rate</div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <a
+                href="/pricing"
+                className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white rounded-lg font-semibold text-lg transition-all duration-300"
+              >
+                <Target className="w-5 h-5 mr-2" />
+                Start Trading Now
+              </a>
+              <a
+                href="https://discord.gg/N7taGVuz"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-8 py-4 bg-transparent border-2 border-slate-600 hover:border-slate-500 text-white rounded-lg font-semibold text-lg transition-all duration-300"
+              >
+                Join Free Community
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* FAQ Section */}
+        <FAQ />
+
+        <CTA user={user} />
+
+        {/* Floating Action Button */}
+        <div className="fixed bottom-8 right-8 z-50">
+          <a
+            href="/pricing"
+            className="group bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white p-4 rounded-full shadow-2xl hover:shadow-blue-500/25 transition-all duration-300 hover:scale-110"
+          >
+            <Target className="w-6 h-6" />
+          </a>
+        </div>
+      </div>
+    </>
   );
 }

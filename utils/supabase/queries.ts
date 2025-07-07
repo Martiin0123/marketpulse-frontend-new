@@ -535,7 +535,7 @@ export const ensureUserReferralCodeClient = async (supabase: SupabaseClient) => 
   return newReferralCode;
 };
 
-// New function to calculate pro-rated monthly performance for performance guarantee
+// New function to calculate pro-rated monthly performance for No Loss Guarantee
 export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClient, targetMonth?: string) => {
   const { data: { user } } = await supabase.auth.getUser();
   
@@ -632,9 +632,9 @@ export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClie
     isPeriodEnded
   });
 
-  // Get positions that both entered AND exited during the effective period
-  const { data: positions, error } = await supabase
-    .from('positions')
+  // Get signals that both entered AND exited during the effective period
+  const { data: signals, error } = await supabase
+    .from('signals')
     .select('*')
     .eq('status', 'closed')
     .not('exit_timestamp', 'is', null)
@@ -648,18 +648,18 @@ export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClie
   console.log('🔍 Performance Analysis Debug:', {
     effectiveStartDate: effectiveStartDate.toISOString(),
     effectiveEndDate: effectiveEndDate.toISOString(),
-    positionsFound: positions?.length || 0,
-    totalPnL: positions?.reduce((sum, p) => sum + (p.pnl || 0), 0) || 0,
-    positions: positions?.map(p => ({
-      id: p.id,
-      pnl: p.pnl,
-      entry_timestamp: p.entry_timestamp,
-      exit_timestamp: p.exit_timestamp,
-      symbol: p.symbol
+    signalsFound: signals?.length || 0,
+    totalPnL: signals?.reduce((sum, s) => sum + (s.pnl_percentage || 0), 0) || 0,
+    signals: signals?.map(s => ({
+      id: s.id,
+      pnl_percentage: s.pnl_percentage,
+      entry_timestamp: s.entry_timestamp,
+      exit_timestamp: s.exit_timestamp,
+      symbol: s.symbol
     }))
   });
 
-  if (error || !positions) {
+  if (error || !signals) {
     return {
       totalPnL: 0,
       totalPositions: 0,
@@ -675,9 +675,9 @@ export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClie
   }
 
   // Calculate performance
-  const totalPnL = positions.reduce((sum, pos) => sum + (pos.pnl || 0), 0);
-  const profitablePositions = positions.filter(pos => (pos.pnl || 0) > 0).length;
-  const totalPositions = positions.length;
+  const totalPnL = signals.reduce((sum, signal) => sum + (signal.pnl_percentage || 0), 0);
+  const profitablePositions = signals.filter(signal => (signal.pnl_percentage || 0) > 0).length;
+  const totalPositions = signals.length;
 
   return {
     totalPnL,
@@ -692,4 +692,31 @@ export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClie
     isPeriodEnded,
     positions
   };
+});
+
+export const getClosedBybitSignalsCurrentMonth = cache(async (supabase: SupabaseClient) => {
+  // Get the start and end of the current month
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+  // Convert to ISO strings for proper comparison
+  const startDate = startOfMonth.toISOString();
+  const endDate = endOfMonth.toISOString();
+
+  const { data: signals, error } = await supabase
+    .from('signals')
+    .select('*')
+    .eq('status', 'closed')
+    .eq('exchange', 'bybit')
+    .not('exit_timestamp', 'is', null)
+    .gte('exit_timestamp', startDate)
+    .lte('exit_timestamp', endDate)
+    .order('exit_timestamp', { ascending: false });
+
+  if (error) {
+    return [];
+  }
+
+  return signals;
 });

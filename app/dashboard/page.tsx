@@ -1,11 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/utils/supabase/server';
-import {
-  getUser,
-  getSubscription,
-  getPositions,
-  getSignals
-} from '@/utils/supabase/queries';
+import { getUser, getSubscription, getSignals } from '@/utils/supabase/queries';
 import Dashboard from '@/components/ui/Dashboard/Dashboard';
 
 export default async function DashboardPage() {
@@ -27,17 +22,14 @@ export default async function DashboardPage() {
     return redirect('/?message=subscription_required');
   }
 
-  const [positions, signals] = await Promise.all([
-    getPositions(supabase),
-    getSignals(supabase)
-  ]);
+  const signals = await getSignals(supabase);
 
   return (
     <Dashboard
       user={user}
       subscription={subscription}
-      positions={positions || []}
       signals={signals || []}
+      stats={{}}
     />
   );
 }

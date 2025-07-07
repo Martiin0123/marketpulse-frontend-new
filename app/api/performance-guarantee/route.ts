@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { getProRatedMonthlyPerformance } from '@/utils/supabase/queries';
-import { sendRefundRequestEmail } from '@/utils/email';
+import { sendRefundRequestToDiscord } from '@/utils/discord';
 
 export async function POST(request: NextRequest) {
   try {
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
         month_key: performance.monthKey,
         refund_amount: refundAmount,
         status: 'pending',
-        notes: `Performance guarantee refund request. P&L: ${performance.totalPnL}, Positions: ${performance.totalPositions}, Win Rate: ${performance.totalPositions > 0 ? ((performance.profitablePositions / performance.totalPositions) * 100).toFixed(1) : 0}%`
+        notes: `No Loss Guarantee refund request. P&L: ${performance.totalPnL}, Signals: ${performance.totalPositions}, Win Rate: ${performance.totalPositions > 0 ? ((performance.profitablePositions / performance.totalPositions) * 100).toFixed(1) : 0}%`
       })
       .select()
       .single();
@@ -93,29 +93,29 @@ export async function POST(request: NextRequest) {
     }
 
     // TODO: Send notification to admin (email, Slack, etc.)
-    console.log('🔔 PERFORMANCE GUARANTEE REFUND REQUEST:', {
+    console.log('🔔 NO LOSS GUARANTEE REFUND REQUEST:', {
       user_id: user.id,
       month: performance.monthKey,
       refund_amount: refundAmount,
       performance: performance.totalPnL,
-      positions: performance.totalPositions,
+      signals: performance.totalPositions,
       win_rate: performance.totalPositions > 0 ? ((performance.profitablePositions / performance.totalPositions) * 100).toFixed(1) : 0,
       request_id: refundRequest.id
     });
 
-    // Send email notification
-    const emailSent = await sendRefundRequestEmail({
+    // Send Discord notification
+    const discordSent = await sendRefundRequestToDiscord({
       requestId: refundRequest.id.toString(),
       userId: user.id,
       month: performance.monthKey,
       refundAmount,
       performance: performance.totalPnL,
-      positions: performance.totalPositions,
+      signals: performance.totalPositions,
       winRate: performance.totalPositions > 0 ? ((performance.profitablePositions / performance.totalPositions) * 100).toFixed(1) : '0'
-    });
+    }, process.env.DISCORD_WEBHOOK_URL_REFUNDS || '');
 
-    if (!emailSent) {
-      console.warn('⚠️ Failed to send email notification for refund request:', refundRequest.id);
+    if (!discordSent) {
+      console.warn('⚠️ Failed to send Discord notification for refund request:', refundRequest.id);
     }
 
     // For now, just return the calculated refund amount
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Performance guarantee error:', error);
+    console.error('No Loss Guarantee error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -206,7 +206,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Performance guarantee check error:', error);
+    console.error('No Loss Guarantee check error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 

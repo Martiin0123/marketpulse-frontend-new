@@ -1,5 +1,5 @@
 import { createClient } from '@/utils/supabase/server';
-import { getSubscription } from '@/utils/supabase/queries';
+import { getSubscription, getSignals } from '@/utils/supabase/queries';
 import {
   BarChart3,
   TrendingUp,
@@ -9,6 +9,88 @@ import {
   Percent
 } from 'lucide-react';
 
+// Helper function to calculate monthly returns from signals
+function calculateMonthlyReturns(signals: any[]) {
+  const monthlyData: { [key: string]: number } = {};
+
+  // Group signals by month and calculate returns
+  signals.forEach((signal) => {
+    if (signal.status === 'closed' && signal.pnl_percentage !== null) {
+      const date = new Date(signal.exit_timestamp || signal.created_at);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = 0;
+      }
+      monthlyData[monthKey] += signal.pnl_percentage;
+    }
+  });
+
+  // Convert to array format and sort by date
+  const monthlyReturns = Object.entries(monthlyData)
+    .map(([month, returnValue]) => ({
+      month: new Date(month + '-01').toLocaleDateString('en-US', {
+        month: 'short'
+      }),
+      return: returnValue,
+      date: month
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  return monthlyReturns;
+}
+
+// Helper function to calculate max drawdown
+function calculateMaxDrawdown(signals: any[]) {
+  let peak = 0;
+  let maxDrawdown = 0;
+  let runningBalance = 100;
+
+  const completedSignals = signals
+    .filter(
+      (signal) => signal.status === 'closed' && signal.pnl_percentage !== null
+    )
+    .sort(
+      (a, b) =>
+        new Date(a.exit_timestamp || a.created_at).getTime() -
+        new Date(b.exit_timestamp || b.created_at).getTime()
+    );
+
+  completedSignals.forEach((signal) => {
+    const pnl = signal.pnl_percentage || 0;
+    runningBalance *= 1 + pnl / 100;
+
+    if (runningBalance > peak) {
+      peak = runningBalance;
+    }
+
+    const drawdown = ((peak - runningBalance) / peak) * 100;
+    if (drawdown > maxDrawdown) {
+      maxDrawdown = drawdown;
+    }
+  });
+
+  return maxDrawdown;
+}
+
+// Helper function to calculate Sharpe ratio (simplified)
+function calculateSharpeRatio(signals: any[]) {
+  const completedSignals = signals.filter(
+    (signal) => signal.status === 'closed' && signal.pnl_percentage !== null
+  );
+
+  if (completedSignals.length === 0) return 0;
+
+  const returns = completedSignals.map((signal) => signal.pnl_percentage || 0);
+  const avgReturn = returns.reduce((sum, ret) => sum + ret, 0) / returns.length;
+  const variance =
+    returns.reduce((sum, ret) => sum + Math.pow(ret - avgReturn, 2), 0) /
+    returns.length;
+  const stdDev = Math.sqrt(variance);
+
+  return stdDev > 0 ? avgReturn / stdDev : 0;
+}
+
 export default async function PerformanceReports() {
   const supabase = createClient();
 
@@ -17,31 +99,50 @@ export default async function PerformanceReports() {
   } = await supabase.auth.getUser();
 
   const subscription = user ? await getSubscription(supabase) : null;
+  const signals = await getSignals(supabase);
 
-  // Mock performance data - in a real app, this would come from your database
+  // Calculate real performance metrics from signals
+  const completedTrades = signals.filter(
+    (signal) => signal.status === 'closed' && signal.pnl_percentage !== null
+  );
+
+  const totalTrades = signals.filter((signal) => signal.type === 'buy').length;
+  const profitableTrades = completedTrades.filter(
+    (signal) => (signal.pnl_percentage || 0) > 0
+  ).length;
+  const winRate =
+    completedTrades.length > 0
+      ? (profitableTrades / completedTrades.length) * 100
+      : 0;
+
+  const totalReturn = completedTrades.reduce(
+    (sum, signal) => sum + (signal.pnl_percentage || 0),
+    0
+  );
+  const averageTradeReturn =
+    completedTrades.length > 0 ? totalReturn / completedTrades.length : 0;
+
+  const monthlyReturns = calculateMonthlyReturns(signals);
+  const maxDrawdown = calculateMaxDrawdown(signals);
+  const sharpeRatio = calculateSharpeRatio(signals);
+
+  // Calculate average monthly return
+  const averageMonthlyReturn =
+    monthlyReturns.length > 0
+      ? monthlyReturns.reduce((sum, month) => sum + month.return, 0) /
+        monthlyReturns.length
+      : 0;
+
   const performanceData = {
-    totalReturn: 156.8,
-    monthlyReturn: 12.4,
-    winRate: 78.5,
-    totalTrades: 342,
-    profitableTrades: 268,
-    averageTradeReturn: 2.3,
-    maxDrawdown: -8.2,
-    sharpeRatio: 1.85,
-    monthlyReturns: [
-      { month: 'Jan', return: 8.2 },
-      { month: 'Feb', return: 12.1 },
-      { month: 'Mar', return: 6.8 },
-      { month: 'Apr', return: 15.3 },
-      { month: 'May', return: 9.7 },
-      { month: 'Jun', return: 11.2 },
-      { month: 'Jul', return: 13.5 },
-      { month: 'Aug', return: 7.9 },
-      { month: 'Sep', return: 16.1 },
-      { month: 'Oct', return: 14.8 },
-      { month: 'Nov', return: 18.2 },
-      { month: 'Dec', return: 12.4 }
-    ]
+    totalReturn,
+    monthlyReturn: averageMonthlyReturn,
+    winRate,
+    totalTrades,
+    profitableTrades,
+    averageTradeReturn,
+    maxDrawdown,
+    sharpeRatio,
+    monthlyReturns
   };
 
   return (
@@ -70,8 +171,11 @@ export default async function PerformanceReports() {
               <div className="p-2 bg-blue-500/20 rounded-lg">
                 <TrendingUp className="w-6 h-6 text-blue-400" />
               </div>
-              <span className="text-2xl font-bold text-green-400">
-                +{performanceData.totalReturn}%
+              <span
+                className={`text-2xl font-bold ${performanceData.totalReturn >= 0 ? 'text-green-400' : 'text-red-400'}`}
+              >
+                {performanceData.totalReturn >= 0 ? '+' : ''}
+                {performanceData.totalReturn.toFixed(2)}%
               </span>
             </div>
             <h3 className="text-slate-300 font-medium">Total Return</h3>
@@ -84,7 +188,7 @@ export default async function PerformanceReports() {
                 <Target className="w-6 h-6 text-emerald-400" />
               </div>
               <span className="text-2xl font-bold text-emerald-400">
-                {performanceData.winRate}%
+                {performanceData.winRate.toFixed(1)}%
               </span>
             </div>
             <h3 className="text-slate-300 font-medium">Win Rate</h3>
@@ -109,8 +213,11 @@ export default async function PerformanceReports() {
               <div className="p-2 bg-indigo-500/20 rounded-lg">
                 <DollarSign className="w-6 h-6 text-indigo-400" />
               </div>
-              <span className="text-2xl font-bold text-indigo-400">
-                +{performanceData.monthlyReturn}%
+              <span
+                className={`text-2xl font-bold ${performanceData.monthlyReturn >= 0 ? 'text-indigo-400' : 'text-red-400'}`}
+              >
+                {performanceData.monthlyReturn >= 0 ? '+' : ''}
+                {performanceData.monthlyReturn.toFixed(2)}%
               </span>
             </div>
             <h3 className="text-slate-300 font-medium">Monthly Return</h3>
@@ -126,28 +233,42 @@ export default async function PerformanceReports() {
               Monthly Performance
             </h3>
             <div className="space-y-4">
-              {performanceData.monthlyReturns.map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <Calendar className="w-4 h-4 text-slate-400" />
-                    <span className="text-slate-300">{item.month}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"
-                        style={{ width: `${Math.max(0, item.return)}%` }}
-                      />
+              {performanceData.monthlyReturns.length > 0 ? (
+                performanceData.monthlyReturns.map((item, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Calendar className="w-4 h-4 text-slate-400" />
+                      <span className="text-slate-300">{item.month}</span>
                     </div>
-                    <span
-                      className={`text-sm font-medium ${item.return >= 0 ? 'text-green-400' : 'text-red-400'}`}
-                    >
-                      {item.return >= 0 ? '+' : ''}
-                      {item.return}%
-                    </span>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"
+                          style={{
+                            width: `${Math.max(0, Math.min(item.return, 100))}%`
+                          }}
+                        />
+                      </div>
+                      <span
+                        className={`text-sm font-medium ${item.return >= 0 ? 'text-green-400' : 'text-red-400'}`}
+                      >
+                        {item.return >= 0 ? '+' : ''}
+                        {item.return.toFixed(2)}%
+                      </span>
+                    </div>
                   </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <Calendar className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+                  <p className="text-slate-400">
+                    No monthly data available yet
+                  </p>
                 </div>
-              ))}
+              )}
             </div>
           </div>
 
@@ -163,7 +284,7 @@ export default async function PerformanceReports() {
                   <span className="text-slate-300">Sharpe Ratio</span>
                 </div>
                 <span className="text-lg font-semibold text-green-400">
-                  {performanceData.sharpeRatio}
+                  {performanceData.sharpeRatio.toFixed(2)}
                 </span>
               </div>
 
@@ -173,7 +294,7 @@ export default async function PerformanceReports() {
                   <span className="text-slate-300">Max Drawdown</span>
                 </div>
                 <span className="text-lg font-semibold text-red-400">
-                  {performanceData.maxDrawdown}%
+                  {performanceData.maxDrawdown.toFixed(2)}%
                 </span>
               </div>
 
@@ -182,8 +303,11 @@ export default async function PerformanceReports() {
                   <DollarSign className="w-5 h-5 text-slate-400" />
                   <span className="text-slate-300">Avg Trade Return</span>
                 </div>
-                <span className="text-lg font-semibold text-blue-400">
-                  +{performanceData.averageTradeReturn}%
+                <span
+                  className={`text-lg font-semibold ${performanceData.averageTradeReturn >= 0 ? 'text-blue-400' : 'text-red-400'}`}
+                >
+                  {performanceData.averageTradeReturn >= 0 ? '+' : ''}
+                  {performanceData.averageTradeReturn.toFixed(2)}%
                 </span>
               </div>
 
@@ -193,8 +317,7 @@ export default async function PerformanceReports() {
                   <span className="text-slate-300">Profitable Trades</span>
                 </div>
                 <span className="text-lg font-semibold text-emerald-400">
-                  {performanceData.profitableTrades}/
-                  {performanceData.totalTrades}
+                  {performanceData.profitableTrades}/{completedTrades.length}
                 </span>
               </div>
             </div>
@@ -212,8 +335,8 @@ export default async function PerformanceReports() {
               involves substantial risk of loss.
             </p>
             <p>
-              • These performance metrics are based on historical data and may
-              not reflect actual trading results.
+              • These performance metrics are based on actual trading signals
+              and historical data.
             </p>
             <p>
               • Individual results may vary based on market conditions, timing,

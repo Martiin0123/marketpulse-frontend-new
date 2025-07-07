@@ -8,6 +8,16 @@ interface TradingSignal {
   description?: string;
 }
 
+interface RefundRequestData {
+  requestId: string;
+  userId: string;
+  month: string;
+  refundAmount: number;
+  performance: number;
+  signals: number;
+  winRate: string;
+}
+
 interface DiscordWebhookData {
   content?: string;
   embeds?: DiscordEmbed[];
@@ -135,3 +145,100 @@ export async function sendTradingSignalToDiscord(signal: TradingSignal, webhookU
   }
 }
 
+export async function sendRefundRequestToDiscord(data: RefundRequestData, webhookUrl: string) {
+  try {
+    // Validate webhook URL
+    if (!webhookUrl || !webhookUrl.includes('discord.com/api/webhooks/')) {
+      console.error('❌ Invalid Discord webhook URL for refunds');
+      return false;
+    }
+
+    // Create Discord embed for refund request
+    const embed: DiscordEmbed = {
+      title: '💰 No Loss Guarantee Refund Request',
+      description: `New refund request submitted for no loss guarantee`,
+      color: 0xffa500, // Orange color for refund requests
+      fields: [
+        {
+          name: 'Request ID',
+          value: data.requestId,
+          inline: true
+        },
+        {
+          name: 'User ID',
+          value: data.userId,
+          inline: true
+        },
+        {
+          name: 'Month',
+          value: data.month,
+          inline: true
+        },
+        {
+          name: 'Refund Amount',
+          value: `$${data.refundAmount.toFixed(2)}`,
+          inline: true
+        },
+        {
+          name: 'Performance',
+          value: `$${data.performance.toFixed(2)}`,
+          inline: true
+        },
+        {
+          name: 'Signals',
+          value: data.signals.toString(),
+          inline: true
+        },
+        {
+          name: 'Win Rate',
+          value: `${data.winRate}%`,
+          inline: true
+        }
+      ],
+      timestamp: new Date().toISOString(),
+      footer: {
+        text: 'MarketPulse No Loss Guarantee'
+      }
+    };
+
+    // Create webhook payload
+    const webhookData: DiscordWebhookData = {
+      username: 'MarketPulse Refund Bot',
+      avatar_url: 'https://marketpulse.com/logo.png', // Replace with your logo URL
+      embeds: [embed]
+    };
+
+    console.log('📡 Sending refund request to Discord:', {
+      requestId: data.requestId,
+      userId: data.userId,
+      refundAmount: data.refundAmount,
+      webhookUrl: webhookUrl.substring(0, 50) + '...'
+    });
+
+    // Send webhook
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(webhookData)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Discord webhook failed: ${response.status} ${errorText}`);
+    }
+
+    console.log('✅ Refund request sent to Discord successfully');
+    return true;
+
+  } catch (error: any) {
+    console.error('❌ Error sending refund request to Discord:', error);
+    console.error('🔍 Error details:', {
+      message: error.message,
+      status: error.status,
+      response: error.response
+    });
+    return false;
+  }
+}

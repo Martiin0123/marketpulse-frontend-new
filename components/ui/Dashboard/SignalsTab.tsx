@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { Tables } from '@/types_db';
 import { createClient } from '@/utils/supabase/client';
-import SignalCard from './SignalCard';
 import {
   TrendingUp,
   TrendingDown,
@@ -12,7 +11,17 @@ import {
   X,
   Clock,
   Link,
-  Unlink
+  Unlink,
+  BarChart3,
+  Target,
+  Zap,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  DollarSign,
+  Activity,
+  Bell,
+  Sparkles
 } from 'lucide-react';
 
 type Signal = Tables<'signals'>;
@@ -21,19 +30,18 @@ interface Props {
   signals: Signal[];
 }
 
-interface SignalGroup {
-  id: string;
-  symbol: string;
-  buySignal?: Signal;
-  sellSignal?: Signal;
-  isComplete: boolean;
-  timeRange: string;
-}
-
 export default function SignalsTab({ signals: initialSignals }: Props) {
   const [signals, setSignals] = useState<Signal[]>(initialSignals);
   const [searchTerm, setSearchTerm] = useState('');
-  const [groupedSignals, setGroupedSignals] = useState<SignalGroup[]>([]);
+  const [filterType, setFilterType] = useState<
+    'all' | 'buy' | 'sell' | 'close'
+  >('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'closed'>(
+    'all'
+  );
+  const [filterExchange, setFilterExchange] = useState<
+    'all' | 'bybit' | 'alpaca'
+  >('all');
   const supabase = createClient();
 
   useEffect(() => {
@@ -52,7 +60,11 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
             setSignals((current) => {
               const newSignal = payload.new as Signal;
               const newSignals = [...current, newSignal];
-              return newSignals.sort((a, b) => Number(b.id) - Number(a.id));
+              return newSignals.sort(
+                (a, b) =>
+                  new Date(b.created_at).getTime() -
+                  new Date(a.created_at).getTime()
+              );
             });
           } else if (payload.eventType === 'UPDATE') {
             setSignals((current) =>
@@ -70,109 +82,49 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
     };
   }, [supabase]);
 
-  // --- New grouping logic: pair buys and sells in order for each symbol ---
-  useEffect(() => {
-    const groups: SignalGroup[] = [];
-    const signalsBySymbol: { [symbol: string]: Signal[] } = {};
-
-    // 1. Group signals by symbol and sort by created_at
-    signals.forEach((signal) => {
-      if (!signalsBySymbol[signal.symbol]) signalsBySymbol[signal.symbol] = [];
-      signalsBySymbol[signal.symbol].push(signal);
-    });
-    Object.values(signalsBySymbol).forEach((signalList) =>
-      signalList.sort(
-        (a, b) =>
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      )
-    );
-
-    // 2. Pair buys and sells in order
-    Object.entries(signalsBySymbol).forEach(([symbol, signalList]) => {
-      const buys: Signal[] = [];
-      const sells: Signal[] = [];
-      signalList.forEach((sig) => {
-        if (sig.type === 'buy') buys.push(sig);
-        else if (sig.type === 'sell' || sig.type === 'close') sells.push(sig);
-      });
-
-      let i = 0;
-      for (; i < Math.max(buys.length, sells.length); i++) {
-        const buySignal = buys[i];
-        const sellSignal = sells[i];
-        groups.push({
-          id: `${symbol}-${buySignal?.id || ''}-${sellSignal?.id || ''}`,
-          symbol,
-          buySignal,
-          sellSignal,
-          isComplete: !!(buySignal && sellSignal),
-          timeRange:
-            buySignal && sellSignal
-              ? 'Complete'
-              : buySignal
-                ? 'Waiting for Sell'
-                : 'Waiting for Buy'
-        });
-      }
-    });
-    const sortedGroups = groups.sort((a, b) => {
-      // Sort by buy signal timestamp first, then sell signal if no buy
-      const aBuyTime = a.buySignal
-        ? new Date(a.buySignal.created_at).getTime()
-        : 0;
-      const bBuyTime = b.buySignal
-        ? new Date(b.buySignal.created_at).getTime()
-        : 0;
-
-      // If both have buy signals, sort by buy time (most recent first)
-      if (aBuyTime > 0 && bBuyTime > 0) {
-        return bBuyTime - aBuyTime;
-      }
-
-      // If only one has buy signal, prioritize the one with buy signal
-      if (aBuyTime > 0 && bBuyTime === 0) return -1;
-      if (aBuyTime === 0 && bBuyTime > 0) return 1;
-
-      // If neither has buy signal, sort by sell signal time
-      const aSellTime = a.sellSignal
-        ? new Date(a.sellSignal.created_at).getTime()
-        : 0;
-      const bSellTime = b.sellSignal
-        ? new Date(b.sellSignal.created_at).getTime()
-        : 0;
-
-      return bSellTime - aSellTime;
-    });
-
-    console.log('Sorted groups (most recent first):', sortedGroups);
-    setGroupedSignals(sortedGroups);
-  }, [signals]);
-
-  // Filter signals based on search term only
-  const filteredGroups = groupedSignals.filter((group) => {
-    const matchesSearch = group.symbol
+  // Filter signals based on search and filters
+  const filteredSignals = signals.filter((signal) => {
+    const matchesSearch = signal.symbol
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
+    const matchesType = filterType === 'all' || signal.type === filterType;
+    const matchesStatus =
+      filterStatus === 'all' || signal.status === filterStatus;
+    const matchesExchange =
+      filterExchange === 'all' || signal.exchange === filterExchange;
 
-    return matchesSearch;
+    return matchesSearch && matchesType && matchesStatus && matchesExchange;
   });
 
+  // Calculate statistics - only count completed trades (BUY signals that are closed)
+  const totalSignals = signals.length;
   const buySignals = signals.filter((signal) => signal.type === 'buy');
   const sellSignals = signals.filter((signal) => signal.type === 'sell');
   const closeSignals = signals.filter((signal) => signal.type === 'close');
+  const activeSignals = signals.filter((signal) => signal.status === 'active');
+  const unclosedSignals = signals.filter(
+    (signal) => signal.status === 'active' || signal.status === 'executed'
+  );
+  const completedTrades = signals.filter(
+    (signal) =>
+      signal.type === 'buy' &&
+      signal.status === 'closed' &&
+      signal.pnl_percentage !== null
+  );
+  const winningTrades = completedTrades.filter(
+    (signal) => (signal.pnl_percentage || 0) > 0
+  );
+  const winRate =
+    completedTrades.length > 0
+      ? (winningTrades.length / completedTrades.length) * 100
+      : 0;
+  const totalPnL = completedTrades.reduce(
+    (sum, signal) => sum + (signal.pnl_percentage || 0),
+    0
+  );
 
-  const formatTime = (timestamp: string | number) => {
-    let date: Date;
-    if (typeof timestamp === 'number') {
-      // Check if it's already in milliseconds (13 digits) or seconds (10 digits)
-      if (timestamp.toString().length === 13) {
-        date = new Date(timestamp);
-      } else {
-        date = new Date(timestamp * 1000);
-      }
-    } else {
-      date = new Date(timestamp);
-    }
+  const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp);
     const now = new Date();
     const diffInMinutes = Math.floor(
       (now.getTime() - date.getTime()) / (1000 * 60)
@@ -187,164 +139,302 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
     }
   };
 
+  const isNewSignal = (timestamp: string) => {
+    const signalTime = new Date(timestamp).getTime();
+    const now = new Date().getTime();
+    const diffInMinutes = (now - signalTime) / (1000 * 60);
+    return diffInMinutes < 30; // Consider signals from last 30 minutes as "new"
+  };
+
+  const getSignalIcon = (type: string) => {
+    switch (type) {
+      case 'buy':
+        return <TrendingUp className="w-4 h-4 text-emerald-400" />;
+      case 'sell':
+        return <TrendingDown className="w-4 h-4 text-red-400" />;
+      case 'close':
+        return <XCircle className="w-4 h-4 text-orange-400" />;
+      default:
+        return <Activity className="w-4 h-4 text-slate-400" />;
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'active':
+        return <CheckCircle className="w-4 h-4 text-emerald-400" />;
+      case 'closed':
+        return <XCircle className="w-4 h-4 text-slate-400" />;
+      default:
+        return <AlertTriangle className="w-4 h-4 text-yellow-400" />;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white mb-2">
-            Trading Signals
-          </h2>
-          <p className="text-slate-400">
-            Real-time signals and market analysis
-          </p>
-        </div>
-        <div className="flex items-center space-x-4 text-sm text-slate-400">
-          <div className="flex items-center space-x-1">
-            <TrendingUp className="w-4 h-4 text-emerald-500" />
-            <span>{buySignals.length} Buy</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <TrendingDown className="w-4 h-4 text-red-500" />
-            <span>{sellSignals.length} Sell</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <X className="w-4 h-4 text-purple-500" />
-            <span>{closeSignals.length} Close</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <input
-          type="text"
-          placeholder="Search signals..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-full text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
-        />
-      </div>
-
-      {/* Signals Grid */}
-      {filteredGroups.length === 0 ? (
-        <div className="text-center py-16">
-          <TrendingUp className="mx-auto h-12 w-12 text-slate-500 mb-4" />
-          <h3 className="text-lg font-medium text-slate-300 mb-2">
-            No signals found
-          </h3>
-          <p className="text-slate-500">
-            {searchTerm
-              ? 'Try adjusting your search'
-              : 'Signals will appear here as they are generated'}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {filteredGroups.slice(0, 12).map((group) => (
-            <div key={group.id} className="space-y-4">
-              {/* Group Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <h3 className="text-lg font-semibold text-white">
-                    {group.symbol}
-                  </h3>
-                  <div className="flex items-center space-x-2">
-                    {group.isComplete ? (
-                      <div className="flex items-center space-x-1 text-emerald-400">
-                        <Link className="w-4 h-4" />
-                        <span className="text-sm">Complete</span>
-                      </div>
-                    ) : group.buySignal && !group.sellSignal ? (
-                      <div className="flex items-center space-x-1 text-blue-400">
-                        <TrendingUp className="w-4 h-4" />
-                        <span className="text-sm">Waiting for Sell</span>
-                      </div>
-                    ) : group.sellSignal && !group.buySignal ? (
-                      <div className="flex items-center space-x-1 text-red-400">
-                        <TrendingDown className="w-4 h-4" />
-                        <span className="text-sm">Waiting for Buy</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center space-x-1 text-yellow-400">
-                        <Unlink className="w-4 h-4" />
-                        <span className="text-sm">Open</span>
-                      </div>
-                    )}
-                    <span className="text-xs text-slate-500 bg-slate-700/50 px-2 py-1 rounded">
-                      {group.timeRange}
+          <div className="flex items-center space-x-3 mb-2">
+            <h2 className="text-2xl font-bold text-white">
+              Trading Signals Analysis
+            </h2>
+            {unclosedSignals.length > 0 && (
+              <div className="flex items-center space-x-2">
+                <div className="bg-orange-500/20 border border-orange-500/30 rounded-full px-3 py-1">
+                  <div className="flex items-center space-x-1">
+                    <Bell className="w-3 h-3 text-orange-400" />
+                    <span className="text-xs font-medium text-orange-300">
+                      {unclosedSignals.length} Unclosed
                     </span>
                   </div>
                 </div>
               </div>
+            )}
+          </div>
+          <p className="text-slate-400">
+            Comprehensive analysis of your Pine Script strategy signals
+          </p>
+        </div>
+      </div>
 
-              {/* Signal Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative">
-                {group.buySignal && (
-                  <div className="relative">
-                    <SignalCard signal={group.buySignal} />
-                    {group.isComplete && (
-                      <div className="absolute -top-2 -right-2 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
-                        <TrendingUp className="w-2 h-2 text-white" />
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Percentage Gain Badge for Complete Pairs */}
-                {group.isComplete && group.buySignal && group.sellSignal && (
-                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20">
-                    {(() => {
-                      const buyPrice = group.buySignal.entry_price;
-                      const sellPrice = group.sellSignal.entry_price;
-                      const percentageGain =
-                        ((sellPrice - buyPrice) / buyPrice) * 100;
-                      const isProfit = percentageGain > 0;
-
-                      return (
-                        <div
-                          className={`px-3 py-1 rounded-full text-xs font-medium shadow-md border border-slate-700 ${
-                            isProfit
-                              ? 'bg-emerald-500/80 text-white'
-                              : 'bg-red-500/80 text-white'
-                          }`}
-                        >
-                          {isProfit ? '+' : ''}
-                          {percentageGain.toFixed(2)}%
-                        </div>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                {group.sellSignal && (
-                  <div className="relative">
-                    <SignalCard
-                      signal={group.sellSignal}
-                      isPartOfCompleteGroup={group.isComplete}
-                    />
-                    {group.isComplete && (
-                      <div className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
-                        <TrendingDown className="w-2 h-2 text-white" />
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-blue-500/20 rounded-lg">
+              <Zap className="w-6 h-6 text-blue-400" />
             </div>
-          ))}
+            <div className="ml-4">
+              <p className="text-sm font-medium text-slate-400">
+                Total Signals
+              </p>
+              <p className="text-2xl font-bold text-white">{totalSignals}</p>
+            </div>
+          </div>
         </div>
-      )}
 
-      {/* Show More Button */}
-      {filteredGroups.length > 12 && (
-        <div className="text-center">
-          <button className="px-6 py-3 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 hover:border-slate-600/50 rounded-full text-slate-300 hover:text-white transition-all duration-300">
-            Show More Signals
-          </button>
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-emerald-500/20 rounded-lg">
+              <Target className="w-6 h-6 text-emerald-400" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-slate-400">Win Rate</p>
+              <p className="text-2xl font-bold text-white">
+                {winRate.toFixed(1)}%
+              </p>
+              <p className="text-xs text-slate-500">
+                {winningTrades.length} / {completedTrades.length}
+              </p>
+            </div>
+          </div>
         </div>
-      )}
+
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-cyan-500/20 rounded-lg">
+              <DollarSign className="w-6 h-6 text-cyan-400" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-slate-400">Total P&L</p>
+              <p
+                className={`text-2xl font-bold ${totalPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+              >
+                {totalPnL >= 0 ? '+' : ''}
+                {totalPnL.toFixed(2)}%
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-indigo-500/20 rounded-lg">
+              <BarChart3 className="w-6 h-6 text-indigo-400" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-slate-400">
+                Active Signals
+              </p>
+              <p className="text-2xl font-bold text-white">
+                {activeSignals.length}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Search */}
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Search symbols..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Type Filter */}
+          <div className="flex gap-2">
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value as any)}
+              className="px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Types</option>
+              <option value="buy">Buy</option>
+              <option value="sell">Sell</option>
+              <option value="close">Close</option>
+            </select>
+
+            {/* Status Filter */}
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as any)}
+              className="px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="closed">Closed</option>
+            </select>
+
+            {/* Exchange Filter */}
+            <select
+              value={filterExchange}
+              onChange={(e) => setFilterExchange(e.target.value as any)}
+              className="px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Exchanges</option>
+              <option value="bybit">Bybit</option>
+              <option value="alpaca">Alpaca</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Signals Table */}
+      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-700">
+            <thead className="bg-slate-900/50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                  Signal
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                  Symbol
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                  Entry Price
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                  Exit Price
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                  P&L (%)
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                  Exchange
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                  Created
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700">
+              {filteredSignals.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-6 py-12 text-center">
+                    <Zap className="mx-auto h-12 w-12 text-slate-500 mb-4" />
+                    <h3 className="text-lg font-medium text-slate-300 mb-2">
+                      No signals found
+                    </h3>
+                    <p className="text-slate-500">
+                      Try adjusting your filters or wait for new signals from
+                      your Pine Script strategy.
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                filteredSignals.map((signal) => {
+                  const isNew = isNewSignal(signal.created_at);
+                  return (
+                    <tr
+                      key={signal.id}
+                      className={`hover:bg-slate-700/30 transition-all duration-200 ${
+                        isNew
+                          ? 'bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-l-4 border-blue-500'
+                          : ''
+                      }`}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          {getSignalIcon(signal.type)}
+                          <span className="ml-2 text-sm font-medium text-white">
+                            {signal.type?.toUpperCase()}
+                          </span>
+                          {isNew && (
+                            <div className="ml-2 flex items-center space-x-1 bg-blue-500/20 border border-blue-500/30 rounded-full px-2 py-1">
+                              <Sparkles className="w-3 h-3 text-blue-400" />
+                              <span className="text-xs font-medium text-blue-300">
+                                NEW
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
+                        {signal.symbol}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                        ${Number(signal.entry_price).toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                        {signal.exit_price
+                          ? `$${Number(signal.exit_price).toFixed(2)}`
+                          : '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          {getStatusIcon(signal.status)}
+                          <span className="ml-2 text-sm font-medium text-white">
+                            {signal.status?.toUpperCase()}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <span
+                          className={`${(signal.pnl_percentage || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+                        >
+                          {(signal.pnl_percentage || 0) >= 0 ? '+' : ''}
+                          {(signal.pnl_percentage || 0).toFixed(2)}%
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                        <span className="capitalize">{signal.exchange}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                        {formatTime(signal.created_at)}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

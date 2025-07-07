@@ -379,24 +379,66 @@ export type Database = {
           symbol: string
           type: string
           entry_price: number
+          exit_price: number | null
+          exit_timestamp: string | null
+          pnl_percentage: number | null
+          status: string
           created_at: string
-          metadata: Json | null
+          exchange: string
+          signal_source: string
+          strategy_name: string
+          timeframe: string | null
+          rsi_value: number | null
+          smoothing_ma_value: number | null
+          long_term_ma_value: number | null
+          divergence_type: string | null
+          exit_reason: string | null
+          alert_message: string | null
+          technical_metadata: Json | null
         }
         Insert: {
           id?: string
           symbol: string
           type: string
           entry_price: number
+          exit_price?: number | null
+          exit_timestamp?: string | null
+          pnl_percentage?: number | null
+          status?: string
           created_at?: string
-          metadata?: Json | null
+          exchange?: string
+          signal_source?: string
+          strategy_name?: string
+          timeframe?: string | null
+          rsi_value?: number | null
+          smoothing_ma_value?: number | null
+          long_term_ma_value?: number | null
+          divergence_type?: string | null
+          exit_reason?: string | null
+          alert_message?: string | null
+          technical_metadata?: Json | null
         }
         Update: {
           id?: string
           symbol?: string
           type?: string
           entry_price?: number
+          exit_price?: number | null
+          exit_timestamp?: string | null
+          pnl_percentage?: number | null
+          status?: string
           created_at?: string
-          metadata?: Json | null
+          exchange?: string
+          signal_source?: string
+          strategy_name?: string
+          timeframe?: string | null
+          rsi_value?: number | null
+          smoothing_ma_value?: number | null
+          long_term_ma_value?: number | null
+          divergence_type?: string | null
+          exit_reason?: string | null
+          alert_message?: string | null
+          technical_metadata?: Json | null
         }
         Relationships: []
       }

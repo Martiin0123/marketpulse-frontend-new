@@ -3,58 +3,31 @@ import { Star, Quote } from 'lucide-react';
 export default function Testimonials() {
   const testimonials = [
     {
-      name: 'Sarah Chen',
-      role: 'Day Trader',
-      location: 'San Francisco, CA',
-      avatar: 'SC',
-      rating: 5,
-      text: "PrimeScope completely transformed my trading strategy. The AI signals are incredibly accurate, and I've seen a 340% increase in my portfolio since I started using it 6 months ago.",
-      highlight: '340% portfolio increase'
-    },
-    {
-      name: 'Michael Rodriguez',
-      role: 'Investment Manager',
-      location: 'New York, NY',
-      avatar: 'MR',
-      rating: 5,
-      text: 'The real-time notifications have saved me from so many bad trades. The risk management features are top-notch, and the mobile app keeps me connected to the markets 24/7.',
-      highlight: 'Avoided major losses'
-    },
-    {
-      name: 'Alex Thompson',
-      role: 'Crypto Trader',
-      location: 'London, UK',
-      avatar: 'AT',
-      rating: 5,
-      text: "I was skeptical at first, but PrimeScope's crypto signals are unmatched. The platform helped me navigate the volatile crypto market and achieve consistent profits.",
-      highlight: 'Consistent crypto profits'
-    },
-    {
-      name: 'Emma Wilson',
-      role: 'Swing Trader',
-      location: 'Toronto, CA',
-      avatar: 'EW',
-      rating: 5,
-      text: 'The technical analysis tools are phenomenal. I love how the platform adapts to my trading style and provides personalized insights that actually work.',
-      highlight: 'Personalized insights'
-    },
-    {
-      name: 'David Kim',
-      role: 'Portfolio Manager',
-      location: 'Seoul, KR',
-      avatar: 'DK',
-      rating: 5,
-      text: 'Managing multiple portfolios is so much easier with PrimeScope. The AI-powered risk assessment has helped me optimize returns while minimizing downside risk.',
-      highlight: 'Optimized risk/return'
-    },
-    {
-      name: 'Lisa Johnson',
+      name: 'Tom',
       role: 'Part-time Trader',
-      location: 'Sydney, AU',
-      avatar: 'LJ',
+      location: 'Berlin, DE',
+      avatar: 'T',
       rating: 5,
-      text: "As someone who can only trade part-time, the 24/7 monitoring is a game-changer. I never miss opportunities, even when I'm at my day job.",
-      highlight: 'Never miss opportunities'
+      text: "I've been using MarketPulse for 4 months. The signals are clear and easy to follow. My trading is much more consistent now.",
+      highlight: 'Consistent results'
+    },
+    {
+      name: 'Julia',
+      role: 'Crypto Enthusiast',
+      location: 'Amsterdam, NL',
+      avatar: 'J',
+      rating: 5,
+      text: 'The Discord community is super helpful. I like that I can ask questions and get real feedback.',
+      highlight: 'Helpful community'
+    },
+    {
+      name: 'Mark',
+      role: 'New to Trading',
+      location: 'Manchester, UK',
+      avatar: 'M',
+      rating: 5,
+      text: "No Loss Guarantee gave me the confidence to try new strategies. It's a great safety net for new traders.",
+      highlight: 'Confidence boost'
     }
   ];
 

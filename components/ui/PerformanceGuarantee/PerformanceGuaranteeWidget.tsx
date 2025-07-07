@@ -93,7 +93,7 @@ export default function PerformanceGuaranteeWidget() {
       <div className="w-full bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl shadow-2xl p-8">
         <div className="text-center mb-8">
           <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 bg-clip-text text-transparent mb-2">
-            Performance Guarantee
+            No Loss Guarantee
           </h3>
         </div>
         <div className="animate-pulse space-y-4">
@@ -110,7 +110,7 @@ export default function PerformanceGuaranteeWidget() {
       <div className="w-full bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl shadow-2xl p-8">
         <div className="text-center mb-8">
           <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 bg-clip-text text-transparent mb-2">
-            Performance Guarantee
+            No Loss Guarantee
           </h3>
         </div>
         <div className="text-center py-8">
@@ -133,7 +133,7 @@ export default function PerformanceGuaranteeWidget() {
             No active subscription found
           </p>
           <p className="text-slate-500 mt-2">
-            Subscribe to access performance guarantee
+            Subscribe to access No Loss Guarantee
           </p>
         </div>
       </div>
@@ -174,7 +174,7 @@ export default function PerformanceGuaranteeWidget() {
         <div className="text-center mb-8">
           <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 bg-clip-text text-transparent mb-2">
             <span className="mr-2">{getStatusIcon()}</span>
-            Performance Guarantee
+            No Loss Guarantee
           </h3>
         </div>
 
@@ -218,7 +218,7 @@ export default function PerformanceGuaranteeWidget() {
               <div className="text-3xl font-bold text-white mb-1">
                 {perf.totalPositions}
               </div>
-              <div className="text-sm text-slate-400">Positions</div>
+              <div className="text-sm text-slate-400">Signals</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-white mb-1">

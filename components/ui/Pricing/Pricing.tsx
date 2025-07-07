@@ -76,6 +76,19 @@ export default function Pricing({ user, products, subscription }: Props) {
     )
   ).filter(Boolean) as BillingInterval[];
 
+  // Debug logging
+  console.log('[CLIENT] Available intervals:', intervals);
+  console.log(
+    '[CLIENT] Products with prices:',
+    products.map((p) => ({
+      name: p.name,
+      prices: p.prices?.map((price) => ({
+        interval: price.interval,
+        unit_amount: price.unit_amount
+      }))
+    }))
+  );
+
   useEffect(() => {
     if (intervals.length > 0 && !intervals.includes(billingInterval)) {
       setBillingInterval(intervals[0]);
@@ -208,44 +221,40 @@ export default function Pricing({ user, products, subscription }: Props) {
 
             {/* Billing Interval Toggle */}
             <div className="relative inline-flex bg-slate-800/50 backdrop-blur-sm rounded-full p-2 border border-slate-700/50 shadow-xl mb-12">
-              {intervals.includes('month') && (
-                <button
-                  onClick={() => setBillingInterval('month')}
-                  type="button"
-                  className={`${
-                    billingInterval === 'month'
-                      ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg'
-                      : 'text-slate-400 hover:text-white'
-                  } relative px-8 py-3 text-sm font-medium rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:scale-105`}
-                >
-                  Monthly
-                </button>
-              )}
-              {intervals.includes('year') && (
-                <button
-                  onClick={() => setBillingInterval('year')}
-                  type="button"
-                  className={`${
-                    billingInterval === 'year'
-                      ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg'
-                      : 'text-slate-400 hover:text-white'
-                  } relative px-8 py-3 text-sm font-medium rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:scale-105`}
-                >
-                  Yearly
-                  <span className="ml-2 inline-flex items-center px-3 py-1 rounded-full text-xs bg-emerald-500/20 text-emerald-300 font-medium">
-                    Save 20%
-                  </span>
-                </button>
-              )}
+              <button
+                onClick={() => setBillingInterval('month')}
+                type="button"
+                className={`${
+                  billingInterval === 'month'
+                    ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg'
+                    : 'text-slate-400 hover:text-white'
+                } relative px-8 py-3 text-sm font-medium rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:scale-105`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setBillingInterval('year')}
+                type="button"
+                className={`${
+                  billingInterval === 'year'
+                    ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg'
+                    : 'text-slate-400 hover:text-white'
+                } relative px-8 py-3 text-sm font-medium rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:scale-105`}
+              >
+                Yearly
+                <span className="ml-2 inline-flex items-center px-3 py-1 rounded-full text-xs bg-emerald-500/20 text-emerald-300 font-medium">
+                  Save 20%
+                </span>
+              </button>
             </div>
           </div>
 
-          {/* Money Back Guarantee */}
+          {/* No Loss Guarantee */}
           <div className="text-center mb-12">
             <div className="inline-flex items-center px-6 py-3 bg-emerald-500/10 backdrop-blur-sm rounded-full border border-emerald-500/30">
               <Shield className="w-5 h-5 text-emerald-400 mr-3" />
               <span className="text-emerald-200 text-sm font-medium">
-                Performance Guarantee
+                No Loss Guarantee
               </span>
             </div>
             <div className="mt-4 max-w-2xl mx-auto">
@@ -261,7 +270,7 @@ export default function Pricing({ user, products, subscription }: Props) {
 
           {/* Pricing Cards */}
           <div className="flex justify-center">
-            <div className="grid grid-cols-1 gap-8 max-w-md">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl w-full">
               {products.map((product, index) => {
                 const price = product?.prices?.find(
                   (price) => price.interval === billingInterval
@@ -289,8 +298,10 @@ export default function Pricing({ user, products, subscription }: Props) {
                           isPopular,
                         'border-emerald-500/50 shadow-2xl shadow-emerald-500/25 bg-slate-800/40':
                           isCurrentPlan,
+                        'border-purple-500/50 shadow-2xl shadow-purple-500/25 bg-slate-800/40':
+                          index === 2,
                         'border-slate-700/50 hover:border-slate-600/50 bg-slate-800/20':
-                          !isPopular && !isCurrentPlan
+                          !isPopular && !isCurrentPlan && index !== 2
                       }
                     )}
                   >
@@ -314,6 +325,16 @@ export default function Pricing({ user, products, subscription }: Props) {
                       </div>
                     )}
 
+                    {/* Limited Badge for 3rd option */}
+                    {index === 2 && (
+                      <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
+                        <div className="bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
+                          <AlertTriangle className="w-4 h-4 mr-2" />
+                          only 10 Spots
+                        </div>
+                      </div>
+                    )}
+
                     {/* Plan Header */}
                     <div className="text-center mb-8">
                       {/* Price */}
@@ -333,6 +354,88 @@ export default function Pricing({ user, products, subscription }: Props) {
                         {product.description}
                       </p>
 
+                      {/* Feature Indicators */}
+                      <div className="mb-6">
+                        {index === 0 && (
+                          <div className="flex items-center space-x-2 p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                            <Bell className="w-4 h-4 text-blue-400" />
+                            <div>
+                              <p className="text-blue-200 text-sm font-medium">
+                                Free Trading Signals
+                              </p>
+                              <p className="text-slate-400 text-xs">
+                                Occasional signals (limited frequency)
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {index === 1 && (
+                          <div className="flex items-center space-x-2 p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
+                            <Zap className="w-4 h-4 text-emerald-400" />
+                            <div>
+                              <p className="text-emerald-200 text-sm font-medium">
+                                All Discord Trading Signals
+                              </p>
+                              <p className="text-slate-400 text-xs">
+                                Real-time signals via Discord
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {index === 2 && (
+                          <div className="flex items-center space-x-2 p-3 bg-purple-500/10 rounded-lg border border-purple-500/30">
+                            <BarChart3 className="w-4 h-4 text-purple-400" />
+                            <div>
+                              <p className="text-purple-200 text-sm font-medium">
+                                Automatic Trading API
+                              </p>
+                              <p className="text-slate-400 text-xs">
+                                Full automation with API access
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Additional info boxes for balance */}
+                      {index === 0 && (
+                        <div className="mb-6 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                          <p className="text-blue-200 text-sm font-medium mb-2">
+                            🎯 Perfect for Beginners
+                          </p>
+                          <p className="text-slate-400 text-xs">
+                            Try our signals risk-free and upgrade when you're
+                            ready
+                          </p>
+                        </div>
+                      )}
+
+                      {index === 1 && (
+                        <div className="mb-6 p-4 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
+                          <p className="text-emerald-200 text-sm font-medium mb-2">
+                            ⚡ Most Popular Choice
+                          </p>
+                          <p className="text-slate-400 text-xs">
+                            Join 500+ traders getting real-time Discord signals
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Limited spots notice for 3rd option */}
+                      {index === 2 && (
+                        <div className="mb-6 p-4 bg-purple-500/10 rounded-lg border border-purple-500/30">
+                          <p className="text-purple-200 text-sm font-medium mb-2">
+                            ⚠️ Limited Availability
+                          </p>
+                          <p className="text-slate-400 text-xs">
+                            Only accepting qualified traders. Application
+                            required.
+                          </p>
+                        </div>
+                      )}
+
                       {/* CTA Button */}
                       {isCurrentPlan ? (
                         <Button
@@ -342,6 +445,21 @@ export default function Pricing({ user, products, subscription }: Props) {
                         >
                           View Dashboard
                         </Button>
+                      ) : index === 2 ? (
+                        // Special handling for 3rd option (limited spots)
+                        <Button
+                          variant="slim"
+                          type="button"
+                          onClick={() =>
+                            window.open(
+                              'mailto:apply@marketpulse.com?subject=Application for Premium Plan',
+                              '_blank'
+                            )
+                          }
+                          className="w-full group-hover:scale-105 transition-transform duration-300 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                        >
+                          Apply Now
+                        </Button>
                       ) : (
                         <Button
                           variant="slim"
@@ -350,8 +468,21 @@ export default function Pricing({ user, products, subscription }: Props) {
                           onClick={() => handleStripeCheckout(price)}
                           className="w-full group-hover:scale-105 transition-transform duration-300"
                         >
-                          {subscription ? 'Change Plan' : 'Get Started'}
+                          {subscription
+                            ? 'Change Plan'
+                            : index === 0
+                              ? 'Start Free, Upgrade Later'
+                              : 'Start Trading Smarter'}
                         </Button>
+                      )}
+
+                      {/* Yearly price not available message */}
+                      {billingInterval === 'year' && !price && (
+                        <div className="mt-4 p-3 bg-orange-500/10 rounded-lg border border-orange-500/30">
+                          <p className="text-orange-200 text-sm text-center">
+                            Yearly pricing not available for this plan
+                          </p>
+                        </div>
                       )}
                     </div>
                   </div>

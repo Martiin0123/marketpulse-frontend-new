@@ -33,7 +33,7 @@ export default async function PerformanceGuarantee() {
               </div>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">
-              Performance Guarantee
+              No Loss Guarantee
             </h1>
             <p className="text-xl text-slate-400 max-w-3xl mx-auto">
               We stand behind our trading signals with a comprehensive
