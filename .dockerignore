@@ -44,6 +44,8 @@ docker-compose*
 # Documentation
 README.md
 LICENSE
+DEPLOYMENT.md
+*.md
 
 # Supabase local
 supabase/.temp
@@ -57,4 +59,14 @@ coverage
 # IDE
 *.swp
 *.swo
-*~ 
+*~
+
+# Development files
+scripts/
+fixtures/
+test-*.json
+
+# Build artifacts
+.next/
+out/
+dist/ 
