@@ -469,4 +469,55 @@ export async function getBybitTickerPrice(symbol: string): Promise<number> {
     console.error(`❌ Error fetching ticker price for ${symbol}:`, error);
     throw error;
   }
+}
+
+// Whitelist functions - These are placeholder functions for whitelist management
+// In a real implementation, these would interact with Bybit's whitelist API
+
+export async function addFollowerToWhitelist(bybitUid: string): Promise<boolean> {
+  try {
+    console.log(`🔧 Adding follower with UID ${bybitUid} to whitelist...`);
+    
+    // TODO: Implement actual Bybit whitelist API call
+    // This is a placeholder function that should be implemented based on Bybit's official API
+    console.warn('⚠️ addFollowerToWhitelist is a placeholder function. Implement actual Bybit whitelist API integration.');
+    
+    // For now, return true to indicate success
+    return true;
+  } catch (error) {
+    console.error(`❌ Error adding follower to whitelist:`, error);
+    return false;
+  }
+}
+
+export async function removeFollowerFromWhitelist(bybitUid: string): Promise<boolean> {
+  try {
+    console.log(`🔧 Removing follower with UID ${bybitUid} from whitelist...`);
+    
+    // TODO: Implement actual Bybit whitelist API call
+    // This is a placeholder function that should be implemented based on Bybit's official API
+    console.warn('⚠️ removeFollowerFromWhitelist is a placeholder function. Implement actual Bybit whitelist API integration.');
+    
+    // For now, return true to indicate success
+    return true;
+  } catch (error) {
+    console.error(`❌ Error removing follower from whitelist:`, error);
+    return false;
+  }
+}
+
+export async function getWhitelistStatus(bybitUid: string): Promise<{ isWhitelisted: boolean; status?: string }> {
+  try {
+    console.log(`🔍 Checking whitelist status for UID ${bybitUid}...`);
+    
+    // TODO: Implement actual Bybit whitelist API call
+    // This is a placeholder function that should be implemented based on Bybit's official API
+    console.warn('⚠️ getWhitelistStatus is a placeholder function. Implement actual Bybit whitelist API integration.');
+    
+    // For now, return a default status
+    return { isWhitelisted: false, status: 'not_implemented' };
+  } catch (error) {
+    console.error(`❌ Error checking whitelist status:`, error);
+    return { isWhitelisted: false, status: 'error' };
+  }
 } 

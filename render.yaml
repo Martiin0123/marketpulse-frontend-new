@@ -1,0 +1,75 @@
+services:
+  - type: web
+    name: marketpulse-frontend
+    env: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_TELEMETRY_DISABLED
+        value: 1
+      # Supabase Configuration
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      # Stripe Configuration
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY_LIVE
+        sync: false
+      - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      # Bybit Configuration
+      - key: BYBIT_API_KEY
+        sync: false
+      - key: BYBIT_SECRET_KEY
+        sync: false
+      - key: BYBIT_TESTNET
+        value: 'true'
+      # Discord Configuration
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: DISCORD_REDIRECT_URI
+        sync: false
+      - key: DISCORD_GUILD_ID
+        sync: false
+      - key: DISCORD_BOT_TOKEN
+        sync: false
+      - key: DISCORD_WEBHOOK_URL
+        sync: false
+      - key: DISCORD_WEBHOOK_URL_FREE
+        sync: false
+      - key: DISCORD_WEBHOOK_URL_WHITELIST
+        sync: false
+      - key: DISCORD_WEBHOOK_URL_REFUNDS
+        sync: false
+      - key: DISCORD_ROLE_FREE
+        sync: false
+      - key: DISCORD_ROLE_PRO
+        sync: false
+      - key: DISCORD_ROLE_PREMIUM
+        sync: false
+      # Site Configuration
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false
+      - key: NEXT_PUBLIC_VERCEL_URL
+        sync: false
+      # Cron Configuration
+      - key: CRON_SECRET_TOKEN
+        sync: false
+      # Auth Configuration
+      - key: DISABLE_AUTH_MIDDLEWARE
+        value: 'false'
+    healthCheckPath: /
+    autoDeploy: true
