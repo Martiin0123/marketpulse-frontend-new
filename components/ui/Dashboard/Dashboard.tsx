@@ -31,11 +31,20 @@ import VIPWhitelistWidget from './VIPWhitelistWidget';
 type Signal = Tables<'signals'>;
 type Subscription = Tables<'subscriptions'>;
 
+interface Stats {
+  totalSignals: number;
+  activeSignals: number;
+  closedSignals: number;
+  totalPnl: number;
+  winRate: number;
+  averagePnl: number;
+}
+
 interface Props {
   user: User;
   subscription: Subscription;
   signals: Signal[];
-  stats: any;
+  stats: Stats;
 }
 
 export default function Dashboard({
@@ -46,7 +55,7 @@ export default function Dashboard({
 }: Props) {
   const [signals, setSignals] = useState<Signal[]>(initialSignals);
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'signals' | 'performance-guarantee'
+    'overview' | 'signals' | 'strategy-analysis' | 'performance-guarantee'
   >('overview');
   const [notification, setNotification] = useState<{
     type: 'success' | 'error';
@@ -80,7 +89,7 @@ export default function Dashboard({
 
   // Real-time updates for signals
   useEffect(() => {
-    let channel: any = null;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
     const setupChannel = async () => {
       try {
@@ -504,7 +513,7 @@ export default function Dashboard({
 
         {activeTab === 'signals' && <SignalsTab signals={signals} />}
 
-        {activeTab === 'performance-guarantee' && (
+        {activeTab === 'strategy-analysis' && (
           <div className="space-y-6">
             <PerformanceGuaranteeWidget />
           </div>

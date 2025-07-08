@@ -42,28 +42,42 @@ function getBybitClient() {
   return bybitClient;
 }
 
-// Types for Bybit responses
-export interface BybitPosition {
+// Define proper types for Bybit position data
+interface BybitPosition {
   symbol: string;
-  side: 'Buy' | 'Sell';
+  side: string;
   size: string;
-  avgPrice: string;
-  unrealisedPnl: string;
-  markPrice: string;
   positionValue: string;
+  entryPrice: string;
+  markPrice: string;
+  unrealizedPnl: string;
+  leverage: string;
+  marginType: string;
   positionIdx: number;
+  autoAddMargin: string;
+  positionStatus: string;
   riskId: number;
   stopLoss: string;
   takeProfit: string;
   trailingStop: string;
-  positionStatus: string;
-  autoAddMargin: string;
-  leverage: string;
-  positionBalance: string;
-  updatedTime: string;
+  positionMM: string;
+  positionIM: string;
+  tpslMode: string;
+  adlRanking: number;
   seq: number;
+  updatedTime: string;
 }
 
+interface BybitPositionsResponse {
+  retCode: number;
+  retMsg: string;
+  result: {
+    category: string;
+    list: BybitPosition[];
+  };
+}
+
+// Types for Bybit responses
 export interface BybitAccount {
   accountType: string;
   coin: string[];
@@ -155,39 +169,31 @@ export async function getBybitAccount(): Promise<any> {
 }
 
 // Position functions
-export async function getBybitPositions(): Promise<any[]> {
+export async function getBybitPositions(): Promise<BybitPosition[]> {
   try {
-    const client = getBybitClient();
-    if (!client) throw new Error('Bybit client not initialized');
-    
-    const response = await client.getPositionInfo({ category: 'linear' });
-    
-    if (response.retCode !== 0) {
-      throw new Error(`Bybit API error: ${response.retMsg}`);
+    const response = await fetch('/api/bybit/positions');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
     
-    return response.result.list.filter((position: any) => parseFloat(position.size) > 0);
+    const data: BybitPositionsResponse = await response.json();
+    
+    if (data.retCode !== 0) {
+      throw new Error(`Bybit API error: ${data.retMsg}`);
+    }
+    
+    // Filter out positions with size > 0
+    return data.result.list.filter((position: BybitPosition) => parseFloat(position.size) > 0);
   } catch (error) {
     console.error('Error fetching Bybit positions:', error);
-    throw error;
+    return [];
   }
 }
 
-export async function getBybitPosition(symbol: string): Promise<any | null> {
+export async function getBybitPosition(symbol: string): Promise<BybitPosition | null> {
   try {
-    const client = getBybitClient();
-    if (!client) throw new Error('Bybit client not initialized');
-    
-    const response = await client.getPositionInfo({ 
-      category: 'linear',
-      symbol: symbol
-    });
-    
-    if (response.retCode !== 0) {
-      throw new Error(`Bybit API error: ${response.retMsg}`);
-    }
-    
-    const position = response.result.list.find((pos: any) => parseFloat(pos.size) > 0);
+    const positions = await getBybitPositions();
+    const position = positions.find((pos: BybitPosition) => parseFloat(pos.size) > 0);
     return position || null;
   } catch (error) {
     console.error('Error fetching Bybit position:', error);

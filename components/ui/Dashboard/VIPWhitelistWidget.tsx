@@ -13,10 +13,19 @@ import {
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import { User } from '@supabase/supabase-js';
+import { Tables } from '@/types_db';
 
 interface VIPWhitelistWidgetProps {
   user: User;
-  subscription: any;
+  subscription:
+    | (Tables<'subscriptions'> & {
+        prices:
+          | (Tables<'prices'> & {
+              products: Tables<'products'> | null;
+            })
+          | null;
+      })
+    | null;
 }
 
 export default function VIPWhitelistWidget({

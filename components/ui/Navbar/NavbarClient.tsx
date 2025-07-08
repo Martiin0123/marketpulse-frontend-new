@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronDown, User, LogOut, Users } from 'lucide-react';
+import { ChevronDown, User as UserIcon, LogOut, Users } from 'lucide-react';
 import { SignOut } from '@/utils/auth-helpers/server';
 import { handleRequest } from '@/utils/auth-helpers/client';
+import { User } from '@supabase/supabase-js';
+import { Tables } from '@/types_db';
 
 interface NavbarClientProps {
-  user: any;
+  user: User | null;
 }
 
 export default function NavbarClient({ user }: NavbarClientProps) {
@@ -42,13 +44,13 @@ export default function NavbarClient({ user }: NavbarClientProps) {
         className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800/50 transition-all duration-200 group"
       >
         <div
-          className={`w-8 h-8 rounded-lg ${getAvatarColor(user.email)} flex items-center justify-center text-white text-sm font-bold shadow-sm`}
+          className={`w-8 h-8 rounded-lg ${getAvatarColor(user?.email)} flex items-center justify-center text-white text-sm font-bold shadow-sm`}
         >
-          {getInitials(user.email)}
+          {getInitials(user?.email)}
         </div>
         <div className="hidden sm:block text-left">
           <div className="text-sm font-medium text-white group-hover:text-blue-300 transition-colors">
-            {user.email?.split('@')[0]}
+            {user?.email?.split('@')[0]}
           </div>
           <div className="text-xs text-slate-400 group-hover:text-slate-300 transition-colors">
             View profile
@@ -65,13 +67,13 @@ export default function NavbarClient({ user }: NavbarClientProps) {
           <div className="p-3 border-b border-slate-700/50">
             <div className="flex items-center space-x-3">
               <div
-                className={`w-9 h-9 rounded-lg ${getAvatarColor(user.email)} flex items-center justify-center text-white font-bold shadow-sm`}
+                className={`w-9 h-9 rounded-lg ${getAvatarColor(user?.email)} flex items-center justify-center text-white font-bold shadow-sm`}
               >
-                {getInitials(user.email)}
+                {getInitials(user?.email)}
               </div>
               <div>
                 <div className="text-sm font-medium text-white">
-                  {user.email}
+                  {user?.email}
                 </div>
                 <div className="text-xs text-slate-400">Signed in</div>
               </div>
@@ -84,7 +86,7 @@ export default function NavbarClient({ user }: NavbarClientProps) {
               onClick={() => setIsDropdownOpen(false)}
               className="flex items-center space-x-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-md transition-all duration-200"
             >
-              <User className="w-4 h-4" />
+              <UserIcon className="w-4 h-4" />
               <span>Account Settings</span>
             </Link>
 

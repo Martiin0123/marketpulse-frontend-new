@@ -1,11 +1,38 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { unstable_cache as cache } from 'next/cache';
+import { Tables } from '@/types_db';
 
 export const getUser = cache(async (supabase: SupabaseClient) => {
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-  return user;
+  const { data: user } = await supabase.auth.getUser();
+  
+  if (!user.user?.id) {
+    return null;
+  }
+
+  // Get user profile with proper types
+  const { data: profile, error } = await supabase
+    .from('users')
+    .select(`
+      id,
+      full_name,
+      avatar_url,
+      billing_address,
+      payment_method,
+      referral_code,
+      referred_by
+    `)
+    .eq('id', user.user.id)
+    .single();
+
+  if (error) {
+    console.error('Error fetching user profile:', error);
+    return null;
+  }
+
+  return {
+    ...user.user,
+    ...profile
+  };
 });
 
 export const getSubscription = cache(async (supabase: SupabaseClient) => {
@@ -43,27 +70,21 @@ export const getSubscription = cache(async (supabase: SupabaseClient) => {
         interval_count,
         trial_period_days,
         type,
-        active,
-        description,
-        metadata,
         products:product_id (
           id,
           name,
           description,
-          active,
           image,
           metadata
         )
       )
     `)
     .eq('user_id', user.user.id)
-    .in('status', ['trialing', 'active', 'past_due', 'incomplete'])
-    .order('created', { ascending: false })
-    .limit(1)
+    .eq('status', 'active')
     .single();
 
   if (error) {
-    console.warn('Subscription query error:', error.message);
+    console.error('Error fetching subscription:', error);
     return null;
   }
 
@@ -110,9 +131,8 @@ export type UserDetails = {
   id: string;
   full_name: string;
   avatar_url: string | null;
-  billing_address: any | null;
-  payment_method: any | null;
-  metadata: any | null;
+  billing_address: Tables<'users'>['billing_address'];
+  payment_method: Tables<'users'>['payment_method'];
 };
 
 export const getUserDetails = cache(async (supabase: SupabaseClient): Promise<UserDetails | null> => {
@@ -128,8 +148,7 @@ export const getUserDetails = cache(async (supabase: SupabaseClient): Promise<Us
     full_name: user.user_metadata?.full_name || '',
     avatar_url: user.user_metadata?.avatar_url || null,
     billing_address: user.user_metadata?.billing_address || null,
-    payment_method: user.user_metadata?.payment_method || null,
-    metadata: user.user_metadata || null
+    payment_method: user.user_metadata?.payment_method || null
   };
 });
 
@@ -254,42 +273,33 @@ export const getReferralStats = cache(async (supabase: SupabaseClient) => {
     };
   }
 
-  try {
-    // Use the fixed database function
-    const { data: stats, error } = await supabase.rpc('get_referral_stats', {
-      user_id_param: user.id
-    });
-
-    if (!error && stats && stats.length > 0) {
-      return {
-        totalEarnings: Number(stats[0].total_earnings) || 0,
-        pendingAmount: Number(stats[0].pending_amount) || 0,
-        totalClicks: Number(stats[0].total_clicks) || 0,
-        pendingReferrals: Number(stats[0].pending_referrals) || 0,
-        activeReferrals: Number(stats[0].active_referrals) || 0
-      };
-    }
-  } catch (error) {
-  }
-
-  // Fallback: calculate manually
-  const [referralCode, referrals, rewards] = await Promise.all([
-    getUserReferralCode(supabase),
-    getReferrals(supabase),
-    getReferralRewards(supabase)
+  const [rewards, referrals, referralCode] = await Promise.all([
+    supabase
+      .from('referral_rewards')
+      .select('*')
+      .eq('user_id', user.id),
+    supabase
+      .from('referrals')
+      .select('*')
+      .eq('referrer_id', user.id),
+    supabase
+      .from('referral_codes')
+      .select('*')
+      .eq('user_id', user.id)
+      .single()
   ]);
 
-  const totalEarnings = rewards
-    .filter(r => r.status === 'paid')
-    .reduce((sum, r) => sum + Number(r.amount), 0);
+  const totalEarnings = (rewards.data || [])
+    .filter((r: Tables<'referral_rewards'>) => r.status === 'paid')
+    .reduce((sum: number, r: Tables<'referral_rewards'>) => sum + Number(r.amount), 0);
 
-  const pendingAmount = rewards
-    .filter(r => r.status === 'eligible' || r.status === 'pending')
-    .reduce((sum, r) => sum + Number(r.amount), 0);
+  const pendingAmount = (rewards.data || [])
+    .filter((r: Tables<'referral_rewards'>) => r.status === 'eligible' || r.status === 'pending')
+    .reduce((sum: number, r: Tables<'referral_rewards'>) => sum + Number(r.amount), 0);
 
-  const pendingReferrals = referrals.filter(r => r.status === 'pending').length;
-  const activeReferrals = referrals.filter(r => r.status === 'active').length;
-  const totalClicks = referralCode?.clicks || 0;
+  const pendingReferrals = (referrals.data || []).filter((r: Tables<'referrals'>) => r.status === 'pending').length;
+  const activeReferrals = (referrals.data || []).filter((r: Tables<'referrals'>) => r.status === 'active').length;
+  const totalClicks = referralCode.data?.clicks || 0;
 
   return {
     totalEarnings,
@@ -314,14 +324,11 @@ export const getReferralRewards = cache(async (supabase: SupabaseClient) => {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
-  if (error) {
-    return rewards.map(reward => ({
-      ...reward,
-      referral: null
-    }));
+  if (error || !rewards) {
+    return [];
   }
 
-  if (!rewards || rewards.length === 0) {
+  if (rewards.length === 0) {
     return [];
   }
 
@@ -333,14 +340,14 @@ export const getReferralRewards = cache(async (supabase: SupabaseClient) => {
     .in('id', referralIds);
 
   if (referralsError) {
-    return rewards.map(reward => ({
+    return rewards.map((reward: Tables<'referral_rewards'>) => ({
       ...reward,
       referral: null
     }));
   }
 
   // Combine the data
-  return rewards.map(reward => {
+  return rewards.map((reward: Tables<'referral_rewards'>) => {
     const referral = referrals?.find(r => r.id === reward.referral_id);
     
     return {
@@ -524,16 +531,30 @@ export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClie
     return null;
   }
 
-  // Determine which month to analyze
-  let analysisDate: Date;
-  let effectiveStartDate: Date;
-  let effectiveEndDate: Date;
-  let isPeriodEnded: boolean;
+  // Initialize variables with default values
+  let analysisDate: Date = new Date();
+  let effectiveStartDate: Date = new Date();
+  let effectiveEndDate: Date = new Date();
+  let isPeriodEnded: boolean = false;
   
   if (targetMonth) {
     // Parse target month (YYYY-MM format)
     const [year, month] = targetMonth.split('-').map(Number);
     analysisDate = new Date(year, month - 1, 1); // month is 0-indexed
+    
+    const monthStart = new Date(analysisDate.getFullYear(), analysisDate.getMonth(), 1);
+    const monthEnd = new Date(analysisDate.getFullYear(), analysisDate.getMonth() + 1, 0, 23, 59, 59);
+    
+    // If a specific month is requested, use calendar month boundaries
+    if (new Date(subscription.created) >= monthStart) {
+      // User subscribed this month - use subscription start date
+      effectiveStartDate = new Date(subscription.created);
+    } else {
+      // User subscribed before this month - use month start
+      effectiveStartDate = monthStart;
+    }
+    effectiveEndDate = monthEnd;
+    isPeriodEnded = new Date() > monthEnd;
   } else {
     // For default (previous month), use the previous subscription period
     const subscriptionStart = new Date(subscription.created);
@@ -562,23 +583,6 @@ export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClie
       isPeriodEnded,
       now: now.toISOString()
     });
-  }
-
-  // Only recalculate dates if targetMonth is provided
-  if (targetMonth) {
-    const monthStart = new Date(analysisDate.getFullYear(), analysisDate.getMonth(), 1);
-    const monthEnd = new Date(analysisDate.getFullYear(), analysisDate.getMonth() + 1, 0, 23, 59, 59);
-    
-    // If a specific month is requested, use calendar month boundaries
-    if (new Date(subscription.created) >= monthStart) {
-      // User subscribed this month - use subscription start date
-      effectiveStartDate = new Date(subscription.created);
-    } else {
-      // User subscribed before this month - use month start
-      effectiveStartDate = monthStart;
-    }
-    effectiveEndDate = monthEnd;
-    isPeriodEnded = new Date() > monthEnd;
   }
   
   // Debug: Log the final dates before querying positions

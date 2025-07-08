@@ -6,13 +6,14 @@ import { createClient } from '@/utils/supabase/client';
 export default function TestAuthPage() {
   const [status, setStatus] = useState('Testing...');
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const supabase = createClient();
 
   const testSupabaseConnection = async () => {
     try {
       setStatus('Testing Supabase connection...');
-      const supabase = createClient();
-
-      // Test basic connection
       const { data, error } = await supabase.auth.getUser();
 
       if (error) {
@@ -24,8 +25,10 @@ export default function TestAuthPage() {
         );
         setError(null);
       }
-    } catch (err: any) {
-      setError(`Connection error: ${err.message}`);
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Auth error:', error.message);
+      setError(error.message);
       setStatus('Failed');
     }
   };
@@ -47,6 +50,41 @@ export default function TestAuthPage() {
     } catch (err: any) {
       setError(`Test error: ${err.message}`);
       setStatus('Failed');
+    }
+  };
+
+  const testSignOut = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      setMessage('Sign out successful');
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Sign out error:', error.message);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const testGetUser = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const {
+        data: { user },
+        error
+      } = await supabase.auth.getUser();
+      if (error) throw error;
+      setMessage(`User: ${user?.email || 'No user'}`);
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Get user error:', error.message);
+      setError(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 

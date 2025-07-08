@@ -1,10 +1,11 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
+import { User } from '@supabase/supabase-js';
 
 const PROTECTED_ROUTES = ['/dashboard', '/signals', '/account', '/referrals', '/performance-reports'];
 
 // Simple cache to reduce auth requests
-const authCache = new Map<string, { user: any; timestamp: number }>();
+const authCache = new Map<string, { user: User | null; timestamp: number }>();
 const CACHE_DURATION = 30 * 1000; // 30 seconds
 
 // Rate limiting for auth requests

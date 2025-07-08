@@ -37,23 +37,27 @@ export default async function TestSupabasePage() {
               try {
                 // This will be executed on the server
                 return <p>Database connection: Working</p>;
-              } catch (dbError: any) {
-                return <p>Database error: {dbError.message}</p>;
+              } catch (dbError: unknown) {
+                const error = dbError as Error;
+                console.error('Database error:', error.message);
+                return <p>Database error: {error.message}</p>;
               }
             })()}
           </div>
         </div>
       </div>
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Supabase test page error:', err.message);
     return (
       <div className="min-h-screen bg-slate-900 text-white p-8">
         <h1 className="text-2xl font-bold mb-4 text-red-500">
           Supabase Test Page - ERROR
         </h1>
-        <p className="text-red-400">Error: {error.message}</p>
+        <p className="text-red-400">Error: {err.message}</p>
         <pre className="mt-4 p-4 bg-slate-800 rounded text-sm overflow-auto">
-          {error.stack}
+          {err.stack}
         </pre>
       </div>
     );

@@ -10,10 +10,20 @@ import {
   Zap,
   AlertTriangle
 } from 'lucide-react';
+import { User } from '@supabase/supabase-js';
+import { Tables } from '@/types_db';
 
 interface FooterProps {
-  user?: any;
-  subscription?: any;
+  user?: User | null;
+  subscription?:
+    | (Tables<'subscriptions'> & {
+        prices:
+          | (Tables<'prices'> & {
+              products: Tables<'products'> | null;
+            })
+          | null;
+      })
+    | null;
 }
 
 export default function Footer({ user, subscription }: FooterProps) {

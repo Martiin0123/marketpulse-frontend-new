@@ -35,6 +35,13 @@ interface CopyTradingRelationship {
   created_at: string;
 }
 
+interface RelationshipUpdate {
+  status?: 'active' | 'paused' | 'terminated';
+  allocation_percentage?: number;
+  risk_level?: 'low' | 'medium' | 'high';
+  auto_rebalance?: boolean;
+}
+
 export default function CopyTradingDashboard() {
   const [leaders, setLeaders] = useState<CopyTradingLeader[]>([]);
   const [relationships, setRelationships] = useState<CopyTradingRelationship[]>(
@@ -122,7 +129,10 @@ export default function CopyTradingDashboard() {
     }
   };
 
-  const updateRelationship = async (relationshipId: string, updates: any) => {
+  const updateRelationship = async (
+    relationshipId: string,
+    updates: RelationshipUpdate
+  ) => {
     try {
       const response = await fetch('/api/bybit/copy-trading', {
         method: 'PUT',

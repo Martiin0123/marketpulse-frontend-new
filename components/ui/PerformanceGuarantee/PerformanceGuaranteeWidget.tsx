@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Card from '../Card';
 import Button from '../Button';
+import { Tables } from '@/types_db';
 
 interface Signal {
   id: string;
@@ -40,10 +41,14 @@ interface PerformanceResponse {
   refundAmount: number;
   refundPlan: string;
   refundCurrency: string;
-  existingRefund: any;
+  existingRefund: Tables<'performance_refunds'> | null;
   isPeriodEnded: boolean;
   requestId?: string;
   message: string;
+}
+
+interface PerformanceGuaranteeWidgetProps {
+  existingRefund: Tables<'performance_refunds'> | null;
 }
 
 export default function PerformanceGuaranteeWidget() {
