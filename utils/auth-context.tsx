@@ -189,67 +189,62 @@ export function AuthProvider({
           setUser(session.user);
           setError(null);
 
-          // Only fetch subscription if we don't already have one for this user
-          if (!subscription || subscription.user_id !== session.user.id) {
-            try {
-              const { data: subData, error: subError } = await supabase
-                .from('subscriptions')
-                .select(
-                  `
+          // Always fetch fresh subscription data on sign in to avoid stale closures
+          try {
+            const { data: subData, error: subError } = await supabase
+              .from('subscriptions')
+              .select(
+                `
+                  id,
+                  status,
+                  price_id,
+                  cancel_at,
+                  cancel_at_period_end,
+                  canceled_at,
+                  created,
+                  current_period_start,
+                  current_period_end,
+                  ended_at,
+                  trial_end,
+                  trial_start,
+                  user_id,
+                  metadata,
+                  quantity,
+                  role,
+                  prices:price_id (
                     id,
-                    status,
-                    price_id,
-                    cancel_at,
-                    cancel_at_period_end,
-                    canceled_at,
-                    created,
-                    current_period_start,
-                    current_period_end,
-                    ended_at,
-                    trial_end,
-                    trial_start,
-                    user_id,
-                    metadata,
-                    quantity,
-                    role,
-                    prices:price_id (
+                    unit_amount,
+                    currency,
+                    interval,
+                    interval_count,
+                    trial_period_days,
+                    type,
+                    products:product_id (
                       id,
-                      unit_amount,
-                      currency,
-                      interval,
-                      interval_count,
-                      trial_period_days,
-                      type,
-                      products:product_id (
-                        id,
-                        name,
-                        description,
-                        image,
-                        metadata
-                      )
+                      name,
+                      description,
+                      image,
+                      metadata
                     )
-                  `
-                )
-                .eq('user_id', session.user.id)
-                .eq('status', 'active')
-                .single();
+                  )
+                `
+              )
+              .eq('user_id', session.user.id)
+              .eq('status', 'active')
+              .single();
 
-              if (!subError && mountedLocal) {
-                // Ensure currency is always a string
-                if (
-                  subData?.prices?.currency &&
-                  typeof subData.prices.currency !== 'string'
-                ) {
-                  subData.prices.currency = String(subData.prices.currency);
-                }
-                setSubscription(subData);
+            if (!subError && mountedLocal) {
+              // Ensure currency is always a string
+              if (
+                subData?.prices?.currency &&
+                typeof subData.prices.currency !== 'string'
+              ) {
+                subData.prices.currency = String(subData.prices.currency);
               }
-            } catch (subError) {
-              console.error(
-                'Subscription fetch error on auth change:',
-                subError
-              );
+              setSubscription(subData);
             }
+          } catch (subError) {
+            console.error('Subscription fetch error on auth change:', subError);
           }
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
@@ -269,7 +264,7 @@ export function AuthProvider({
         authSubscription.unsubscribe();
       }
     };
-  }, [initialUser, initialSubscription]); // Stable dependencies
+  }, [initialUser, initialSubscription]); // Keep stable dependencies only
 
   const refreshUser = debounceAuth(async () => {
     if (!supabase) {
