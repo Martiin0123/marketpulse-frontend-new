@@ -66,43 +66,63 @@ export default function CustomerPortalForm({ subscription }: Props) {
   };
 
   return (
-    <Card
-      title="Your Plan"
-      description={
-        subscription
-          ? `You are currently on the ${subscription?.prices?.products?.name} plan.`
-          : 'You are not currently subscribed to any plan.'
-      }
-      footer={
-        <div className="flex flex-col items-start justify-between sm:flex-row sm:items-center">
-          <p className="pb-4 sm:pb-0">Manage your subscription on Stripe.</p>
-          {error && (
-            <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-              <p className="font-semibold">Error:</p>
-              <p>{error}</p>
+    <div className="space-y-4">
+      {/* Subscription Details */}
+      <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-600">
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="text-white font-medium">Plan Details</h4>
+            <p className="text-slate-400 text-sm">
+              {subscription
+                ? `${subscription?.prices?.products?.name || 'Subscription'} plan`
+                : 'No active subscription'}
+            </p>
+          </div>
+          <div className="text-right">
+            <div className="text-lg font-semibold text-white">
+              {subscription ? (
+                subscriptionPrice ? (
+                  `${subscriptionPrice}/${subscription?.prices?.interval}`
+                ) : (
+                  `${subscription?.prices?.products?.name || 'Active'}`
+                )
+              ) : (
+                <Link href="/pricing" className="text-blue-400 hover:text-blue-300 transition-colors">
+                  Choose Plan
+                </Link>
+              )}
             </div>
-          )}
-          <Button
-            variant="slim"
-            onClick={handleStripePortalRequest}
-            loading={isSubmitting}
-          >
-            Open customer portal
-          </Button>
+          </div>
         </div>
-      }
-    >
-      <div className="mt-8 mb-4 text-xl font-semibold">
-        {subscription ? (
-          subscriptionPrice ? (
-            `${subscriptionPrice}/${subscription?.prices?.interval}`
-          ) : (
-            `${subscription?.prices?.products?.name || 'Subscription'} plan`
-          )
-        ) : (
-          <Link href="/">Choose your plan</Link>
-        )}
       </div>
-    </Card>
+
+      {/* Error Display */}
+      {error && (
+        <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+          <div className="flex items-center space-x-2">
+            <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+            <p className="text-red-300 font-medium text-sm">Error</p>
+          </div>
+          <p className="text-red-200 text-sm mt-1">{error}</p>
+        </div>
+      )}
+
+      {/* Stripe Portal Button */}
+      <div className="flex items-center justify-between p-4 bg-slate-700/30 rounded-lg border border-slate-600">
+        <div>
+          <h4 className="text-white font-medium">Billing Management</h4>
+          <p className="text-slate-400 text-sm">
+            Manage your subscription, payment methods, and billing history
+          </p>
+        </div>
+        <button
+          onClick={handleStripePortalRequest}
+          disabled={isSubmitting}
+          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isSubmitting ? 'Opening...' : 'Manage Billing'}
+        </button>
+      </div>
+    </div>
   );
 }

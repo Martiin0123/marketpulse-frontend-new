@@ -41,13 +41,27 @@ export function AuthProvider({
   );
   const [loading, setLoading] = useState(!initialUser);
   const [error, setError] = useState<string | null>(null);
-  const supabase = createClient();
+  
+  // Safely create Supabase client with error handling
+  let supabase: ReturnType<typeof createClient> | null = null;
+  try {
+    supabase = createClient();
+  } catch (clientError) {
+    console.error('Failed to initialize Supabase client:', clientError);
+    setError('Failed to initialize authentication. Please check your configuration.');
+    setLoading(false);
+  }
 
   // Initialize auth state
   useEffect(() => {
     let mounted = true;
 
     const initializeAuth = async () => {
+      // Don't proceed if Supabase client failed to initialize
+      if (!supabase) {
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
@@ -144,84 +158,97 @@ export function AuthProvider({
       setLoading(false);
     }
 
-    // Listen for auth state changes
-    const {
-      data: { subscription: authSubscription }
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
+    // Listen for auth state changes (only if Supabase client exists)
+    let authSubscription: { unsubscribe: () => void } | null = null;
+    
+    if (supabase) {
+      const {
+        data: { subscription: authSub }
+      } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (!mounted) return;
 
-      if (event === 'SIGNED_IN' && session?.user) {
-        setUser(session.user);
-        setError(null);
+        if (event === 'SIGNED_IN' && session?.user) {
+          setUser(session.user);
+          setError(null);
 
-        // Fetch subscription for new user
-        try {
-          const { data: subData, error: subError } = await supabase
-            .from('subscriptions')
-            .select(
-              `
-                id,
-                status,
-                price_id,
-                cancel_at,
-                cancel_at_period_end,
-                canceled_at,
-                created,
-                current_period_start,
-                current_period_end,
-                ended_at,
-                trial_end,
-                trial_start,
-                user_id,
-                metadata,
-                quantity,
-                role,
-                prices:price_id (
+          // Fetch subscription for new user
+          try {
+            const { data: subData, error: subError } = await supabase
+              .from('subscriptions')
+              .select(
+                `
                   id,
-                  unit_amount,
-                  currency,
-                  interval,
-                  interval_count,
-                  trial_period_days,
-                  type,
-                  products:product_id (
+                  status,
+                  price_id,
+                  cancel_at,
+                  cancel_at_period_end,
+                  canceled_at,
+                  created,
+                  current_period_start,
+                  current_period_end,
+                  ended_at,
+                  trial_end,
+                  trial_start,
+                  user_id,
+                  metadata,
+                  quantity,
+                  role,
+                  prices:price_id (
                     id,
-                    name,
-                    description,
-                    image,
-                    metadata
+                    unit_amount,
+                    currency,
+                    interval,
+                    interval_count,
+                    trial_period_days,
+                    type,
+                    products:product_id (
+                      id,
+                      name,
+                      description,
+                      image,
+                      metadata
+                    )
                   )
-                )
-              `
-            )
-            .eq('user_id', session.user.id)
-            .eq('status', 'active')
-            .single();
+                `
+              )
+              .eq('user_id', session.user.id)
+              .eq('status', 'active')
+              .single();
 
-          if (!subError && mounted) {
-            // Ensure currency is always a string
-            if (subData?.prices?.currency && typeof subData.prices.currency !== 'string') {
-              subData.prices.currency = String(subData.prices.currency);
+            if (!subError && mounted) {
+              // Ensure currency is always a string
+              if (subData?.prices?.currency && typeof subData.prices.currency !== 'string') {
+                subData.prices.currency = String(subData.prices.currency);
+              }
+              setSubscription(subData);
             }
-            setSubscription(subData);
+          } catch (subError) {
+            console.error('Subscription fetch error on auth change:', subError);
           }
-        } catch (subError) {
-          console.error('Subscription fetch error on auth change:', subError);
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setSubscription(null);
+          setError(null);
         }
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setSubscription(null);
-        setError(null);
-      }
-    });
+      });
+      
+      authSubscription = { unsubscribe: authSub.unsubscribe };
+    }
 
     return () => {
       mounted = false;
-      authSubscription.unsubscribe();
+      if (authSubscription) {
+        authSubscription.unsubscribe();
+      }
     };
   }, [initialUser, initialSubscription]); // Stable dependencies
 
   const refreshUser = async () => {
+    if (!supabase) {
+      setError('Authentication service not available');
+      return;
+    }
+
     try {
       const {
         data: { user: currentUser },
@@ -241,7 +268,7 @@ export function AuthProvider({
   };
 
   const refreshSubscription = async () => {
-    if (!user) return;
+    if (!user || !supabase) return;
 
     try {
       const { data: subData, error } = await supabase
