@@ -22,7 +22,11 @@
     "perf:test": "node scripts/performance-test.js",
     "perf:monitor": "node scripts/monitor-spam.sh",
     "dev:fast": "DISABLE_AUTH_MIDDLEWARE=true next dev",
-    "dev:no-auth": "DISABLE_AUTH_MIDDLEWARE=true next dev"
+    "dev:no-auth": "DISABLE_AUTH_MIDDLEWARE=true next dev",
+    "railway:deploy": "./scripts/deploy-railway.sh",
+    "railway:logs": "railway logs",
+    "railway:status": "railway status",
+    "railway:open": "railway open"
   },
   "dependencies": {
     "@radix-ui/react-toast": "^1.1.5",
