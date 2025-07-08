@@ -41,6 +41,7 @@ export function AuthProvider({
   );
   const [loading, setLoading] = useState(!initialUser);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
   
   // Safely create Supabase client with error handling
   let supabase: ReturnType<typeof createClient> | null = null;
@@ -52,9 +53,14 @@ export function AuthProvider({
     setLoading(false);
   }
 
+  // Handle hydration
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Initialize auth state
   useEffect(() => {
-    let mounted = true;
+    let mountedLocal = true;
 
     const initializeAuth = async () => {
       // Don't proceed if Supabase client failed to initialize
@@ -72,7 +78,7 @@ export function AuthProvider({
           error: userError
         } = await supabase.auth.getUser();
 
-        if (!mounted) return;
+        if (!mountedLocal) return;
 
         if (userError) {
           console.error('Auth initialization error:', userError);
@@ -127,7 +133,7 @@ export function AuthProvider({
                 .eq('status', 'active')
                 .single();
 
-              if (!subError && mounted) {
+              if (!subError && mountedLocal) {
                 // Ensure currency is always a string
                 if (subData?.prices?.currency && typeof subData.prices.currency !== 'string') {
                   subData.prices.currency = String(subData.prices.currency);
@@ -141,11 +147,11 @@ export function AuthProvider({
         }
       } catch (err) {
         console.error('Auth initialization failed:', err);
-        if (mounted) {
+        if (mountedLocal) {
           setError('Failed to initialize authentication');
         }
       } finally {
-        if (mounted) {
+        if (mountedLocal) {
           setLoading(false);
         }
       }
@@ -165,7 +171,7 @@ export function AuthProvider({
       const {
         data: { subscription: authSub }
       } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (!mounted) return;
+        if (!mountedLocal) return;
 
         if (event === 'SIGNED_IN' && session?.user) {
           setUser(session.user);
@@ -215,7 +221,7 @@ export function AuthProvider({
               .eq('status', 'active')
               .single();
 
-            if (!subError && mounted) {
+            if (!subError && mountedLocal) {
               // Ensure currency is always a string
               if (subData?.prices?.currency && typeof subData.prices.currency !== 'string') {
                 subData.prices.currency = String(subData.prices.currency);
@@ -236,7 +242,7 @@ export function AuthProvider({
     }
 
     return () => {
-      mounted = false;
+      mountedLocal = false;
       if (authSubscription) {
         authSubscription.unsubscribe();
       }
@@ -332,6 +338,11 @@ export function AuthProvider({
     refreshUser,
     refreshSubscription
   };
+
+  // Prevent hydration mismatch by only rendering after component is mounted
+  if (!mounted) {
+    return <AuthContext.Provider value={value}>{null}</AuthContext.Provider>;
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
