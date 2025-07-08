@@ -10,6 +10,11 @@ import {
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/utils/supabase/client';
 import { Tables } from '@/types_db';
+import {
+  guardedRefresh,
+  debounceAuth,
+  authCircuitBreaker
+} from '@/utils/supabase/auth-guards';
 
 type Subscription = Tables<'subscriptions'>;
 
@@ -42,14 +47,16 @@ export function AuthProvider({
   const [loading, setLoading] = useState(!initialUser);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-  
+
   // Safely create Supabase client with error handling
   let supabase: ReturnType<typeof createClient> | null = null;
   try {
     supabase = createClient();
   } catch (clientError) {
     console.error('Failed to initialize Supabase client:', clientError);
-    setError('Failed to initialize authentication. Please check your configuration.');
+    setError(
+      'Failed to initialize authentication. Please check your configuration.'
+    );
     setLoading(false);
   }
 
@@ -135,7 +142,10 @@ export function AuthProvider({
 
               if (!subError && mountedLocal) {
                 // Ensure currency is always a string
-                if (subData?.prices?.currency && typeof subData.prices.currency !== 'string') {
+                if (
+                  subData?.prices?.currency &&
+                  typeof subData.prices.currency !== 'string'
+                ) {
                   subData.prices.currency = String(subData.prices.currency);
                 }
                 setSubscription(subData);
@@ -166,78 +176,90 @@ export function AuthProvider({
 
     // Listen for auth state changes (only if Supabase client exists)
     let authSubscription: { unsubscribe: () => void } | null = null;
-    
+
     if (supabase) {
       const {
         data: { subscription: authSub }
       } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (!mountedLocal) return;
 
+        console.log('Auth state change:', event, !!session);
+
         if (event === 'SIGNED_IN' && session?.user) {
           setUser(session.user);
           setError(null);
 
-          // Fetch subscription for new user
-          try {
-            const { data: subData, error: subError } = await supabase
-              .from('subscriptions')
-              .select(
-                `
-                  id,
-                  status,
-                  price_id,
-                  cancel_at,
-                  cancel_at_period_end,
-                  canceled_at,
-                  created,
-                  current_period_start,
-                  current_period_end,
-                  ended_at,
-                  trial_end,
-                  trial_start,
-                  user_id,
-                  metadata,
-                  quantity,
-                  role,
-                  prices:price_id (
+          // Only fetch subscription if we don't already have one for this user
+          if (!subscription || subscription.user_id !== session.user.id) {
+            try {
+              const { data: subData, error: subError } = await supabase
+                .from('subscriptions')
+                .select(
+                  `
                     id,
-                    unit_amount,
-                    currency,
-                    interval,
-                    interval_count,
-                    trial_period_days,
-                    type,
-                    products:product_id (
+                    status,
+                    price_id,
+                    cancel_at,
+                    cancel_at_period_end,
+                    canceled_at,
+                    created,
+                    current_period_start,
+                    current_period_end,
+                    ended_at,
+                    trial_end,
+                    trial_start,
+                    user_id,
+                    metadata,
+                    quantity,
+                    role,
+                    prices:price_id (
                       id,
-                      name,
-                      description,
-                      image,
-                      metadata
+                      unit_amount,
+                      currency,
+                      interval,
+                      interval_count,
+                      trial_period_days,
+                      type,
+                      products:product_id (
+                        id,
+                        name,
+                        description,
+                        image,
+                        metadata
+                      )
                     )
-                  )
-                `
-              )
-              .eq('user_id', session.user.id)
-              .eq('status', 'active')
-              .single();
+                  `
+                )
+                .eq('user_id', session.user.id)
+                .eq('status', 'active')
+                .single();
 
-            if (!subError && mountedLocal) {
-              // Ensure currency is always a string
-              if (subData?.prices?.currency && typeof subData.prices.currency !== 'string') {
-                subData.prices.currency = String(subData.prices.currency);
+              if (!subError && mountedLocal) {
+                // Ensure currency is always a string
+                if (
+                  subData?.prices?.currency &&
+                  typeof subData.prices.currency !== 'string'
+                ) {
+                  subData.prices.currency = String(subData.prices.currency);
+                }
+                setSubscription(subData);
               }
-              setSubscription(subData);
+            } catch (subError) {
+              console.error(
+                'Subscription fetch error on auth change:',
+                subError
+              );
             }
-          } catch (subError) {
-            console.error('Subscription fetch error on auth change:', subError);
           }
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
           setSubscription(null);
           setError(null);
+        } else if (event === 'TOKEN_REFRESHED') {
+          console.log('Token refreshed - no action needed');
         }
       });
-      
+
       authSubscription = { unsubscribe: authSub.unsubscribe };
     }
 
@@ -249,31 +271,33 @@ export function AuthProvider({
     };
   }, [initialUser, initialSubscription]); // Stable dependencies
 
-  const refreshUser = async () => {
+  const refreshUser = debounceAuth(async () => {
     if (!supabase) {
       setError('Authentication service not available');
       return;
     }
 
     try {
-      const {
-        data: { user: currentUser },
-        error
-      } = await supabase.auth.getUser();
-      if (error) {
-        setError(error.message);
-        setUser(null);
-      } else {
-        setUser(currentUser);
-        setError(null);
-      }
+      await authCircuitBreaker.execute(async () => {
+        const {
+          data: { user: currentUser },
+          error
+        } = await supabase.auth.getUser();
+        if (error) {
+          setError(error.message);
+          setUser(null);
+        } else {
+          setUser(currentUser);
+          setError(null);
+        }
+      });
     } catch (err) {
       console.error('Error refreshing user:', err);
       setError('Failed to refresh user');
     }
-  };
+  }, 2000); // 2 second debounce
 
-  const refreshSubscription = async () => {
+  const refreshSubscription = debounceAuth(async () => {
     if (!user || !supabase) return;
 
     try {
@@ -328,7 +352,7 @@ export function AuthProvider({
     } catch (err) {
       console.error('Error refreshing subscription:', err);
     }
-  };
+  }, 3000); // 3 second debounce
 
   const value: AuthContextType = {
     user,

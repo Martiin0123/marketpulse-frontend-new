@@ -6,12 +6,12 @@ const PROTECTED_ROUTES = ['/dashboard', '/signals', '/account', '/referrals', '/
 
 // Simple cache to reduce auth requests
 const authCache = new Map<string, { user: User | null; timestamp: number }>();
-const CACHE_DURATION = 30 * 1000; // 30 seconds (reduced from 60)
+const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes cache duration
 
-// Rate limiting for auth requests - more lenient for production
+// Rate limiting for auth requests - more conservative
 const rateLimitMap = new Map<string, { count: number; timestamp: number }>();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const MAX_REQUESTS_PER_WINDOW = 20; // Increased from 5 to 20 auth requests per minute per IP
+const MAX_REQUESTS_PER_WINDOW = 5; // Reduced to 5 auth requests per minute per IP
 
 // Clean up old cache entries periodically
 setInterval(() => {
@@ -210,16 +210,8 @@ export const updateSession = async (request: NextRequest) => {
       }
     }
 
-    // Only refresh session for protected routes to reduce auth calls
-    if (PROTECTED_ROUTES.some(route => pathname.startsWith(route))) {
-      try {
-        await supabase.auth.getUser();
-      } catch (authError) {
-        console.error('Session refresh error in middleware:', authError);
-        // If session refresh fails, continue with the request
-        // The page will handle authentication itself
-      }
-    }
+    // Skip session refresh in middleware - let the page handle it
+    // This reduces the number of auth requests significantly
 
     return response;
   } catch (e) {
