@@ -20,7 +20,7 @@ export default async function SignIn({
   searchParams
 }: {
   params: { id: string };
-  searchParams: { disable_button: boolean };
+  searchParams: { disable_button: boolean; next?: string };
 }) {
   const { allowEmail, allowPassword } = getAuthTypes();
   const viewTypes = getViewTypes();
@@ -47,7 +47,16 @@ export default async function SignIn({
   } = await supabase.auth.getUser();
 
   if (user && viewProp !== 'update_password') {
-    return redirect('/');
+    // Check if there's a 'next' parameter to redirect to
+    const nextUrl = searchParams.next;
+
+    // If there's a next URL and it's a valid internal path, redirect there
+    if (nextUrl && nextUrl.startsWith('/') && !nextUrl.startsWith('//')) {
+      return redirect(nextUrl);
+    }
+
+    // Otherwise redirect to dashboard
+    return redirect('/dashboard');
   } else if (!user && viewProp === 'update_password') {
     return redirect('/signin');
   }
@@ -70,6 +79,7 @@ export default async function SignIn({
             <PasswordSignIn
               allowEmail={allowEmail}
               redirectMethod={redirectMethod}
+              disableButton={searchParams.disable_button}
             />
           )}
           {viewProp === 'email_signin' && (
@@ -86,9 +96,7 @@ export default async function SignIn({
               disableButton={searchParams.disable_button}
             />
           )}
-          {viewProp === 'update_password' && (
-            <UpdatePassword redirectMethod={redirectMethod} />
-          )}
+          {viewProp === 'update_password' && <UpdatePassword />}
           {viewProp === 'signup' && (
             <SignUp allowEmail={allowEmail} redirectMethod={redirectMethod} />
           )}

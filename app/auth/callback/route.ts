@@ -26,9 +26,24 @@ export async function GET(request: NextRequest) {
   }
 
   // URL to redirect to after sign in process completes
+  // Check if there's a 'next' parameter to redirect to
+  const nextUrl = requestUrl.searchParams.get('next');
+  
+  // If there's a next URL and it's a valid internal path, redirect there
+  if (nextUrl && nextUrl.startsWith('/') && !nextUrl.startsWith('//')) {
+    return NextResponse.redirect(
+      getStatusRedirect(
+        `${requestUrl.origin}${nextUrl}`,
+        'Success!',
+        'You are now signed in.'
+      )
+    );
+  }
+  
+  // Otherwise redirect to dashboard
   return NextResponse.redirect(
     getStatusRedirect(
-      `${requestUrl.origin}/account`,
+      `${requestUrl.origin}/dashboard`,
       'Success!',
       'You are now signed in.'
     )

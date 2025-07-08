@@ -135,6 +135,7 @@ export async function signInWithPassword(formData: FormData) {
   const cookieStore = cookies();
   const email = String(formData.get('email')).trim();
   const password = String(formData.get('password')).trim();
+  const nextUrl = String(formData.get('next') || '').trim();
   let redirectPath: string;
 
   const supabase = createClient();
@@ -151,7 +152,13 @@ export async function signInWithPassword(formData: FormData) {
     );
   } else if (data.user) {
     cookieStore.set('preferredSignInView', 'password_signin', { path: '/' });
-    redirectPath = getStatusRedirect('/', 'Success!', 'You are now signed in.');
+    
+    // If there's a next URL and it's a valid internal path, redirect there
+    if (nextUrl && nextUrl.startsWith('/') && !nextUrl.startsWith('//')) {
+      redirectPath = getStatusRedirect(nextUrl, 'Success!', 'You are now signed in.');
+    } else {
+      redirectPath = getStatusRedirect('/dashboard', 'Success!', 'You are now signed in.');
+    }
   } else {
     redirectPath = getErrorRedirect(
       '/signin/password_signin',

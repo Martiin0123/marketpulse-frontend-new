@@ -4,7 +4,9 @@ import {
   getBybitPosition, 
   getBybitAccount,
   convertSymbolFormat,
-  getBybitTickerPrice
+  getBybitTickerPrice,
+  getBybitSymbolInfo,
+  setBybitLeverage
 } from '@/utils/bybit/client'
 
 const supabase = createClient(
@@ -71,21 +73,34 @@ function parseAIAlgorithmAlert(alertMessage) {
   
   // Extract symbol and price from alert message
   // Format: "Primescope LONG Entry! Symbol: SOLUSDT, Price: 45.20"
+  // OR simplified: "BTCUSD BUY" or "SOLUSDT SELL"
   const symbolMatch = alertMessage.match(/Symbol:\s*([A-Z]+)/);
   const priceMatch = alertMessage.match(/Price:\s*([\d.]+)/);
   
-  const symbol = symbolMatch ? symbolMatch[1] : null;
-  const price = priceMatch ? parseFloat(priceMatch[1]) : null;
+  let symbol = symbolMatch ? symbolMatch[1] : null;
+  let price = priceMatch ? parseFloat(priceMatch[1]) : null;
+  
+  // Handle simplified format: "BTCUSD BUY" or "SOLUSDT SELL"
+  if (!symbol) {
+    const words = alertMessage.trim().split(/\s+/);
+    if (words.length >= 2) {
+      symbol = words[0];
+      const actionWord = words[1].toUpperCase();
+      if (actionWord === 'BUY' || actionWord === 'SELL' || actionWord === 'LONG' || actionWord === 'SHORT') {
+        // We'll determine action below
+      }
+    }
+  }
   
   // Determine action based on alert message
   let action = null;
   let signalType = null;
   let exitReason = null;
   
-  if (alertMessage.includes('LONG Entry')) {
+  if (alertMessage.includes('LONG Entry') || alertMessage.includes('BUY') || alertMessage.includes('LONG')) {
     action = 'BUY';
     signalType = 'entry';
-  } else if (alertMessage.includes('SHORT Entry')) {
+  } else if (alertMessage.includes('SHORT Entry') || alertMessage.includes('SELL') || alertMessage.includes('SHORT')) {
     action = 'SELL';
     signalType = 'entry';
   } else if (alertMessage.includes('LONG Exit') || alertMessage.includes('SHORT Exit')) {
@@ -96,6 +111,11 @@ function parseAIAlgorithmAlert(alertMessage) {
     } else if (alertMessage.includes('Stop/Trailing')) {
       exitReason = 'stop_trailing';
     }
+  }
+  
+  // If no price provided, we'll get it from Bybit API
+  if (!price) {
+    console.log('📊 No price in alert, will fetch from Bybit API');
   }
   
   console.log('📊 Parsed signal data:', {
@@ -324,93 +344,124 @@ async function sendErrorDiscordNotification(signal, error, webhookUrl) {
 }
 
 export async function POST(request) {
-  const body = await request.json()
-  
-  // Handle both direct API calls and Pine Script alerts
-  let signalData;
-  
-  if (body.alert_message) {
-    // Parse Pine Script alert message
-    signalData = parseAIAlgorithmAlert(body.alert_message);
-    console.log('📨 Received Pine Script alert for Bybit:', signalData);
-  } else {
-    // Direct API call format
-    signalData = {
-      symbol: body.symbol,
-      price: body.price,
-      action: body.action,
-      quantity: body.quantity || 1,
-      strategy_metadata: body.strategy_metadata || {},
-      signalType: body.signal_type || 'entry',
-      exitReason: body.exit_reason
-    };
-  }
-
-  const { symbol, price, action, quantity = 1, strategy_metadata = {}, signalType = 'entry', exitReason } = signalData;
-
-  if (!symbol || !action || !price) {
-    return new Response(JSON.stringify({ 
-      error: 'Missing required fields: symbol, action, price',
-      received: body
-    }), { status: 400 })
-  }
-
-  // Convert symbol format for Bybit (e.g., BTCUSD -> BTCUSDT)
-  const bybitSymbol = convertSymbolFormat(symbol.toUpperCase(), true);
-  
-  // Parse and validate timestamp
-  let validTimestamp
-  let unixTimestamp
+  console.log('🚀 API endpoint hit: /api/bybit/tradingview');
   try {
-    const timestamp = body.timestamp || body.time || Date.now();
-    if (typeof timestamp === 'string') {
-      validTimestamp = new Date(timestamp).toISOString()
-      unixTimestamp = Math.floor(new Date(timestamp).getTime() / 1000)
-    } else {
-      validTimestamp = new Date(Number(timestamp) * 1000).toISOString()
-      unixTimestamp = Math.floor(Date.now() / 1000)
-    }
-      
-    if (isNaN(new Date(validTimestamp).getTime())) {
-      throw new Error('Invalid timestamp')
-    }
-  } catch (error) {
-    validTimestamp = new Date().toISOString()
-    unixTimestamp = Math.floor(Date.now() / 1000)
-  }
-
-  const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
-  const discordFreeWebhookUrl = process.env.DISCORD_WEBHOOK_URL_FREE;
-  
-  // Get trade counter from database or initialize
-  let tradeCounter = 1;
-  try {
-    const { data: counterData } = await supabase
-      .from('trade_counter')
-      .select('counter')
-      .single();
+    // Check environment variables
+    console.log('🔑 Environment check:', {
+      hasBybitKey: !!process.env.BYBIT_API_KEY,
+      hasBybitSecret: !!process.env.BYBIT_SECRET_KEY,
+      bybitTestnet: process.env.BYBIT_TESTNET
+    });
     
-    if (counterData) {
-      tradeCounter = counterData.counter + 1;
-    }
+    console.log('📨 About to parse request body...');
+    const body = await request.json();
+    console.log('📨 Request body parsed successfully:', body);
     
-    // Update counter in database
-    await supabase
-      .from('trade_counter')
-      .upsert({ id: 1, counter: tradeCounter, updated_at: new Date().toISOString() });
-      
-  } catch (error) {
-    console.log('⚠️ Could not get trade counter, using default:', error.message);
-  }
-  
-  const isEveryFifthTrade = tradeCounter % 5 === 0;
-  console.log(`📊 Trade counter: ${tradeCounter}${isEveryFifthTrade ? ' (5th trade - sending to both webhooks)' : ''}`);
+    // Handle both direct API calls and Pine Script alerts
+    console.log('🔍 About to parse signal data...');
+    let signalData;
+    try {
+      if (body.alert_message) {
+        // Parse Pine Script alert message
+        console.log('📨 Parsing Pine Script alert message...');
+        signalData = parseAIAlgorithmAlert(body.alert_message);
+        console.log('📨 Received Pine Script alert for Bybit:', signalData);
+      } else {
+        // Direct API call format
+        console.log('📨 Using direct API call format...');
+        signalData = {
+          symbol: body.symbol,
+          price: body.price,
+          action: body.action,
+          quantity: body.quantity || 1,
+          strategy_metadata: body.strategy_metadata || {},
+          signalType: body.signal_type || 'entry',
+          exitReason: body.exit_reason
+        };
+      }
+    } catch (parseError) {
+      console.error('❌ Error parsing signal data:', parseError);
+      return new Response(JSON.stringify({ 
+        error: 'Failed to parse signal data',
+        details: parseError.message
+      }), { 
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
-  try {
+    console.log('🔍 Extracting signal data...');
+    const { symbol, price, action, quantity = 1, strategy_metadata = {}, signalType = 'entry', exitReason } = signalData;
+    console.log('📊 Extracted signal data:', { symbol, price, action, quantity, signalType, exitReason });
+
+    if (!symbol || !action) {
+      console.log('❌ Missing required fields:', { symbol, action, price });
+      return new Response(JSON.stringify({ 
+        error: 'Missing required fields: symbol, action',
+        received: body
+      }), { 
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Convert symbol format for Bybit (e.g., BTCUSD -> BTCUSDT)
+    const bybitSymbol = convertSymbolFormat(symbol.toUpperCase(), true);
+    
+    // Parse and validate timestamp
+    let validTimestamp;
+    let unixTimestamp;
+    try {
+      const timestamp = body.timestamp || body.time || Date.now();
+      if (typeof timestamp === 'string') {
+        validTimestamp = new Date(timestamp).toISOString();
+        unixTimestamp = Math.floor(new Date(timestamp).getTime() / 1000);
+      } else {
+        validTimestamp = new Date(Number(timestamp) * 1000).toISOString();
+        unixTimestamp = Math.floor(Date.now() / 1000);
+      }
+      if (isNaN(new Date(validTimestamp).getTime())) {
+        throw new Error('Invalid timestamp');
+      }
+    } catch (error) {
+      validTimestamp = new Date().toISOString();
+      unixTimestamp = Math.floor(Date.now() / 1000);
+    }
+
+    const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
+    const discordFreeWebhookUrl = process.env.DISCORD_WEBHOOK_URL_FREE;
+    
+    // Get trade counter from database or initialize (make it optional to avoid rate limits)
+    let tradeCounter = 1;
+    let isEveryFifthTrade = false;
+    let dbErrorHint = null;
+    try {
+      const { data: counterData } = await supabase
+        .from('trade_counter')
+        .select('counter')
+        .single();
+      if (counterData) {
+        tradeCounter = counterData.counter + 1;
+      }
+      // Update counter in database
+      await supabase
+        .from('trade_counter')
+        .upsert({ id: 1, counter: tradeCounter, updated_at: new Date().toISOString() });
+      isEveryFifthTrade = tradeCounter % 5 === 0;
+      console.log(`📊 Trade counter: ${tradeCounter}${isEveryFifthTrade ? ' (5th trade - sending to both webhooks)' : ''}`);
+    } catch (error) {
+      dbErrorHint = '⚠️ Signal was NOT saved to the database due to rate limit or DB error.';
+      console.log('⚠️ Could not get trade counter (rate limit?), using default:', error.message);
+      // Don't fail the entire request if trade counter fails
+    }
+
+    console.log('🔍 Starting Bybit API calls...');
+    
     // Get current price from Bybit if not provided
     let currentPrice = price;
     if (!currentPrice || currentPrice === 0) {
       try {
+        console.log('📊 Fetching current price for symbol:', bybitSymbol);
         const tickerPrice = await getBybitTickerPrice(bybitSymbol);
         currentPrice = tickerPrice;
         console.log('📊 Fetched current price from Bybit:', { symbol: bybitSymbol, price: currentPrice });
@@ -421,57 +472,65 @@ export async function POST(request) {
     }
 
     // Get Bybit account info
-    const account = await getBybitAccount()
+    console.log('📊 Fetching Bybit account info...');
+    const account = await getBybitAccount();
     console.log('📊 Bybit Account:', {
       totalEquity: account.totalEquity,
       totalWalletBalance: account.totalWalletBalance,
       totalAvailableBalance: account.totalAvailableBalance
-    })
+    });
 
     let orderResult = null;
     let databaseResult = null;
+    let signalSaved = true;
 
     // Handle CLOSE action (exit signal from Pine Script)
     if (action.toUpperCase() === 'CLOSE') {
-      try {
-        // Check if position exists in Bybit
-        const bybitPosition = await getBybitPosition(bybitSymbol)
+      // Check if position exists in Bybit
+      const bybitPosition = await getBybitPosition(bybitSymbol);
+      
+      if (!bybitPosition) {
+        const error = new Error('No open position found to close');
+        console.log('⚠️ No position to close for:', bybitSymbol);
         
-        if (!bybitPosition) {
-          const error = new Error('No open position found to close');
-          console.log('⚠️ No position to close for:', bybitSymbol);
-          
-          if (discordWebhookUrl) {
-            await sendErrorDiscordNotification({
-              symbol: symbol.toUpperCase(),
-              action: 'CLOSE',
-              price: currentPrice
-            }, error, discordWebhookUrl);
-          }
-          
-          return new Response(JSON.stringify({ 
-            message: 'No open position found to close',
-            symbol: bybitSymbol
-          }), { status: 404 })
+        if (discordWebhookUrl) {
+          await sendErrorDiscordNotification({
+            symbol: symbol.toUpperCase(),
+            action: 'CLOSE',
+            price: currentPrice,
+            dbErrorHint
+          }, error, discordWebhookUrl);
         }
-
-        // Submit sell order to close position
-        orderResult = await submitBybitOrder({
+        
+        return new Response(JSON.stringify({ 
+          message: 'No open position found to close',
           symbol: bybitSymbol,
-          side: bybitPosition.side === 'Buy' ? 'Sell' : 'Buy', // Reverse the position
-          orderType: 'Market',
-          qty: bybitPosition.size,
-          reduceOnly: true
-        })
+          dbErrorHint
+        }), { 
+          status: 404,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
 
-        console.log('🔴 Bybit position close order submitted:', {
-          symbol: bybitSymbol,
-          qty: bybitPosition.size,
-          order_id: orderResult.orderId,
-          status: orderResult.orderStatus,
-          exit_reason: exitReason
-        })
+      // Submit sell order to close position
+      orderResult = await submitBybitOrder({
+        symbol: bybitSymbol,
+        side: bybitPosition.side === 'Buy' ? 'Sell' : 'Buy', // Reverse the position
+        orderType: 'Market',
+        qty: bybitPosition.size,
+        reduceOnly: true
+      });
 
+      console.log('🔴 Bybit position close order submitted:', {
+        symbol: bybitSymbol,
+        qty: bybitPosition.size,
+        order_id: orderResult.orderId,
+        status: orderResult.orderStatus,
+        exit_reason: exitReason
+      });
+
+      // Try to update database (but don't fail if it doesn't work)
+      try {
         // Find and update the original BUY signal with exit information
         const { data: originalSignal, error: findError } = await supabase
           .from('signals')
@@ -482,12 +541,12 @@ export async function POST(request) {
           .eq('exchange', 'bybit')
           .order('created_at', { ascending: false })
           .limit(1)
-          .single()
+          .single();
 
         if (originalSignal) {
-          const entryPrice = Number(originalSignal.entry_price)
-          const exitPrice = Number(currentPrice)
-          const pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100
+          const entryPrice = Number(originalSignal.entry_price);
+          const exitPrice = Number(currentPrice);
+          const pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
 
           // Update the original BUY signal with exit information
           const { data: updatedSignal, error: updateSignalError } = await supabase
@@ -501,10 +560,12 @@ export async function POST(request) {
             })
             .eq('id', originalSignal.id)
             .select()
-            .single()
+            .single();
 
           if (updateSignalError) {
             console.error('❌ Error updating original signal:', updateSignalError);
+            signalSaved = false;
+            dbErrorHint = '⚠️ Signal was NOT saved to the database due to rate limit or DB error.';
           } else {
             console.log('✅ Updated original signal with exit data:', {
               signal_id: originalSignal.id,
@@ -533,7 +594,11 @@ export async function POST(request) {
             technical_metadata: strategy_metadata
           }])
           .select()
-          .single()
+          .single();
+        if (signalError) {
+          signalSaved = false;
+          dbErrorHint = '⚠️ Signal was NOT saved to the database due to rate limit or DB error.';
+        }
 
         // Send success Discord notification
         if (discordWebhookUrl) {
@@ -543,7 +608,8 @@ export async function POST(request) {
             price: currentPrice,
             timestamp: validTimestamp,
             strategy_metadata: strategy_metadata,
-            exitReason: exitReason
+            exitReason: exitReason,
+            dbErrorHint
           }, orderResult, discordWebhookUrl);
         }
         
@@ -555,7 +621,8 @@ export async function POST(request) {
             price: currentPrice,
             timestamp: validTimestamp,
             strategy_metadata: strategy_metadata,
-            exitReason: exitReason
+            exitReason: exitReason,
+            dbErrorHint
           }, orderResult, discordFreeWebhookUrl, true);
         }
 
@@ -566,70 +633,177 @@ export async function POST(request) {
           bybit_position: bybitPosition,
           signal_id: signal?.id,
           pnl_percentage: databaseResult?.pnl_percentage || null,
-          exit_reason: exitReason
-        }), { status: 200 })
+          exit_reason: exitReason,
+          signalSaved,
+          dbErrorHint
+        }), { 
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
 
-      } catch (error) {
-        console.error('❌ Error closing position:', error);
-        
+      } catch (dbError) {
+        console.error('❌ Database error (rate limit?), but order was successful:', dbError);
+        signalSaved = false;
+        dbErrorHint = '⚠️ Signal was NOT saved to the database due to rate limit or DB error.';
+        // Return success even if database fails
         if (discordWebhookUrl) {
-          await sendErrorDiscordNotification({
+          await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
             action: 'CLOSE',
-            price: currentPrice
-          }, error, discordWebhookUrl);
+            price: currentPrice,
+            timestamp: validTimestamp,
+            strategy_metadata: strategy_metadata,
+            exitReason: exitReason,
+            dbErrorHint
+          }, orderResult, discordWebhookUrl);
         }
-        
-        throw error;
+        return new Response(JSON.stringify({ 
+          message: 'Bybit position close order submitted successfully (database update failed)',
+          order_id: orderResult.orderId,
+          symbol: bybitSymbol,
+          bybit_position: bybitPosition,
+          error: 'Database update failed due to rate limit',
+          signalSaved,
+          dbErrorHint
+        }), { 
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
       }
     }
 
-    // Handle BUY action (long entry signal from Pine Script)
-    if (action.toUpperCase() === 'BUY') {
-      try {
-        // Check for existing position in Bybit
-        const existingBybitPosition = await getBybitPosition(bybitSymbol)
-        
-        if (existingBybitPosition) {
-          const error = new Error('Position already exists');
-          console.log('⚠️ Position already exists:', existingBybitPosition)
-          
-          if (discordWebhookUrl) {
-            await sendErrorDiscordNotification({
-              symbol: symbol.toUpperCase(),
-              action: 'BUY',
-              price: currentPrice
-            }, error, discordWebhookUrl);
-          }
-          
-          return new Response(JSON.stringify({ 
-            message: 'Position already exists',
-            symbol: bybitSymbol,
-            position: existingBybitPosition
-          }), { status: 200 })
+    // Handle BUY/SELL action with dynamic position sizing
+    if (action.toUpperCase() === 'BUY' || action.toUpperCase() === 'SELL') {
+      const isBuy = action.toUpperCase() === 'BUY';
+
+      // Check for existing position in Bybit
+      const existingBybitPosition = await getBybitPosition(bybitSymbol);
+
+      if (existingBybitPosition) {
+        const error = new Error('Position already exists');
+        console.log('⚠️ Position already exists:', existingBybitPosition);
+
+        if (discordWebhookUrl) {
+          await sendErrorDiscordNotification({
+            symbol: symbol.toUpperCase(),
+            action: isBuy ? 'BUY' : 'SELL',
+            price: currentPrice,
+            dbErrorHint
+          }, error, discordWebhookUrl);
         }
 
-        // Submit buy order
-        orderResult = await submitBybitOrder({
+        return new Response(JSON.stringify({
+          message: 'Position already exists',
           symbol: bybitSymbol,
-          side: 'Buy',
-          orderType: 'Market',
-          qty: quantity.toString()
-        })
+          position: existingBybitPosition,
+          dbErrorHint
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
 
-        console.log('🟢 Bybit buy order submitted:', {
-          symbol: bybitSymbol,
-          qty: quantity,
-          order_id: orderResult.orderId,
-          status: orderResult.orderStatus
-        })
+      // 🧠 Dynamic position sizing: use 45% of available margin
+      const leverage = 10; // Or fetch dynamically from your config
+      const riskPercent = 0.45;
 
-        // Create signal in database with Pine Script metadata
+      let quantity;
+      try {
+        const account = await getBybitAccount();
+        const availableMargin = Number(account.totalAvailableBalance);
+        const tradeAllocation = availableMargin * riskPercent;
+
+        const tickerPrice = await getBybitTickerPrice(bybitSymbol);
+        quantity = (tradeAllocation * leverage) / tickerPrice;
+
+        // Validate and round quantity based on Bybit requirements
+        if (quantity <= 0) {
+          throw new Error('Calculated quantity is zero or negative.');
+        }
+
+        // Get symbol info to determine proper quantity validation
+        let symbolInfo;
+        try {
+          symbolInfo = await getBybitSymbolInfo(bybitSymbol);
+        } catch (symbolError) {
+          console.warn(`⚠️ Could not fetch symbol info for ${bybitSymbol}, using default values:`, symbolError.message);
+          symbolInfo = null;
+        }
+
+        // Use symbol info for proper quantity validation
+        let minQuantity = 0.001; // Default minimum
+        let qtyStep = 0.001; // Default step size
+        
+        if (symbolInfo) {
+          minQuantity = parseFloat(symbolInfo.lotSizeFilter?.minOrderQty || '0.001');
+          qtyStep = parseFloat(symbolInfo.lotSizeFilter?.qtyStep || '0.001');
+        }
+
+        // Round quantity to meet step size requirements
+        const steps = Math.floor(quantity / qtyStep);
+        quantity = steps * qtyStep;
+
+        // Ensure minimum quantity
+        if (quantity < minQuantity) {
+          console.log(`⚠️ Calculated quantity ${quantity} is below minimum ${minQuantity}, using minimum`);
+          quantity = minQuantity;
+        }
+
+        // Fix floating-point precision issues by converting to string with proper decimal places
+        const decimalPlaces = qtyStep.toString().split('.')[1]?.length || 0;
+        quantity = parseFloat(quantity.toFixed(decimalPlaces));
+
+        console.log(`📏 Final quantity after validation: ${quantity} (min: ${minQuantity}, step: ${qtyStep})`);
+
+        console.log('📏 Calculated dynamic position size:', {
+          availableMargin,
+          tradeAllocation,
+          tickerPrice,
+          leverage,
+          quantity
+        });
+
+        // Set leverage before placing order
+        try {
+          await setBybitLeverage(bybitSymbol, leverage);
+          console.log(`✅ Leverage set to ${leverage}x for ${bybitSymbol}`);
+        } catch (leverageError) {
+          console.warn(`⚠️ Could not set leverage for ${bybitSymbol}:`, leverageError.message);
+          // Continue with order placement even if leverage setting fails
+        }
+      } catch (calcError) {
+        console.error('❌ Failed to calculate position size:', calcError);
+        return new Response(JSON.stringify({
+          error: 'Failed to calculate position size',
+          details: calcError.message
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      // Submit buy/sell order
+      orderResult = await submitBybitOrder({
+        symbol: bybitSymbol,
+        side: isBuy ? 'Buy' : 'Sell',
+        orderType: 'Market',
+        qty: quantity.toString()
+      });
+
+      console.log(`${isBuy ? '🟢 Buy' : '🔴 Sell'} order submitted:`, {
+        symbol: bybitSymbol,
+        qty: quantity,
+        order_id: orderResult.orderId,
+        status: orderResult.orderStatus
+      });
+
+      // Try to update database (but don't fail if it doesn't work)
+      try {
         const { data: signal, error: signalError } = await supabase
           .from('signals')
           .insert([{
             symbol: symbol.toUpperCase(),
-            type: 'buy',
+            type: isBuy ? 'buy' : 'sell',
             entry_price: currentPrice,
             created_at: validTimestamp,
             strategy_name: 'Primescope Crypto',
@@ -640,167 +814,95 @@ export async function POST(request) {
             technical_metadata: strategy_metadata
           }])
           .select()
-          .single()
+          .single();
 
         databaseResult = signal;
+        if (signalError) {
+          signalSaved = false;
+          dbErrorHint = '⚠️ Signal was NOT saved to the database due to rate limit or DB error.';
+          console.error('❌ Database insert error:', signalError);
+        } else {
+          signalSaved = true;
+          console.log('✅ Signal saved to database:', signal?.id);
+        }
 
         // Send success Discord notification
         if (discordWebhookUrl) {
           await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
-            action: 'BUY',
+            action: isBuy ? 'BUY' : 'SELL',
             price: currentPrice,
             timestamp: validTimestamp,
             quantity: quantity,
-            strategy_metadata: strategy_metadata
+            strategy_metadata: strategy_metadata,
+            dbErrorHint
           }, orderResult, discordWebhookUrl);
         }
 
-        return new Response(JSON.stringify({ 
-          message: 'Bybit buy order submitted successfully',
+        return new Response(JSON.stringify({
+          message: `Bybit ${isBuy ? 'buy' : 'sell'} order submitted successfully`,
           order_id: orderResult.orderId,
-          signal_id: signal.id,
+          signal_id: signal?.id || null,
           symbol: bybitSymbol,
           entry_price: currentPrice,
-          rsi_value: strategy_metadata.rsi_value
-        }), { status: 200 })
+          rsi_value: strategy_metadata.rsi_value,
+          signalSaved,
+          dbErrorHint
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
 
-      } catch (error) {
-        console.error('❌ Error submitting buy order:', error);
-        
-        if (discordWebhookUrl) {
-          await sendErrorDiscordNotification({
-            symbol: symbol.toUpperCase(),
-            action: 'BUY',
-            price: currentPrice
-          }, error, discordWebhookUrl);
-        }
-        
-        throw error;
-      }
-    }
+      } catch (dbError) {
+        console.error('❌ Database error (rate limit?), but order was successful:', dbError);
+        signalSaved = false;
+        dbErrorHint = '⚠️ Signal was NOT saved to the database due to rate limit or DB error.';
 
-    // Handle SELL action (short entry signal from Pine Script)
-    if (action.toUpperCase() === 'SELL') {
-      try {
-        // Check for existing position in Bybit
-        const existingBybitPosition = await getBybitPosition(bybitSymbol)
-        
-        if (existingBybitPosition) {
-          const error = new Error('Position already exists');
-          console.log('⚠️ Position already exists:', existingBybitPosition)
-          
-          if (discordWebhookUrl) {
-            await sendErrorDiscordNotification({
-              symbol: symbol.toUpperCase(),
-              action: 'SELL',
-              price: currentPrice
-            }, error, discordWebhookUrl);
-          }
-          
-          return new Response(JSON.stringify({ 
-            message: 'Position already exists',
-            symbol: bybitSymbol,
-            position: existingBybitPosition
-          }), { status: 200 })
-        }
-
-        // Submit sell order (short)
-        orderResult = await submitBybitOrder({
-          symbol: bybitSymbol,
-          side: 'Sell',
-          orderType: 'Market',
-          qty: quantity.toString()
-        })
-
-        console.log('🔴 Bybit sell order submitted:', {
-          symbol: bybitSymbol,
-          qty: quantity,
-          order_id: orderResult.orderId,
-          status: orderResult.orderStatus
-        })
-
-        // Create signal in database with Pine Script metadata
-        const { data: signal, error: signalError } = await supabase
-          .from('signals')
-          .insert([{
-            symbol: symbol.toUpperCase(),
-            type: 'sell',
-            entry_price: currentPrice,
-            created_at: validTimestamp,
-            strategy_name: 'Primescope Crypto',
-            signal_source: 'ai_algorithm',
-            exchange: 'bybit',
-            status: 'active',
-            rsi_value: strategy_metadata.rsi_value,
-            technical_metadata: strategy_metadata
-          }])
-          .select()
-          .single()
-
-        databaseResult = signal;
-
-        // Send success Discord notification
         if (discordWebhookUrl) {
           await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
-            action: 'SELL',
+            action: isBuy ? 'BUY' : 'SELL',
             price: currentPrice,
             timestamp: validTimestamp,
             quantity: quantity,
-            strategy_metadata: strategy_metadata
+            strategy_metadata: strategy_metadata,
+            dbErrorHint
           }, orderResult, discordWebhookUrl);
         }
 
-        return new Response(JSON.stringify({ 
-          message: 'Bybit sell order submitted successfully',
+        return new Response(JSON.stringify({
+          message: `Bybit ${isBuy ? 'buy' : 'sell'} order submitted successfully (database update failed)`,
           order_id: orderResult.orderId,
-          signal_id: signal.id,
           symbol: bybitSymbol,
           entry_price: currentPrice,
-          rsi_value: strategy_metadata.rsi_value
-        }), { status: 200 })
-
-      } catch (error) {
-        console.error('❌ Error submitting sell order:', error);
-        
-        if (discordWebhookUrl) {
-          await sendErrorDiscordNotification({
-            symbol: symbol.toUpperCase(),
-            action: 'SELL',
-            price: currentPrice
-          }, error, discordWebhookUrl);
-        }
-        
-        throw error;
+          error: 'Database update failed due to rate limit',
+          signalSaved,
+          dbErrorHint
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
       }
     }
+
+
 
     return new Response(JSON.stringify({ 
       error: 'Invalid action. Must be BUY, SELL, or CLOSE',
       received: signalData
-    }), { status: 400 })
+    }), { 
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
 
   } catch (error) {
-    console.error('❌ Error processing Bybit Pine Script trading signal:', error)
-    
-    // Send error notification to Discord if not already sent
-    if (discordWebhookUrl && !error.discordNotified) {
-      try {
-        await sendErrorDiscordNotification({
-          symbol: symbol?.toUpperCase(),
-          action: action,
-          price: price
-        }, error, discordWebhookUrl);
-      } catch (discordError) {
-        console.error('❌ Failed to send error notification to Discord:', discordError);
-      }
-    }
-    
+    console.error('❌ Top-level error in POST handler:', error);
     return new Response(JSON.stringify({ 
-      error: 'Failed to process Bybit trading signal',
-      details: error.message,
-      received: body
-    }), { status: 500 })
+      error: 'Unexpected error in POST handler',
+      details: error.message
+    }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 } 

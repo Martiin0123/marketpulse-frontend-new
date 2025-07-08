@@ -143,6 +143,25 @@ pnpm dlx vercel env pull .env.local
 
 Running this command will create a new `.env.local` file in your project folder. For security purposes, you will need to set the `SUPABASE_SERVICE_ROLE_KEY` manually from your [Supabase dashboard](https://app.supabase.io/) (`Settings > API`). If you are not using a local Supabase instance, you should also change the `--local` flag to `--linked' or '--project-id <string>' in the `supabase:generate-types`script in`package.json`.(see -> [https://supabase.com/docs/reference/cli/supabase-gen-types-typescript])
 
+### Local development with Docker (Recommended)
+
+For the easiest setup with auth middleware disabled (to avoid Supabase rate limiting), use Docker:
+
+```bash
+# Quick start with auth disabled (recommended for development)
+./scripts/docker-dev.sh
+
+# Or with auth enabled (for testing authentication)
+./scripts/docker-dev-auth.sh
+
+# Manual Docker commands
+docker-compose -f docker-compose.dev.yml up --build
+```
+
+The application will be available at `http://localhost:3004` with hot reloading enabled.
+
+**Note:** The development Docker setup automatically disables auth middleware to prevent Supabase rate limiting issues during development.
+
 ### Local development with Supabase
 
 It's highly recommended to use a local Supabase instance for development and testing. We have provided a set of custom commands for this in `package.json`.

@@ -24,6 +24,7 @@ EXPOSE 3000
 # Set environment to development
 ENV NODE_ENV=development
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV DISABLE_AUTH_MIDDLEWARE=true
 
 # Start development server
 CMD ["pnpm", "dev"] 

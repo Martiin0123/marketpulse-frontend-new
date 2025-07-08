@@ -9,6 +9,14 @@ function createBybitClient() {
   const BYBIT_SECRET_KEY = process.env.BYBIT_SECRET_KEY;
   const BYBIT_TESTNET = process.env.BYBIT_TESTNET === 'true'; // Use testnet by default
 
+  console.log('🔧 Environment variables check:', {
+    hasApiKey: !!BYBIT_API_KEY,
+    hasSecretKey: !!BYBIT_SECRET_KEY,
+    apiKeyLength: BYBIT_API_KEY?.length || 0,
+    secretKeyLength: BYBIT_SECRET_KEY?.length || 0,
+    testnet: BYBIT_TESTNET
+  });
+
   if (!BYBIT_API_KEY || !BYBIT_SECRET_KEY) {
     throw new Error('Bybit API keys not configured. Please set BYBIT_API_KEY and BYBIT_SECRET_KEY in your environment variables.');
   }
@@ -122,10 +130,18 @@ export interface BybitOrder {
 // Account functions
 export async function getBybitAccount(): Promise<any> {
   try {
+    console.log('🔍 Calling getBybitAccount()...');
     const client = getBybitClient();
     if (!client) throw new Error('Bybit client not initialized');
     
+    console.log('📊 Making getWalletBalance API call...');
     const response = await client.getWalletBalance({ accountType: 'UNIFIED' });
+    console.log('📊 getWalletBalance response:', {
+      retCode: response.retCode,
+      retMsg: response.retMsg,
+      hasResult: !!response.result,
+      hasList: !!(response.result && response.result.list)
+    });
     
     if (response.retCode !== 0) {
       throw new Error(`Bybit API error: ${response.retMsg}`);
@@ -133,7 +149,7 @@ export async function getBybitAccount(): Promise<any> {
     
     return response.result.list[0];
   } catch (error) {
-    console.error('Error fetching Bybit account:', error);
+    console.error('❌ Error fetching Bybit account:', error);
     throw error;
   }
 }
@@ -195,6 +211,19 @@ export async function submitBybitOrder(orderData: {
     const client = getBybitClient();
     if (!client) throw new Error('Bybit client not initialized');
     
+    console.log('📤 Submitting Bybit order with data:', {
+      category: 'linear',
+      symbol: orderData.symbol,
+      side: orderData.side,
+      orderType: orderData.orderType,
+      qty: orderData.qty,
+      price: orderData.price,
+      timeInForce: orderData.timeInForce || 'GTC',
+      reduceOnly: orderData.reduceOnly,
+      closeOnTrigger: orderData.closeOnTrigger,
+      orderLinkId: orderData.orderLinkId
+    });
+    
     const response = await client.submitOrder({
       category: 'linear',
       symbol: orderData.symbol,
@@ -206,6 +235,12 @@ export async function submitBybitOrder(orderData: {
       reduceOnly: orderData.reduceOnly,
       closeOnTrigger: orderData.closeOnTrigger,
       orderLinkId: orderData.orderLinkId
+    });
+    
+    console.log('📥 Bybit API response:', {
+      retCode: response.retCode,
+      retMsg: response.retMsg,
+      result: response.result
     });
     
     if (response.retCode !== 0) {
@@ -331,15 +366,86 @@ export function convertSymbolFormat(symbol: string, toBybit: boolean = true): st
   }
 }
 
-// Get current ticker price from Bybit
-export async function getBybitTickerPrice(symbol: string): Promise<number> {
+// Get symbol information including minimum quantity requirements
+export async function getBybitSymbolInfo(symbol: string): Promise<any> {
   try {
+    console.log(`🔍 Getting symbol info for ${symbol}...`);
     const client = getBybitClient();
     if (!client) throw new Error('Bybit client not initialized');
     
+    const response = await client.getInstrumentsInfo({
+      category: 'linear',
+      symbol: symbol
+    });
+    
+    if (response.retCode !== 0) {
+      throw new Error(`Bybit API error: ${response.retMsg}`);
+    }
+    
+    if (!response.result.list || response.result.list.length === 0) {
+      throw new Error(`No symbol info found for: ${symbol}`);
+    }
+    
+    const symbolInfo = response.result.list[0];
+    console.log(`📊 Symbol info for ${symbol}:`, {
+      minOrderQty: symbolInfo.lotSizeFilter?.minOrderQty,
+      qtyStep: symbolInfo.lotSizeFilter?.qtyStep,
+      priceScale: symbolInfo.priceFilter?.tickSize
+    });
+    
+    return symbolInfo;
+  } catch (error) {
+    console.error(`❌ Error fetching symbol info for ${symbol}:`, error);
+    throw error;
+  }
+}
+
+// Set leverage for a symbol
+export async function setBybitLeverage(symbol: string, leverage: number): Promise<void> {
+  try {
+    console.log(`🔧 Setting leverage for ${symbol} to ${leverage}x...`);
+    const client = getBybitClient();
+    if (!client) throw new Error('Bybit client not initialized');
+    
+    const response = await client.setLeverage({
+      category: 'linear',
+      symbol: symbol,
+      buyLeverage: leverage.toString(),
+      sellLeverage: leverage.toString()
+    });
+    
+    console.log('📊 Set leverage response:', {
+      retCode: response.retCode,
+      retMsg: response.retMsg
+    });
+    
+    if (response.retCode !== 0) {
+      throw new Error(`Bybit API error: ${response.retMsg}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error setting leverage for ${symbol}:`, error);
+    throw error;
+  }
+}
+
+// Get current ticker price from Bybit
+export async function getBybitTickerPrice(symbol: string): Promise<number> {
+  try {
+    console.log(`🔍 Calling getBybitTickerPrice(${symbol})...`);
+    const client = getBybitClient();
+    if (!client) throw new Error('Bybit client not initialized');
+    
+    console.log(`📊 Making getTickers API call for ${symbol}...`);
     const response = await client.getTickers({ 
       category: 'linear',
       symbol: symbol
+    });
+    console.log(`📊 getTickers response for ${symbol}:`, {
+      retCode: response.retCode,
+      retMsg: response.retMsg,
+      hasResult: !!response.result,
+      hasList: !!(response.result && response.result.list),
+      listLength: response.result?.list?.length || 0
     });
     
     if (response.retCode !== 0) {
@@ -360,7 +466,7 @@ export async function getBybitTickerPrice(symbol: string): Promise<number> {
     console.log(`📊 Fetched ticker price for ${symbol}: $${price}`);
     return price;
   } catch (error) {
-    console.error(`Error fetching ticker price for ${symbol}:`, error);
+    console.error(`❌ Error fetching ticker price for ${symbol}:`, error);
     throw error;
   }
 } 

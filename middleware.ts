@@ -16,13 +16,18 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - images - .svg, .png, .jpg, .jpeg, .gif, .webp
-     * Feel free to modify this pattern to include more paths.
+     * Match only the routes that need authentication:
+     * - dashboard, account, referrals, performance-reports
+     * - signin pages
+     * - Exclude static assets and API routes
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'
+    '/dashboard/:path*',
+    '/account/:path*',
+    '/referrals/:path*',
+    '/performance-reports/:path*',
+    '/signals/:path*',
+    '/signin/:path*',
+    '/pricing',
+    '/'
   ]
 };
