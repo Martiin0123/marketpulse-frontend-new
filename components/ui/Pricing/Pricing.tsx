@@ -61,7 +61,7 @@ export default function Pricing({ user, products, subscription }: Props) {
       hasProducts: products.length > 0,
       hasSubscription: !!subscription
     });
-  }, [user, products, subscription]);
+  }, []);
 
   useEffect(() => {
     console.log('[CLIENT] Subscription data received:', subscription);

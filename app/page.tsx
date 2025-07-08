@@ -62,252 +62,264 @@ export const metadata: Metadata = {
 
 export default async function HomePage() {
   const supabase = createClient();
-  const user = await getUser(supabase);
-  const subscription = user ? await getSubscription(supabase) : null;
-  const positions = await getPositions(supabase);
 
-  return (
-    <>
-      {/* Limited Time Offer Banner */}
-      <div className="w-full bg-gradient-to-r from-emerald-500 via-blue-500 to-cyan-500 text-white text-center py-2 font-semibold tracking-wide shadow-lg relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-pulse"></div>
-        <div className="relative z-10">
-          Limited Time Offer:{' '}
-          <span className="font-bold">Get 20% Off Your First Month!</span> Use
-          code <span className="bg-white/20 px-2 py-1 rounded">TRADE20</span>
-        </div>
-      </div>
+  try {
+    const [user, subscription, positions] = await Promise.all([
+      getUser(supabase),
+      getUser(supabase).then((user) =>
+        user ? getSubscription(supabase) : null
+      ),
+      getPositions(supabase)
+    ]);
 
-      <div className="min-h-screen bg-slate-900 relative">
-        {/* Animated Background Elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl animate-pulse delay-500"></div>
-        </div>
-
-        <Hero user={user} positions={positions} />
-
-        {/* Stats Section */}
-        <Stats />
-
-        {/* How It Works Section */}
-        <HowItWorks />
-
-        {/* Features Section */}
-        <Features />
-
-        {/* Comparison Section */}
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 my-20">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-white mb-4">
-              Why Choose{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500">
-                MarketPulse
-              </span>
-              ?
-            </h2>
-            <p className="text-xl text-slate-400 max-w-3xl mx-auto">
-              See how we stack up against other trading signal services
-            </p>
-          </div>
-
-          <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* MarketPulse Column */}
-              <div className="relative">
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <div className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-4 py-2 rounded-full text-sm font-semibold">
-                    MarketPulse
-                  </div>
-                </div>
-                <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-xl p-6 mt-4">
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 text-emerald-500" />
-                      <span className="text-white font-medium">
-                        No Loss Guarantee
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 text-emerald-500" />
-                      <span className="text-white font-medium">
-                        Free Discord Community
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 text-emerald-500" />
-                      <span className="text-white font-medium">
-                        Real-time Signals
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 text-emerald-500" />
-                      <span className="text-white font-medium">
-                        Advanced Analytics
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 text-emerald-500" />
-                      <span className="text-white font-medium">
-                        Mobile Notifications
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 text-emerald-500" />
-                      <span className="text-white font-medium">
-                        24/7 Support
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Other Services Column */}
-              <div className="relative">
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <div className="bg-slate-600 text-white px-4 py-2 rounded-full text-sm font-semibold">
-                    Other Services
-                  </div>
-                </div>
-                <div className="bg-slate-700/50 border border-slate-600/50 rounded-xl p-6 mt-4">
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-3">
-                      <X className="w-5 h-5 text-red-400" />
-                      <span className="text-slate-300">No Guarantee</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <X className="w-5 h-5 text-red-400" />
-                      <span className="text-slate-300">Paid Communities</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 text-emerald-500" />
-                      <span className="text-slate-300">Delayed Signals</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <X className="w-5 h-5 text-red-400" />
-                      <span className="text-slate-300">Basic Analytics</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <X className="w-5 h-5 text-red-400" />
-                      <span className="text-slate-300">Email Only</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <X className="w-5 h-5 text-red-400" />
-                      <span className="text-slate-300">Limited Support</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Traditional Trading Column */}
-              <div className="relative">
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <div className="bg-slate-600 text-white px-4 py-2 rounded-full text-sm font-semibold">
-                    Traditional Trading
-                  </div>
-                </div>
-                <div className="bg-slate-700/50 border border-slate-600/50 rounded-xl p-6 mt-4">
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-3">
-                      <X className="w-5 h-5 text-red-400" />
-                      <span className="text-slate-300">High Risk</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <X className="w-5 h-5 text-red-400" />
-                      <span className="text-slate-300">No Guidance</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <X className="w-5 h-5 text-red-400" />
-                      <span className="text-slate-300">Manual Analysis</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <X className="w-5 h-5 text-red-400" />
-                      <span className="text-slate-300">No Analytics</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <X className="w-5 h-5 text-red-400" />
-                      <span className="text-slate-300">Miss Opportunities</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <X className="w-5 h-5 text-red-400" />
-                      <span className="text-slate-300">No Support</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+    return (
+      <>
+        {/* Limited Time Offer Banner */}
+        <div className="w-full bg-gradient-to-r from-emerald-500 via-blue-500 to-cyan-500 text-white text-center py-2 font-semibold tracking-wide shadow-lg relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-pulse"></div>
+          <div className="relative z-10">
+            Limited Time Offer:{' '}
+            <span className="font-bold">Get 20% Off Your First Month!</span> Use
+            code <span className="bg-white/20 px-2 py-1 rounded">TRADE20</span>
           </div>
         </div>
 
-        <Testimonials />
+        <div className="min-h-screen bg-slate-900 relative">
+          {/* Animated Background Elements */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+            <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl animate-pulse delay-500"></div>
+          </div>
 
-        {/* Urgency Section */}
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 my-20">
-          <div className="bg-gradient-to-r from-red-500/10 via-orange-500/10 to-yellow-500/10 backdrop-blur-sm border border-red-500/30 rounded-2xl p-8 text-center">
-            <div className="inline-flex items-center px-4 py-2 bg-red-500/20 rounded-full border border-red-500/30 mb-6">
-              <Zap className="w-4 h-4 text-red-400 mr-2" />
-              <span className="text-red-200 text-sm font-medium">
-                Limited Time Opportunity
-              </span>
+          <Hero user={user} positions={positions} />
+
+          {/* Stats Section */}
+          <Stats />
+
+          {/* How It Works Section */}
+          <HowItWorks />
+
+          {/* Features Section */}
+          <Features />
+
+          {/* Comparison Section */}
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 my-20">
+            <div className="text-center mb-12">
+              <h2 className="text-4xl font-bold text-white mb-4">
+                Why Choose{' '}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500">
+                  MarketPulse
+                </span>
+                ?
+              </h2>
+              <p className="text-xl text-slate-400 max-w-3xl mx-auto">
+                See how we stack up against other trading signal services
+              </p>
             </div>
 
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Don't Miss the Next Big Move
-            </h2>
-
-            <p className="text-lg text-slate-300 mb-6 max-w-2xl mx-auto">
-              Market volatility creates opportunities. Our AI is detecting
-              patterns that could lead to significant profits. Join now and
-              don't let the next profitable signal pass you by.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="bg-slate-800/30 rounded-xl p-6">
-                <div className="text-2xl font-bold text-emerald-400 mb-2">
-                  24/7
+            <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-8">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* MarketPulse Column */}
+                <div className="relative">
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                    <div className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-4 py-2 rounded-full text-sm font-semibold">
+                      MarketPulse
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-xl p-6 mt-4">
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-3">
+                        <CheckCircle className="w-5 h-5 text-emerald-500" />
+                        <span className="text-white font-medium">
+                          No Loss Guarantee
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <CheckCircle className="w-5 h-5 text-emerald-500" />
+                        <span className="text-white font-medium">
+                          Free Discord Community
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <CheckCircle className="w-5 h-5 text-emerald-500" />
+                        <span className="text-white font-medium">
+                          Real-time Signals
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <CheckCircle className="w-5 h-5 text-emerald-500" />
+                        <span className="text-white font-medium">
+                          Advanced Analytics
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <CheckCircle className="w-5 h-5 text-emerald-500" />
+                        <span className="text-white font-medium">
+                          Mobile Notifications
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <CheckCircle className="w-5 h-5 text-emerald-500" />
+                        <span className="text-white font-medium">
+                          24/7 Support
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-slate-400">Market Monitoring</div>
-              </div>
-              <div className="bg-slate-800/30 rounded-xl p-6">
-                <div className="text-2xl font-bold text-emerald-400 mb-2">
-                  Instant
-                </div>
-                <div className="text-slate-400">Signal Delivery</div>
-              </div>
-              <div className="bg-slate-800/30 rounded-xl p-6">
-                <div className="text-2xl font-bold text-emerald-400 mb-2">
-                  95%
-                </div>
-                <div className="text-slate-400">Accuracy Rate</div>
-              </div>
-            </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a
-                href="/pricing"
-                className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white rounded-lg font-semibold text-lg transition-all duration-300"
-              >
-                <Target className="w-5 h-5 mr-2" />
-                Start Trading Now
-              </a>
-              <a
-                href="https://discord.gg/N7taGVuz"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center px-8 py-4 bg-transparent border-2 border-slate-600 hover:border-slate-500 text-white rounded-lg font-semibold text-lg transition-all duration-300"
-              >
-                Join Free Community
-              </a>
+                {/* Other Services Column */}
+                <div className="relative">
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                    <div className="bg-slate-600 text-white px-4 py-2 rounded-full text-sm font-semibold">
+                      Other Services
+                    </div>
+                  </div>
+                  <div className="bg-slate-700/50 border border-slate-600/50 rounded-xl p-6 mt-4">
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-3">
+                        <X className="w-5 h-5 text-red-400" />
+                        <span className="text-slate-300">No Guarantee</span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <X className="w-5 h-5 text-red-400" />
+                        <span className="text-slate-300">Paid Communities</span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <CheckCircle className="w-5 h-5 text-emerald-500" />
+                        <span className="text-slate-300">Delayed Signals</span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <X className="w-5 h-5 text-red-400" />
+                        <span className="text-slate-300">Basic Analytics</span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <X className="w-5 h-5 text-red-400" />
+                        <span className="text-slate-300">Email Only</span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <X className="w-5 h-5 text-red-400" />
+                        <span className="text-slate-300">Limited Support</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Traditional Trading Column */}
+                <div className="relative">
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                    <div className="bg-slate-600 text-white px-4 py-2 rounded-full text-sm font-semibold">
+                      Traditional Trading
+                    </div>
+                  </div>
+                  <div className="bg-slate-700/50 border border-slate-600/50 rounded-xl p-6 mt-4">
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-3">
+                        <X className="w-5 h-5 text-red-400" />
+                        <span className="text-slate-300">High Risk</span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <X className="w-5 h-5 text-red-400" />
+                        <span className="text-slate-300">No Guidance</span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <X className="w-5 h-5 text-red-400" />
+                        <span className="text-slate-300">Manual Analysis</span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <X className="w-5 h-5 text-red-400" />
+                        <span className="text-slate-300">No Analytics</span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <X className="w-5 h-5 text-red-400" />
+                        <span className="text-slate-300">
+                          Miss Opportunities
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <X className="w-5 h-5 text-red-400" />
+                        <span className="text-slate-300">No Support</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
+
+          <Testimonials />
+
+          {/* Urgency Section */}
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 my-20">
+            <div className="bg-gradient-to-r from-red-500/10 via-orange-500/10 to-yellow-500/10 backdrop-blur-sm border border-red-500/30 rounded-2xl p-8 text-center">
+              <div className="inline-flex items-center px-4 py-2 bg-red-500/20 rounded-full border border-red-500/30 mb-6">
+                <Zap className="w-4 h-4 text-red-400 mr-2" />
+                <span className="text-red-200 text-sm font-medium">
+                  Limited Time Opportunity
+                </span>
+              </div>
+
+              <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+                Don't Miss the Next Big Move
+              </h2>
+
+              <p className="text-lg text-slate-300 mb-6 max-w-2xl mx-auto">
+                Market volatility creates opportunities. Our AI is detecting
+                patterns that could lead to significant profits. Join now and
+                don't let the next profitable signal pass you by.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="bg-slate-800/30 rounded-xl p-6">
+                  <div className="text-2xl font-bold text-emerald-400 mb-2">
+                    24/7
+                  </div>
+                  <div className="text-slate-400">Market Monitoring</div>
+                </div>
+                <div className="bg-slate-800/30 rounded-xl p-6">
+                  <div className="text-2xl font-bold text-emerald-400 mb-2">
+                    Instant
+                  </div>
+                  <div className="text-slate-400">Signal Delivery</div>
+                </div>
+                <div className="bg-slate-800/30 rounded-xl p-6">
+                  <div className="text-2xl font-bold text-emerald-400 mb-2">
+                    95%
+                  </div>
+                  <div className="text-slate-400">Accuracy Rate</div>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <a
+                  href="/pricing"
+                  className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white rounded-lg font-semibold text-lg transition-all duration-300"
+                >
+                  <Target className="w-5 h-5 mr-2" />
+                  Start Trading Now
+                </a>
+                <a
+                  href="https://discord.gg/N7taGVuz"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-8 py-4 bg-transparent border-2 border-slate-600 hover:border-slate-500 text-white rounded-lg font-semibold text-lg transition-all duration-300"
+                >
+                  Join Free Community
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* FAQ Section */}
+          <FAQ />
+
+          <CTA user={user} />
         </div>
-
-        {/* FAQ Section */}
-        <FAQ />
-
-        <CTA user={user} />
-      </div>
-    </>
-  );
+      </>
+    );
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    return <div>Error fetching data. Please try again later.</div>;
+  }
 }

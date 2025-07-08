@@ -3,27 +3,35 @@ import type { Tables } from '@/types_db';
 type Price = Tables<'prices'>;
 
 export const getURL = (path: string = '') => {
-  // Check if NEXT_PUBLIC_SITE_URL is set and non-empty. Set this to your site URL in production env.
-  let url =
-    process?.env?.NEXT_PUBLIC_SITE_URL &&
-    process.env.NEXT_PUBLIC_SITE_URL.trim() !== ''
-      ? process.env.NEXT_PUBLIC_SITE_URL
-      : // If not set, check for NEXT_PUBLIC_VERCEL_URL, which is automatically set by Vercel.
-        process?.env?.NEXT_PUBLIC_VERCEL_URL &&
-          process.env.NEXT_PUBLIC_VERCEL_URL.trim() !== ''
-        ? process.env.NEXT_PUBLIC_VERCEL_URL
-        : // If neither is set, default to localhost for local development.
-          'http://localhost:3000/';
+  // Check if we're in a browser environment
+  if (typeof window !== 'undefined') {
+    // In browser, use the current origin
+    const url = window.location.origin;
+    // Ensure path starts without a slash to avoid double slashes in the final URL.
+    const cleanPath = path.replace(/^\/+/, '');
+    return cleanPath ? `${url}/${cleanPath}` : url;
+  }
+
+  // Server-side environment variable handling
+  let url = 'http://localhost:3000'; // Default fallback
+
+  // Check if NEXT_PUBLIC_SITE_URL is set and non-empty
+  if (process?.env?.NEXT_PUBLIC_SITE_URL && process.env.NEXT_PUBLIC_SITE_URL.trim() !== '') {
+    url = process.env.NEXT_PUBLIC_SITE_URL;
+  } else if (process?.env?.NEXT_PUBLIC_VERCEL_URL && process.env.NEXT_PUBLIC_VERCEL_URL.trim() !== '') {
+    // If not set, check for NEXT_PUBLIC_VERCEL_URL, which is automatically set by Vercel
+    url = process.env.NEXT_PUBLIC_VERCEL_URL;
+  }
 
   // Trim the URL and remove trailing slash if exists.
   url = url.replace(/\/+$/, '');
   // Make sure to include `https://` when not localhost.
   url = url.includes('http') ? url : `https://${url}`;
   // Ensure path starts without a slash to avoid double slashes in the final URL.
-  path = path.replace(/^\/+/, '');
+  const cleanPath = path.replace(/^\/+/, '');
 
   // Concatenate the URL and the path.
-  return path ? `${url}/${path}` : url;
+  return cleanPath ? `${url}/${cleanPath}` : url;
 };
 
 export const toDateTime = (secs: number) => {

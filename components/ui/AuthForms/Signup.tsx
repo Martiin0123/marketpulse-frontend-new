@@ -35,7 +35,7 @@ export default function SignUp({ allowEmail, redirectMethod }: SignUpProps) {
       console.log('🔍 Validating referral code:', refParam);
       validateReferralCode(refParam);
     }
-  }, [searchParams]);
+  }, [searchParams?.get('ref')]);
 
   const validateReferralCode = async (code: string) => {
     console.log('🔍 Starting validation for code:', code);
@@ -83,7 +83,7 @@ export default function SignUp({ allowEmail, redirectMethod }: SignUpProps) {
     return () => {
       debouncedValidate.cancel();
     };
-  }, [debouncedValidate]);
+  }, []);
 
   const handleReferralCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const code = e.target.value.trim();

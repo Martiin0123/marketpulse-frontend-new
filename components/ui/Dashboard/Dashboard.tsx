@@ -76,37 +76,51 @@ export default function Dashboard({
       // Clean up URL
       window.history.replaceState({}, '', '/dashboard');
     }
-  }, []);
+  }, []); // Empty dependency array - only run once
 
   // Real-time updates for signals
   useEffect(() => {
-    const channel = supabase
-      .channel('signals-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'signals'
-        },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setSignals((current) => [payload.new as Signal, ...current]);
-          } else if (payload.eventType === 'UPDATE') {
-            setSignals((current) =>
-              current.map((signal) =>
-                signal.id === payload.new.id ? (payload.new as Signal) : signal
-              )
-            );
-          }
-        }
-      )
-      .subscribe();
+    let channel: any = null;
+
+    const setupChannel = async () => {
+      try {
+        channel = supabase
+          .channel('signals-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'signals'
+            },
+            (payload) => {
+              if (payload.eventType === 'INSERT') {
+                setSignals((current) => [payload.new as Signal, ...current]);
+              } else if (payload.eventType === 'UPDATE') {
+                setSignals((current) =>
+                  current.map((signal) =>
+                    signal.id === payload.new.id
+                      ? (payload.new as Signal)
+                      : signal
+                  )
+                );
+              }
+            }
+          )
+          .subscribe();
+      } catch (error) {
+        console.error('Failed to setup real-time channel:', error);
+      }
+    };
+
+    setupChannel();
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
-  }, [supabase]);
+  }, []); // Empty dependency array - only run once
 
   // Calculate signal statistics - only count completed trades (BUY signals that are closed or executed with P&L)
   const completedTrades = signals.filter(

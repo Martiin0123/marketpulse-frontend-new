@@ -15,53 +15,7 @@ export const getSubscription = cache(async (supabase: SupabaseClient) => {
     return null;
   }
 
-  // Check if user exists in users table
-  const { data: dbUser, error: userError } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', user.user.id)
-    .single();
-
-
-  // Check if user has a customer record
-  const { data: customer, error: customerError } = await supabase
-    .from('customers')
-    .select('*')
-    .eq('id', user.user.id)
-    .single();
-
-  // Check all subscriptions regardless of status
-  const { data: allSubscriptions, error: listError } = await supabase
-    .from('subscriptions')
-    .select(`
-      id,
-      status,
-      price_id,
-      cancel_at,
-      cancel_at_period_end,
-      canceled_at,
-      created,
-      current_period_start,
-      current_period_end,
-      ended_at,
-      trial_end,
-      trial_start,
-      user_id,
-      metadata,
-      quantity
-    `)
-    .eq('user_id', user.user.id);
-
-  if (listError) {
-    return null;
-  }
-
-  // If no subscriptions found at all
-  if (!allSubscriptions || allSubscriptions.length === 0) {
-    return null;
-  }
-
-  // Now try to get the active subscription with all relations
+  // Single query to get active subscription with all relations
   const { data: subscription, error } = await supabase
     .from('subscriptions')
     .select(`
@@ -108,7 +62,10 @@ export const getSubscription = cache(async (supabase: SupabaseClient) => {
     .limit(1)
     .single();
 
-
+  if (error) {
+    console.warn('Subscription query error:', error.message);
+    return null;
+  }
 
   return subscription;
 });

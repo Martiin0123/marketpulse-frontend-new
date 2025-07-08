@@ -33,9 +33,6 @@ export default function EmailSignIn({
   return (
     <div>
       <div className="text-center mb-6">
-        <div className="flex justify-center mb-4">
-          <Logo />
-        </div>
         <h2 className="text-2xl font-bold text-white mb-2">
           Magic Link Sign In
         </h2>
