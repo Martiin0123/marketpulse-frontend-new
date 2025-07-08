@@ -242,7 +242,7 @@ export default function AccountPage({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Profile Sidebar */}
           <div className="lg:col-span-4">
-            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6 sticky top-8">
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6 sticky top-24">
               {/* Avatar Section */}
               <div className="text-center mb-6">
                 <div className="relative inline-block mb-4">

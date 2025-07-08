@@ -1,5 +1,8 @@
 import { createClient } from '@/utils/supabase/server';
 
+// Force dynamic rendering since we're using cookies
+export const dynamic = 'force-dynamic';
+
 export default async function TestSupabasePage() {
   try {
     const supabase = createClient();

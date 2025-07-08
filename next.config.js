@@ -6,6 +6,9 @@ const nextConfig = {
   },
   images: {
     domains: [],
+    // Ensure Sharp is used for image optimization in production
+    loader: 'default',
+    formats: ['image/webp'],
   },
   eslint: {
     ignoreDuringBuilds: true,

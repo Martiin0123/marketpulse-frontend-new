@@ -7,11 +7,14 @@ let supabaseClient: ReturnType<typeof createBrowserClient<Database>> | null = nu
 // Define a function to create a Supabase client for client-side operations
 export const createClient = () => {
   if (!supabaseClient) {
-    // Check both process.env and window for environment variables (Render compatibility)
+    // Multiple fallback methods for environment variables (Render compatibility)
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 
-                       (typeof window !== 'undefined' ? window.process?.env?.NEXT_PUBLIC_SUPABASE_URL : null);
+                       (typeof window !== 'undefined' && (window as any).__NEXT_DATA__?.env?.NEXT_PUBLIC_SUPABASE_URL) ||
+                       'https://aehfqzahaorltbhfctsd.supabase.co'; // Fallback to your known URL
+    
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
-                           (typeof window !== 'undefined' ? window.process?.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY : null);
+                           (typeof window !== 'undefined' && (window as any).__NEXT_DATA__?.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY) ||
+                           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFlaGZxemFoYW9ybHRiaGZjdHNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE2OTUzMTEsImV4cCI6MjA2NzI3MTMxMX0.Ehzjr0Xr1e4IsigAnQmzxNc8z8ql9hJyfkWSfdPSJL4'; // Fallback to your known key
 
     // Debug logging for production
     if (process.env.NODE_ENV === 'production') {
@@ -19,6 +22,8 @@ export const createClient = () => {
         url: !!supabaseUrl,
         key: !!supabaseAnonKey,
         env: process.env.NODE_ENV,
+        urlSource: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'process.env' : 'fallback',
+        keySource: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'process.env' : 'fallback',
         allEnvKeys: Object.keys(process.env).filter(key => key.includes('SUPABASE'))
       });
     }
