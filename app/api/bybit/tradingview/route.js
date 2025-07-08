@@ -9,14 +9,26 @@ import {
   setBybitLeverage
 } from '@/utils/bybit/client'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+// Create Supabase client function to avoid module-level initialization
+function createSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  if (!supabaseUrl) {
+    throw new Error('supabaseUrl is required.')
+  }
+  
+  if (!supabaseKey) {
+    throw new Error('supabaseKey is required.')
+  }
+  
+  return createClient(supabaseUrl, supabaseKey)
+}
 
 // Helper function to manually close a signal (for testing)
 async function closeSignalManually(signalId, exitPrice, exitReason = 'manual') {
   try {
+    const supabase = createSupabaseClient()
     const { data: signal, error: fetchError } = await supabase
       .from('signals')
       .select('*')
@@ -346,6 +358,9 @@ async function sendErrorDiscordNotification(signal, error, webhookUrl) {
 export async function POST(request) {
   console.log('🚀 API endpoint hit: /api/bybit/tradingview');
   try {
+    // Create Supabase client
+    const supabase = createSupabaseClient()
+    
     // Check environment variables
     console.log('🔑 Environment check:', {
       hasBybitKey: !!process.env.BYBIT_API_KEY,
