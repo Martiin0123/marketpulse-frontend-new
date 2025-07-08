@@ -27,6 +27,8 @@ import SignalsTab from './SignalsTab';
 import StatsOverview from './StatsOverview';
 import PerformanceGuaranteeWidget from '../PerformanceGuarantee/PerformanceGuaranteeWidget';
 import VIPWhitelistWidget from './VIPWhitelistWidget';
+import { useAuth } from '@/utils/auth-context';
+import { AuthLoadingState } from '@/components/ui/LoadingStates/Skeleton';
 
 type Signal = Tables<'signals'>;
 type Subscription = Tables<'subscriptions'>;
@@ -48,11 +50,12 @@ interface Props {
 }
 
 export default function Dashboard({
-  user,
-  subscription,
+  user: initialUser,
+  subscription: initialSubscription,
   signals: initialSignals,
   stats
 }: Props) {
+  const { user: authUser, subscription: authSubscription, loading } = useAuth();
   const [signals, setSignals] = useState<Signal[]>(initialSignals);
   const [activeTab, setActiveTab] = useState<
     'overview' | 'signals' | 'strategy-analysis' | 'performance-guarantee'
@@ -62,6 +65,10 @@ export default function Dashboard({
     message: string;
   } | null>(null);
   const supabase = createClient();
+
+  // Use auth context data if available, otherwise fall back to props
+  const user = authUser || initialUser;
+  const subscription = authSubscription || initialSubscription;
 
   // Check for URL parameters on mount
   useEffect(() => {
@@ -87,14 +94,18 @@ export default function Dashboard({
     }
   }, []); // Empty dependency array - only run once
 
-  // Real-time updates for signals
+  // Real-time updates for signals - only set up once when component mounts
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    let isSubscribed = false;
 
     const setupChannel = async () => {
       try {
+        // Avoid duplicate subscriptions
+        if (isSubscribed) return;
+        
         channel = supabase
-          .channel('signals-changes')
+          .channel('signals-changes-dashboard')
           .on(
             'postgres_changes',
             {
@@ -104,7 +115,12 @@ export default function Dashboard({
             },
             (payload) => {
               if (payload.eventType === 'INSERT') {
-                setSignals((current) => [payload.new as Signal, ...current]);
+                setSignals((current) => {
+                  // Prevent duplicate signals
+                  const existingSignal = current.find(s => s.id === payload.new.id);
+                  if (existingSignal) return current;
+                  return [payload.new as Signal, ...current];
+                });
               } else if (payload.eventType === 'UPDATE') {
                 setSignals((current) =>
                   current.map((signal) =>
@@ -116,20 +132,28 @@ export default function Dashboard({
               }
             }
           )
-          .subscribe();
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+              isSubscribed = true;
+            }
+          });
       } catch (error) {
         console.error('Failed to setup real-time channel:', error);
       }
     };
 
-    setupChannel();
+    // Only setup if we have a user and no active subscription
+    if (user && !isSubscribed) {
+      setupChannel();
+    }
 
     return () => {
       if (channel) {
         supabase.removeChannel(channel);
+        isSubscribed = false;
       }
     };
-  }, []); // Empty dependency array - only run once
+  }, [user?.id]); // Only depend on user ID
 
   // Calculate signal statistics - only count completed trades (BUY signals that are closed or executed with P&L)
   const completedTrades = signals.filter(
@@ -162,6 +186,11 @@ export default function Dashboard({
     completedTrades.length > 0
       ? totalPnLPercentage / completedTrades.length
       : 0;
+
+  // Show loading state while auth is loading
+  if (loading) {
+    return <AuthLoadingState />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-900">
@@ -264,9 +293,11 @@ export default function Dashboard({
                 <MessageCircle className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-200" />
                 Join Discord Community
               </a>
-
               {/* VIP Whitelist Button */}
-              <VIPWhitelistWidget user={user} subscription={subscription} />
+              <VIPWhitelistWidget
+                user={user}
+                subscription={{ ...subscription, prices: null }}
+              />
             </div>
           </div>
         </div>

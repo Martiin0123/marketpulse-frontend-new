@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { User } from '@supabase/supabase-js';
+import { useAuth } from '@/utils/auth-context';
 import { createClient } from '@/utils/supabase/client';
 import {
   getUserReferralCode,
@@ -107,6 +108,7 @@ export default function ReferralDashboard({
   const [stats, setStats] = useState(initialStats);
   const [loading, setLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const { user: authUser } = useAuth();
   const supabase = createClient();
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';

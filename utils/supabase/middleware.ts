@@ -6,12 +6,12 @@ const PROTECTED_ROUTES = ['/dashboard', '/signals', '/account', '/referrals', '/
 
 // Simple cache to reduce auth requests
 const authCache = new Map<string, { user: User | null; timestamp: number }>();
-const CACHE_DURATION = 30 * 1000; // 30 seconds
+const CACHE_DURATION = 30 * 1000; // 30 seconds (reduced from 60)
 
-// Rate limiting for auth requests
+// Rate limiting for auth requests - more lenient for production
 const rateLimitMap = new Map<string, { count: number; timestamp: number }>();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const MAX_REQUESTS_PER_WINDOW = 10; // Max 10 auth requests per minute per IP
+const MAX_REQUESTS_PER_WINDOW = 20; // Increased from 5 to 20 auth requests per minute per IP
 
 // Clean up old cache entries periodically
 setInterval(() => {
@@ -102,25 +102,36 @@ export const updateSession = async (request: NextRequest) => {
 
     // Skip auth checks in development if DISABLE_AUTH_MIDDLEWARE is set
     if (process.env.NODE_ENV === 'development' && process.env.DISABLE_AUTH_MIDDLEWARE === 'true') {
-      console.log('Auth middleware disabled in development');
+      console.log('🔧 Auth middleware disabled in development');
       return response;
     }
 
-    // Rate limiting check
-    const clientIP = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
-    const now = Date.now();
-    const rateLimitKey = `${clientIP}:${pathname}`;
-    const rateLimit = rateLimitMap.get(rateLimitKey);
-    
-    if (rateLimit && (now - rateLimit.timestamp) < RATE_LIMIT_WINDOW) {
-      if (rateLimit.count >= MAX_REQUESTS_PER_WINDOW) {
-        console.log('Rate limit exceeded for:', pathname);
-        // Allow the request to continue but skip auth checks
-        return response;
+    // Skip auth checks for public routes in development
+    if (process.env.NODE_ENV === 'development' && (
+        pathname === '/' || 
+        pathname.startsWith('/pricing') ||
+        pathname.startsWith('/legal')
+    )) {
+      return response;
+    }
+
+    // Rate limiting check - only for production
+    if (process.env.NODE_ENV === 'production') {
+      const clientIP = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
+      const now = Date.now();
+      const rateLimitKey = `${clientIP}:${pathname}`;
+      const rateLimit = rateLimitMap.get(rateLimitKey);
+      
+      if (rateLimit && (now - rateLimit.timestamp) < RATE_LIMIT_WINDOW) {
+        if (rateLimit.count >= MAX_REQUESTS_PER_WINDOW) {
+          console.log('Rate limit exceeded for:', pathname);
+          // Allow the request to continue but skip auth checks
+          return response;
+        }
+        rateLimit.count++;
+      } else {
+        rateLimitMap.set(rateLimitKey, { count: 1, timestamp: now });
       }
-      rateLimit.count++;
-    } else {
-      rateLimitMap.set(rateLimitKey, { count: 1, timestamp: now });
     }
 
     // Check if this is a protected route
@@ -136,19 +147,23 @@ export const updateSession = async (request: NextRequest) => {
       
       if (cached && (now - cached.timestamp) < CACHE_DURATION) {
         user = cached.user;
-        console.log('Using cached auth for:', pathname);
+        console.log('📦 Using cached auth for:', pathname);
       } else {
         try {
           const { data, error } = await supabase.auth.getUser();
           user = data.user;
           userError = error;
           
-          // Cache the result
-          if (user && !userError) {
-            authCache.set(cacheKey, { user, timestamp: now });
+          // Cache the result (even if there's an error, cache null to prevent repeated requests)
+          authCache.set(cacheKey, { user: user || null, timestamp: now });
+          
+          if (userError) {
+            console.log('⚠️ Auth error in middleware (cached to prevent spam):', userError.message);
           }
         } catch (error) {
-          console.error('Auth error in middleware:', error);
+          console.error('❌ Auth error in middleware:', error);
+          // Cache null to prevent repeated failed requests
+          authCache.set(cacheKey, { user: null, timestamp: now });
           // If there's an auth error (like rate limiting), allow the request to continue
           // The page will handle authentication itself
           return response;

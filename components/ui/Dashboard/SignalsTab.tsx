@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Tables } from '@/types_db';
+import { useAuth } from '@/utils/auth-context';
 import { createClient } from '@/utils/supabase/client';
 import {
   TrendingUp,
@@ -40,45 +41,73 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
     'all'
   );
   const [filterExchange, setFilterExchange] = useState<'all' | 'bybit'>('all');
+  const { user } = useAuth();
   const supabase = createClient();
 
   useEffect(() => {
-    // Set up real-time subscription for new signals
-    const channel = supabase
-      .channel('signals-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'signals'
-        },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setSignals((current) => {
-              const newSignal = payload.new as Signal;
-              const newSignals = [...current, newSignal];
-              return newSignals.sort(
-                (a, b) =>
-                  new Date(b.created_at).getTime() -
-                  new Date(a.created_at).getTime()
-              );
-            });
-          } else if (payload.eventType === 'UPDATE') {
-            setSignals((current) =>
-              current.map((signal) =>
-                signal.id === payload.new.id ? (payload.new as Signal) : signal
-              )
-            );
-          }
-        }
-      )
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let isSubscribed = false;
+
+    const setupChannel = async () => {
+      try {
+        // Avoid duplicate subscriptions
+        if (isSubscribed) return;
+        
+        channel = supabase
+          .channel('signals-changes-signalstab')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'signals'
+            },
+            (payload) => {
+              if (payload.eventType === 'INSERT') {
+                setSignals((current) => {
+                  const newSignal = payload.new as Signal;
+                  // Prevent duplicate signals
+                  const existingSignal = current.find(s => s.id === newSignal.id);
+                  if (existingSignal) return current;
+                  
+                  const newSignals = [...current, newSignal];
+                  return newSignals.sort(
+                    (a, b) =>
+                      new Date(b.created_at).getTime() -
+                      new Date(a.created_at).getTime()
+                  );
+                });
+              } else if (payload.eventType === 'UPDATE') {
+                setSignals((current) =>
+                  current.map((signal) =>
+                    signal.id === payload.new.id ? (payload.new as Signal) : signal
+                  )
+                );
+              }
+            }
+          )
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+              isSubscribed = true;
+            }
+          });
+      } catch (error) {
+        console.error('Failed to setup real-time channel:', error);
+      }
+    };
+
+    // Only setup if we have a user and no active subscription
+    if (user && !isSubscribed) {
+      setupChannel();
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        supabase.removeChannel(channel);
+        isSubscribed = false;
+      }
     };
-  }, [supabase]);
+  }, [user?.id]); // Only depend on user ID
 
   // Filter signals based on search and filters
   const filteredSignals = signals.filter((signal) => {

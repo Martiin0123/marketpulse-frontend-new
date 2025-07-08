@@ -64,11 +64,8 @@ export default async function HomePage() {
   const supabase = createClient();
 
   try {
-    const [user, subscription, positions] = await Promise.all([
+    const [user, positions] = await Promise.all([
       getUser(supabase),
-      getUser(supabase).then((user) =>
-        user ? getSubscription(supabase) : null
-      ),
       getPositions(supabase)
     ]);
 

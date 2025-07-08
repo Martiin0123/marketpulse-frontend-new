@@ -121,9 +121,6 @@ export default function SignUp({ allowEmail, redirectMethod }: SignUpProps) {
   return (
     <div>
       <div className="text-center mb-6">
-        <div className="flex justify-center mb-4">
-          <Logo />
-        </div>
         <h2 className="text-2xl font-bold text-white mb-2">
           Create Your Account
         </h2>

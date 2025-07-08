@@ -26,8 +26,7 @@ export const config = {
     '/referrals/:path*',
     '/performance-reports/:path*',
     '/signals/:path*',
-    '/signin/:path*',
-    '/pricing',
-    '/'
+    '/signin/:path*'
+    // Removed '/pricing' and '/' to reduce middleware calls
   ]
 };

@@ -32,11 +32,13 @@ export default function CustomerPortalForm({ subscription }: Props) {
 
   const subscriptionPrice =
     subscription &&
+    subscription?.prices?.currency &&
+    subscription?.prices?.unit_amount &&
     new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: subscription?.prices?.currency!,
+      currency: subscription.prices.currency,
       minimumFractionDigits: 0
-    }).format((subscription?.prices?.unit_amount || 0) / 100);
+    }).format((subscription.prices.unit_amount || 0) / 100);
 
   const handleStripePortalRequest = async () => {
     setIsSubmitting(true);
@@ -92,7 +94,11 @@ export default function CustomerPortalForm({ subscription }: Props) {
     >
       <div className="mt-8 mb-4 text-xl font-semibold">
         {subscription ? (
-          `${subscriptionPrice}/${subscription?.prices?.interval}`
+          subscriptionPrice ? (
+            `${subscriptionPrice}/${subscription?.prices?.interval}`
+          ) : (
+            `${subscription?.prices?.products?.name || 'Subscription'} plan`
+          )
         ) : (
           <Link href="/">Choose your plan</Link>
         )}

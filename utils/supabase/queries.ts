@@ -9,30 +9,8 @@ export const getUser = cache(async (supabase: SupabaseClient) => {
     return null;
   }
 
-  // Get user profile with proper types
-  const { data: profile, error } = await supabase
-    .from('users')
-    .select(`
-      id,
-      full_name,
-      avatar_url,
-      billing_address,
-      payment_method,
-      referral_code,
-      referred_by
-    `)
-    .eq('id', user.user.id)
-    .single();
-
-  if (error) {
-    console.error('Error fetching user profile:', error);
-    return null;
-  }
-
-  return {
-    ...user.user,
-    ...profile
-  };
+  // Using auth.users directly - no need for custom users table
+  return user.user;
 });
 
 export const getSubscription = cache(async (supabase: SupabaseClient) => {
@@ -88,6 +66,11 @@ export const getSubscription = cache(async (supabase: SupabaseClient) => {
     return null;
   }
 
+  // Ensure currency is always a string
+  if (subscription?.prices?.currency && typeof subscription.prices.currency !== 'string') {
+    subscription.prices.currency = String(subscription.prices.currency);
+  }
+
   return subscription;
 });
 
@@ -131,8 +114,8 @@ export type UserDetails = {
   id: string;
   full_name: string;
   avatar_url: string | null;
-  billing_address: Tables<'users'>['billing_address'];
-  payment_method: Tables<'users'>['payment_method'];
+  billing_address: any;
+  payment_method: any;
 };
 
 export const getUserDetails = cache(async (supabase: SupabaseClient): Promise<UserDetails | null> => {
