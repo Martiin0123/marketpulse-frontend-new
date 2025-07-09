@@ -26,6 +26,9 @@ ENV NEXT_TELEMETRY_DISABLED 1
 # Build the application
 RUN npm run build
 
+# Verify standalone output was created
+RUN ls -la .next/ && test -f .next/standalone/server.js
+
 # Production image, copy all the files and run next
 FROM base AS runner
 WORKDIR /app

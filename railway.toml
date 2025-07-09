@@ -12,4 +12,10 @@ NODE_ENV = "production"
 NEXT_TELEMETRY_DISABLED = "1"
 PORT = "3000"
 BYBIT_TESTNET = "true"
-DISABLE_AUTH_MIDDLEWARE = "false" 
+DISABLE_AUTH_MIDDLEWARE = "false"
+
+# Ensure health checks work properly
+[environments.production.healthcheck]
+path = "/"
+timeout = 300
+interval = 30 

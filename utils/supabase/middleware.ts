@@ -13,8 +13,8 @@ const rateLimitMap = new Map<string, { count: number; timestamp: number }>();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 2; // Reduced to 2 auth requests per minute per IP
 
-// Clean up old cache entries periodically
-setInterval(() => {
+// Helper function to clean up expired cache entries on-demand
+const cleanupExpiredEntries = () => {
   const now = Date.now();
   authCache.forEach((value, key) => {
     if (now - value.timestamp > CACHE_DURATION) {
@@ -26,7 +26,7 @@ setInterval(() => {
       rateLimitMap.delete(key);
     }
   });
-}, 60000); // Clean up every minute
+};
 
 export const createClient = (request: NextRequest) => {
   // Create an unmodified response
@@ -89,6 +89,9 @@ export const createClient = (request: NextRequest) => {
 
 export const updateSession = async (request: NextRequest) => {
   try {
+    // Clean up expired cache entries on each request
+    cleanupExpiredEntries();
+    
     const { supabase, response } = createClient(request);
     const pathname = request.nextUrl.pathname;
 
@@ -145,10 +148,22 @@ export const updateSession = async (request: NextRequest) => {
       const cached = authCache.get(cacheKey);
       const now = Date.now();
       
+      // Quick check: if we have no auth cookies, don't bother making auth requests
+      const hasAuthCookies = request.cookies.has('sb-access-token') || 
+                            request.cookies.has('sb-refresh-token');
+      
+      if (!hasAuthCookies && cacheKey === 'no-auth') {
+        console.log('🚫 No auth cookies found, skipping auth check for:', pathname);
+        // Cache this result to prevent repeated checks
+        authCache.set(cacheKey, { user: null, timestamp: now });
+        user = null;
+      }
+      
       if (cached && (now - cached.timestamp) < CACHE_DURATION) {
         user = cached.user;
         console.log('📦 Using cached auth for:', pathname);
-      } else {
+      } else if (hasAuthCookies || cacheKey !== 'no-auth') {
+        // Only make auth requests if we have cookies or authorization header
         try {
           const { data, error } = await supabase.auth.getUser();
           user = data.user;
@@ -158,12 +173,36 @@ export const updateSession = async (request: NextRequest) => {
           authCache.set(cacheKey, { user: user || null, timestamp: now });
           
           if (userError) {
-            console.log('⚠️ Auth error in middleware (cached to prevent spam):', userError.message);
+            // Handle specific auth errors differently
+            if (userError.message?.includes('refresh_token_not_found') || 
+                userError.message?.includes('Invalid Refresh Token') ||
+                userError.code === 'refresh_token_not_found') {
+              console.log('🔄 Invalid refresh token detected, will redirect to signin');
+              // Clear any auth cookies to force clean signin
+              response.cookies.delete('sb-access-token');
+              response.cookies.delete('sb-refresh-token');
+              // Cache this error for longer to prevent repeated attempts
+              authCache.set(cacheKey, { user: null, timestamp: now + (CACHE_DURATION * 2) });
+            } else {
+              console.log('⚠️ Auth error in middleware (cached to prevent spam):', userError.message);
+            }
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('❌ Auth error in middleware:', error);
-          // Cache null to prevent repeated failed requests
-          authCache.set(cacheKey, { user: null, timestamp: now });
+          // Handle specific error types
+          if (error?.message?.includes('refresh_token_not_found') || 
+              error?.message?.includes('Invalid Refresh Token') ||
+              error?.code === 'refresh_token_not_found') {
+            console.log('🔄 Invalid refresh token in catch block, clearing cookies');
+            // Clear any auth cookies to force clean signin
+            response.cookies.delete('sb-access-token');
+            response.cookies.delete('sb-refresh-token');
+            // Cache this error for longer to prevent repeated attempts
+            authCache.set(cacheKey, { user: null, timestamp: now + (CACHE_DURATION * 2) });
+          } else {
+            // Cache null to prevent repeated failed requests
+            authCache.set(cacheKey, { user: null, timestamp: now });
+          }
           // If there's an auth error (like rate limiting), allow the request to continue
           // The page will handle authentication itself
           return response;
