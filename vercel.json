@@ -1,27 +1,48 @@
 {
+  "functions": {
+    "app/api/webhook/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/webhook/stripe/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/bybit/tradingview/route.js": {
+      "maxDuration": 30
+    },
+    "app/api/cron/check-referral-payouts/route.ts": {
+      "maxDuration": 60
+    }
+  },
   "routes": [
     {
-      "src": "/api/webhook",
+      "src": "/api/webhook/(.*)",
       "methods": ["POST"],
       "headers": {
         "Access-Control-Allow-Origin": "*"
-      },
-      "dest": "/api/webhook"
+      }
     },
-
     {
       "src": "/api/bybit/tradingview",
       "methods": ["POST"],
       "headers": {
         "Access-Control-Allow-Origin": "*"
-      },
-      "dest": "/api/bybit/tradingview"
+      }
     }
   ],
   "crons": [
     {
       "path": "/api/cron/check-referral-payouts",
       "schedule": "0 9 * * *"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/webhook",
+      "destination": "/api/webhook/route"
+    },
+    {
+      "source": "/api/webhook/stripe",
+      "destination": "/api/webhook/stripe/route"
     }
   ]
 }

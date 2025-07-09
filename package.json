@@ -7,7 +7,7 @@
     "lint": "next lint",
     "prettier-fix": "prettier --write .",
     "stripe:login": "stripe login",
-    "stripe:listen": "stripe listen --forward-to=localhost:3000/api/webhooks",
+    "stripe:listen": "stripe listen --forward-to=localhost:3000/api/webhook",
     "supabase:start": "npx supabase start",
     "supabase:stop": "npx supabase stop",
     "supabase:status": "npx supabase status",
@@ -27,7 +27,15 @@
     "railway:env": "./scripts/set-railway-env.sh",
     "railway:logs": "railway logs",
     "railway:status": "railway status",
-    "railway:open": "railway open"
+    "railway:open": "railway open",
+    "vercel:deploy": "./scripts/deploy-vercel.sh",
+    "vercel:preview": "vercel",
+    "vercel:prod": "vercel --prod",
+    "vercel:link": "vercel link",
+    "vercel:env": "vercel env ls",
+    "vercel:logs": "vercel logs",
+    "vercel:open": "vercel open",
+    "vercel:check": "./scripts/vercel-readiness-check.sh"
   },
   "dependencies": {
     "@radix-ui/react-toast": "^1.1.5",

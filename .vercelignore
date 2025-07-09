@@ -1,0 +1,78 @@
+# Development files
+.env.local
+.env.development.local
+.env.test.local
+
+# Docker files (not needed for Vercel)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Railway files (not needed for Vercel)
+railway.toml
+scripts/deploy-railway.sh
+scripts/set-railway-env.sh
+RAILWAY_DEPLOYMENT.md
+
+# Render files (not needed for Vercel)
+render.yaml
+DEPLOYMENT.md
+
+# Development scripts
+scripts/docker-*.sh
+scripts/disable-*.sh
+scripts/debug-*.js
+scripts/monitor-*.js
+scripts/performance-test.js
+
+# Supabase local development
+supabase/config.toml
+supabase/.temp/
+
+# Documentation
+*.md
+!README.md
+!VERCEL_ENV_SETUP.md
+
+# Testing and monitoring
+scripts/check-*.sh
+scripts/monitor-*.sh
+
+# Certificates and keys
+certificates/
+*.pem
+*.key
+*.crt
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+.temp/
+
+# Coverage reports
+coverage/
+.nyc_output/
+
+# Build artifacts that Vercel handles
+.next/
+out/
+dist/
+build/
+
+# Lock files (Vercel uses package-lock.json)
+yarn.lock
+pnpm-lock.yaml 
