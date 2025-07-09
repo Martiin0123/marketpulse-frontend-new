@@ -16,14 +16,21 @@ export const createClient = () => {
 
     // Validate environment variables are present
     if (!supabaseUrl || !supabaseAnonKey) {
-      console.error('Missing Supabase environment variables:', {
-        url: !!supabaseUrl,
-        key: !!supabaseAnonKey,
-        env: process.env.NODE_ENV,
-        availableEnvVars: typeof window !== 'undefined' ? [] : Object.keys(process.env).filter(key => key.startsWith('NEXT_PUBLIC_'))
-      });
+      // Log error only once to prevent spam
+      if (typeof window !== 'undefined' && !(window as any).__supabaseConfigError) {
+        (window as any).__supabaseConfigError = true;
+        console.error('❌ MISSING RAILWAY ENVIRONMENT VARIABLES:');
+        console.error('Please set these in Railway dashboard:');
+        console.error('- NEXT_PUBLIC_SUPABASE_URL');
+        console.error('- NEXT_PUBLIC_SUPABASE_ANON_KEY');
+        console.error('Current status:', {
+          url: !!supabaseUrl,
+          key: !!supabaseAnonKey,
+          env: process.env.NODE_ENV
+        });
+      }
       
-      throw new Error('NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required');
+      throw new Error('Environment variables missing. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Railway dashboard.');
     }
 
     supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey);

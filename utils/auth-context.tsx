@@ -189,63 +189,79 @@ export function AuthProvider({
           setUser(session.user);
           setError(null);
 
-          // Always fetch fresh subscription data on sign in to avoid stale closures
-          try {
-            const { data: subData, error: subError } = await supabase
-              .from('subscriptions')
-              .select(
-                `
-                  id,
-                  status,
-                  price_id,
-                  cancel_at,
-                  cancel_at_period_end,
-                  canceled_at,
-                  created,
-                  current_period_start,
-                  current_period_end,
-                  ended_at,
-                  trial_end,
-                  trial_start,
-                  user_id,
-                  metadata,
-                  quantity,
-                  role,
-                  prices:price_id (
-                    id,
-                    unit_amount,
-                    currency,
-                    interval,
-                    interval_count,
-                    trial_period_days,
-                    type,
-                    products:product_id (
+          // Add retry logic for subscription fetch since it might take time for webhook to process
+          const fetchSubscriptionWithRetry = async (retries = 3) => {
+            for (let i = 0; i < retries; i++) {
+              try {
+                const { data: subData, error: subError } = await supabase
+                  .from('subscriptions')
+                  .select(
+                    `
                       id,
-                      name,
-                      description,
-                      image,
-                      metadata
-                    )
+                      status,
+                      price_id,
+                      cancel_at,
+                      cancel_at_period_end,
+                      canceled_at,
+                      created,
+                      current_period_start,
+                      current_period_end,
+                      ended_at,
+                      trial_end,
+                      trial_start,
+                      user_id,
+                      metadata,
+                      quantity,
+                      role,
+                      prices:price_id (
+                        id,
+                        unit_amount,
+                        currency,
+                        interval,
+                        interval_count,
+                        trial_period_days,
+                        type,
+                        products:product_id (
+                          id,
+                          name,
+                          description,
+                          image,
+                          metadata
+                        )
+                      )
+                    `
                   )
-                `
-              )
-              .eq('user_id', session.user.id)
-              .eq('status', 'active')
-              .single();
+                  .eq('user_id', session.user.id)
+                  .eq('status', 'active')
+                  .single();
 
-            if (!subError && mountedLocal) {
-              // Ensure currency is always a string
-              if (
-                subData?.prices?.currency &&
-                typeof subData.prices.currency !== 'string'
-              ) {
-                subData.prices.currency = String(subData.prices.currency);
+                if (!subError && mountedLocal) {
+                  // Ensure currency is always a string
+                  if (
+                    subData?.prices?.currency &&
+                    typeof subData.prices.currency !== 'string'
+                  ) {
+                    subData.prices.currency = String(subData.prices.currency);
+                  }
+                  setSubscription(subData);
+                  console.log('Subscription loaded successfully');
+                  return;
+                } else if (i === retries - 1) {
+                  // On last retry, accept no subscription (user might be on free plan)
+                  console.log('No active subscription found after retries');
+                  setSubscription(null);
+                }
+              } catch (subError) {
+                console.error(`Subscription fetch error (attempt ${i + 1}):`, subError);
+                if (i < retries - 1) {
+                  // Wait before retry (exponential backoff)
+                  await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
+                }
               }
-              setSubscription(subData);
             }
-          } catch (subError) {
-            console.error('Subscription fetch error on auth change:', subError);
-          }
+          };
+
+          fetchSubscriptionWithRetry();
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
           setSubscription(null);
@@ -266,33 +282,31 @@ export function AuthProvider({
     };
   }, [initialUser, initialSubscription]); // Keep stable dependencies only
 
-  const refreshUser = debounceAuth(async () => {
+  const refreshUser = async () => {
     if (!supabase) {
       setError('Authentication service not available');
       return;
     }
 
     try {
-      await authCircuitBreaker.execute(async () => {
-        const {
-          data: { user: currentUser },
-          error
-        } = await supabase.auth.getUser();
-        if (error) {
-          setError(error.message);
-          setUser(null);
-        } else {
-          setUser(currentUser);
-          setError(null);
-        }
-      });
+      const {
+        data: { user: currentUser },
+        error
+      } = await supabase.auth.getUser();
+      if (error) {
+        setError(error.message);
+        setUser(null);
+      } else {
+        setUser(currentUser);
+        setError(null);
+      }
     } catch (err) {
       console.error('Error refreshing user:', err);
       setError('Failed to refresh user');
     }
-  }, 2000); // 2 second debounce
+  };
 
-  const refreshSubscription = debounceAuth(async () => {
+  const refreshSubscription = async () => {
     if (!user || !supabase) return;
 
     try {
@@ -347,7 +361,7 @@ export function AuthProvider({
     } catch (err) {
       console.error('Error refreshing subscription:', err);
     }
-  }, 3000); // 3 second debounce
+  };
 
   const value: AuthContextType = {
     user,

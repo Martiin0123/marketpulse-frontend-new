@@ -85,18 +85,26 @@ async function handleCheckoutSessionCompleted(
     
     const userEmail = customer.email;
     
-    if (!userEmail) return;
+    if (!userEmail) {
+      console.error('No email found for customer:', customerId);
+      return;
+    }
     
     // Find user by email
     const { data: user } = await supabase.auth.admin.listUsers();
     const userRecord = user.users.find((u: any) => u.email === userEmail);
     
-    if (!userRecord) return;
+    if (!userRecord) {
+      console.error('No user found for email:', userEmail);
+      return;
+    }
     
     // Create or update subscription record
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     
-    await supabase
+    console.log('Creating subscription record for user:', userRecord.id);
+    
+    const { error } = await supabase
       .from('subscriptions')
       .upsert({
         id: subscriptionId,
@@ -110,6 +118,12 @@ async function handleCheckoutSessionCompleted(
         current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
         metadata: subscription.metadata
       });
+    
+    if (error) {
+      console.error('Error creating subscription record:', error);
+    } else {
+      console.log('Subscription record created successfully');
+    }
   }
 }
 
