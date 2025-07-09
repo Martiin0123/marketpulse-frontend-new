@@ -15,31 +15,31 @@ import { Zap, Target, X, CheckCircle } from 'lucide-react';
 // SEO Metadata
 export const metadata: Metadata = {
   title:
-    'MarketPulse - AI-Powered Trading Signals | Transform Your Trading Results',
+    'PrimeScope - AI-Powered Trading Signals | Transform Your Trading Results',
   description:
     'Join 500+ successful traders using our AI-powered trading signals. Get real-time alerts with proven win rates, risk-free monthly guarantee, and instant access. Start profiting from the markets today.',
   keywords:
     'trading signals, AI trading, stock signals, forex signals, crypto signals, trading alerts, automated trading, trading bot, market analysis, trading strategy',
   openGraph: {
     title:
-      'MarketPulse - AI-Powered Trading Signals | Transform Your Trading Results',
+      'PrimeScope - AI-Powered Trading Signals | Transform Your Trading Results',
     description:
       'Join 500+ successful traders using our AI-powered trading signals. Get real-time alerts with proven win rates and risk-free monthly guarantee.',
     type: 'website',
-    url: 'https://marketpulse.com',
-    siteName: 'MarketPulse',
+    url: 'https://primescope.com',
+    siteName: 'PrimeScope',
     images: [
       {
         url: '/demo.png',
         width: 1200,
         height: 630,
-        alt: 'MarketPulse AI Trading Signals Dashboard'
+        alt: 'PrimeScope AI Trading Signals Dashboard'
       }
     ]
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'MarketPulse - AI-Powered Trading Signals',
+    title: 'PrimeScope - AI-Powered Trading Signals',
     description:
       'Transform your trading with AI-powered signals. Join 500+ successful traders today.',
     images: ['/demo.png']
@@ -56,7 +56,7 @@ export const metadata: Metadata = {
     }
   },
   alternates: {
-    canonical: 'https://marketpulse.com'
+    canonical: 'https://primescope.com'
   }
 };
 
@@ -64,10 +64,18 @@ export default async function HomePage() {
   const supabase = createClient();
 
   try {
-    const [user, positions] = await Promise.all([
-      getUser(supabase),
-      getPositions(supabase)
-    ]);
+    const user = await getUser(supabase);
+    let positions = [];
+    
+    // Only try to get positions if user exists, to avoid auth errors
+    if (user) {
+      try {
+        positions = await getPositions(supabase) || [];
+      } catch (posError) {
+        console.log('Positions fetch failed, continuing without positions:', posError);
+        positions = [];
+      }
+    }
 
     return (
       <>
@@ -106,7 +114,7 @@ export default async function HomePage() {
               <h2 className="text-4xl font-bold text-white mb-4">
                 Why Choose{' '}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500">
-                  MarketPulse
+                  PrimeScope
                 </span>
                 ?
               </h2>
@@ -121,7 +129,7 @@ export default async function HomePage() {
                 <div className="relative">
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                     <div className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-4 py-2 rounded-full text-sm font-semibold">
-                      MarketPulse
+                      PrimeScope
                     </div>
                   </div>
                   <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-xl p-6 mt-4">
@@ -317,6 +325,29 @@ export default async function HomePage() {
     );
   } catch (error) {
     console.error('Error fetching data:', error);
-    return <div>Error fetching data. Please try again later.</div>;
+    // Return a basic home page without dynamic data if there's an error
+    return (
+      <>
+        {/* Limited Time Offer Banner */}
+        <div className="w-full bg-gradient-to-r from-emerald-500 via-blue-500 to-cyan-500 text-white text-center py-2 font-semibold tracking-wide shadow-lg relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-pulse"></div>
+          <div className="relative z-10">
+            Limited Time Offer:{' '}
+            <span className="font-bold">Get 20% Off Your First Month!</span> Use
+            code <span className="bg-white/20 px-2 py-1 rounded">TRADE20</span>
+          </div>
+        </div>
+
+        <div className="min-h-screen bg-slate-900 relative">
+          <Hero user={null} positions={[]} />
+          <Stats />
+          <HowItWorks />
+          <Features />
+          <Testimonials />
+          <FAQ />
+          <CTA user={null} />
+        </div>
+      </>
+    );
   }
 }

@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import { useAuth } from '@/utils/auth-context';
-import { createClient } from '@/utils/supabase/client';
 import { useRouter, usePathname } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import {
@@ -23,14 +22,13 @@ import {
 } from 'lucide-react';
 
 export default function NavbarClient() {
-  const { user, subscription, loading } = useAuth();
+  const { user, subscription, loading, signOut } = useAuth();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(loading);
   const router = useRouter();
   const pathname = usePathname();
-  const supabase = createClient();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Add timeout fallback for loading state to prevent infinite skeleton
@@ -66,27 +64,9 @@ export default function NavbarClient() {
     try {
       setIsSigningOut(true);
       setIsDropdownOpen(false);
-      
-      // Use global sign out to clear all sessions
-      const { error } = await supabase.auth.signOut({ scope: 'global' });
-      if (error) throw error;
-      
-      // Clear any cached auth state
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('supabase.auth.token');
-        sessionStorage.clear();
-      }
-      
-      // Force page reload to clear all state
-      window.location.href = '/';
+      await signOut();
     } catch (error) {
       console.error('Error signing out:', error);
-      // Even if sign out fails, try to clear local state
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('supabase.auth.token');
-        sessionStorage.clear();
-        window.location.href = '/';
-      }
     } finally {
       setIsSigningOut(false);
     }

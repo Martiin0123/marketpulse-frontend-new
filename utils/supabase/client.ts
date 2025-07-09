@@ -1,173 +1,63 @@
 import { createBrowserClient } from '@supabase/ssr';
 import { Database } from '@/types_db';
 
-// Singleton pattern to prevent multiple client instances
+// Super simple client with minimal configuration
 let supabaseClient: ReturnType<typeof createBrowserClient<Database>> | null = null;
-
-// Global flags to prevent token refresh spam
-let isRefreshing = false;
-let refreshPromise: Promise<any> | null = null;
-let lastRefreshTime = 0;
-const MIN_REFRESH_INTERVAL = 30000; // 30 seconds minimum between refresh attempts
-let authListenerAttached = false;
-
-// Rate limiting for auth operations
-const authRateLimit = {
-  lastCall: 0,
-  minInterval: 1000, // 1 second minimum between auth calls
-  maxConcurrent: 1,
-  currentCalls: 0
-};
 
 export const createClient = () => {
   if (!supabaseClient) {
-    // Get environment variables without fallbacks
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    // Validate environment variables are present
     if (!supabaseUrl || !supabaseAnonKey) {
-      // Log error only once to prevent spam
-      if (typeof window !== 'undefined' && !(window as any).__supabaseConfigError) {
-        (window as any).__supabaseConfigError = true;
-        console.error('❌ MISSING RAILWAY ENVIRONMENT VARIABLES:');
-        console.error('Please set these in Railway dashboard:');
-        console.error('- NEXT_PUBLIC_SUPABASE_URL');
-        console.error('- NEXT_PUBLIC_SUPABASE_ANON_KEY');
-        console.error('Current status:', {
-          url: !!supabaseUrl,
-          key: !!supabaseAnonKey,
-          env: process.env.NODE_ENV
-        });
-      }
-      
-      throw new Error('Environment variables missing. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Railway dashboard.');
+      throw new Error('Missing Supabase environment variables');
     }
-
-    // Create custom storage with error handling
-    const customStorage = {
-      getItem: (key: string) => {
-        try {
-          if (typeof window === 'undefined') return null;
-          return window.localStorage?.getItem(key) || null;
-        } catch (error) {
-          console.warn('localStorage getItem error:', error);
-          return null;
-        }
-      },
-      setItem: (key: string, value: string) => {
-        try {
-          if (typeof window !== 'undefined' && window.localStorage) {
-            window.localStorage.setItem(key, value);
-          }
-        } catch (error) {
-          console.warn('localStorage setItem error:', error);
-        }
-      },
-      removeItem: (key: string) => {
-        try {
-          if (typeof window !== 'undefined' && window.localStorage) {
-            window.localStorage.removeItem(key);
-          }
-        } catch (error) {
-          console.warn('localStorage removeItem error:', error);
-        }
-      }
-    };
 
     supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
-        autoRefreshToken: true, // Re-enable but we'll control it with our guards
-        persistSession: true,
-        detectSessionInUrl: false, // Disable automatic session detection to reduce requests
-        flowType: 'pkce',
-        storage: customStorage,
-        storageKey: 'supabase.auth.token'
+        autoRefreshToken: false, // Disable auto refresh completely
+        persistSession: false,   // Disable session persistence
+        detectSessionInUrl: false,
+        flowType: 'pkce'
       }
     });
-
-    // Add auth state listener only once
-    if (supabaseClient && !authListenerAttached) {
-      authListenerAttached = true;
-      
-      supabaseClient.auth.onAuthStateChange(async (event, session) => {
-        const now = Date.now();
-        
-        // Prevent rapid-fire auth events
-        if (now - authRateLimit.lastCall < authRateLimit.minInterval) {
-          console.log('Auth rate limit: ignoring rapid auth event', event);
-          return;
-        }
-        authRateLimit.lastCall = now;
-
-        console.log('Auth state change:', event, !!session);
-        
-        if (event === 'TOKEN_REFRESHED') {
-          isRefreshing = false;
-          refreshPromise = null;
-          lastRefreshTime = now;
-          console.log('Token refreshed successfully');
-        } else if (event === 'SIGNED_OUT') {
-          isRefreshing = false;
-          refreshPromise = null;
-          lastRefreshTime = 0;
-          console.log('User signed out');
-          
-          // Clear any stored auth data
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('supabase.auth.token');
-            sessionStorage.clear();
-          }
-        } else if (event === 'SIGNED_IN') {
-          isRefreshing = false;
-          refreshPromise = null;
-          console.log('User signed in');
-        }
-      });
-    }
   }
   return supabaseClient;
 };
 
-// Guarded function to prevent token refresh spam
-export const guardedTokenRefresh = async () => {
-  const now = Date.now();
+// Simple auth functions
+export const signInWithEmail = async (email: string, password: string) => {
+  const supabase = createClient();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
   
-  // Check if we're already refreshing
-  if (isRefreshing && refreshPromise) {
-    console.log('Token refresh already in progress, waiting...');
-    return refreshPromise;
+  if (error) throw error;
+  return data;
+};
+
+export const signUpWithEmail = async (email: string, password: string) => {
+  const supabase = createClient();
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password
+  });
+  
+  if (error) throw error;
+  return data;
+};
+
+export const signOutUser = async () => {
+  const supabase = createClient();
+  
+  // Clear all storage first
+  if (typeof window !== 'undefined') {
+    localStorage.clear();
+    sessionStorage.clear();
   }
   
-  // Check minimum interval
-  if (now - lastRefreshTime < MIN_REFRESH_INTERVAL) {
-    console.log('Token refresh rate limited, using existing session');
-    return Promise.resolve();
-  }
-  
-  // Check concurrent calls
-  if (authRateLimit.currentCalls >= authRateLimit.maxConcurrent) {
-    console.log('Too many concurrent auth calls, skipping refresh');
-    return Promise.resolve();
-  }
-  
-  const client = createClient();
-  if (!client) return Promise.resolve();
-  
-  isRefreshing = true;
-  authRateLimit.currentCalls++;
-  
-  try {
-    refreshPromise = client.auth.refreshSession();
-    const result = await refreshPromise;
-    lastRefreshTime = now;
-    return result;
-  } catch (error) {
-    console.error('Token refresh failed:', error);
-    throw error;
-  } finally {
-    isRefreshing = false;
-    refreshPromise = null;
-    authRateLimit.currentCalls--;
-  }
+  // Then sign out
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
 };

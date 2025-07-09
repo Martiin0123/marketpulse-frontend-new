@@ -4,30 +4,62 @@ import { getSignals } from '@/utils/supabase/queries';
 import Dashboard from '@/components/ui/Dashboard/Dashboard';
 import { getUser } from '@/utils/supabase/queries';
 
+// Force dynamic rendering since this page uses auth
+export const dynamic = 'force-dynamic';
+
 export default async function DashboardPage() {
-  const supabase = createClient();
-  const user = await getUser(supabase);
+  try {
+    const supabase = createClient();
+    const user = await getUser(supabase);
 
-  if (!user) {
-    return redirect('/signin');
+    if (!user) {
+      return redirect('/signin');
+    }
+
+    // Get signals with error handling
+    let signals = [];
+    try {
+      signals = await getSignals(supabase) || [];
+    } catch (signalsError) {
+      console.log('Signals fetch failed, continuing with empty array:', signalsError);
+      signals = [];
+    }
+
+    // Calculate basic stats from signals
+    const totalSignals = signals.length;
+    const activeSignals = signals.filter(s => s.status === 'active').length;
+    const closedSignals = signals.filter(s => s.status === 'closed').length;
+    const completedSignals = signals.filter(s => s.status === 'closed' && s.pnl_percentage !== null);
+    const totalPnl = completedSignals.reduce((sum, s) => sum + (s.pnl_percentage || 0), 0);
+    const winRate = completedSignals.length > 0 ? 
+      (completedSignals.filter(s => (s.pnl_percentage || 0) > 0).length / completedSignals.length) * 100 : 0;
+    const averagePnl = completedSignals.length > 0 ? totalPnl / completedSignals.length : 0;
+
+    return (
+      <Dashboard
+        user={user}
+        subscription={null as any} // Will be provided by auth context
+        signals={signals}
+        stats={{
+          totalSignals,
+          activeSignals,
+          closedSignals,
+          totalPnl,
+          winRate,
+          averagePnl
+        }}
+      />
+    );
+  } catch (error) {
+    console.error('Dashboard error:', error);
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-white mb-4">Dashboard Unavailable</h1>
+          <p className="text-slate-400 mb-4">There was an error loading the dashboard.</p>
+          <a href="/" className="text-blue-400 hover:text-blue-300">Return Home</a>
+        </div>
+      </div>
+    );
   }
-
-  // Get subscription from auth context will be handled client-side
-  const signals = await getSignals(supabase);
-
-  return (
-    <Dashboard
-      user={user}
-      subscription={null as any} // Will be provided by auth context
-      signals={signals || []}
-      stats={{
-        totalSignals: 0,
-        activeSignals: 0,
-        closedSignals: 0,
-        totalPnl: 0,
-        winRate: 0,
-        averagePnl: 0
-      }}
-    />
-  );
 }
