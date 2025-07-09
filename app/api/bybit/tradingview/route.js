@@ -236,6 +236,27 @@ async function sendSuccessDiscordNotification(signal, orderDetails, webhookUrl, 
         inline: true
       });
     }
+    
+    // Add PnL if available (for CLOSE signals or strategy reversals)
+    if (signal.pnl_percentage !== null && signal.pnl_percentage !== undefined && 
+        (signal.action === 'CLOSE' || signal.action.includes('CLOSE'))) {
+      const pnlColor = signal.pnl_percentage >= 0 ? '🟢' : '🔴';
+      const pnlSign = signal.pnl_percentage >= 0 ? '+' : '';
+      embed.fields.push({
+        name: `${pnlColor} P&L`,
+        value: `${pnlSign}${signal.pnl_percentage.toFixed(2)}%`,
+        inline: true
+      });
+      
+      // Update embed color based on PnL for close actions
+      if (signal.action === 'CLOSE' || signal.action.startsWith('CLOSE')) {
+        if (signal.pnl_percentage >= 0) {
+          embed.color = 0x00ff00; // Green for profit
+        } else {
+          embed.color = 0xff0000; // Red for loss
+        }
+      }
+    }
 
     const webhookData = {
       username: isEveryFifthTrade ? 'Primescope Free Trading Bot' : 'Primescope Bybit Trading Bot',
@@ -432,6 +453,20 @@ export async function POST(request) {
           console.error('❌ Failed to parse JSON message:', jsonError);
           throw new Error('Invalid JSON in message field');
         }
+      } else if (body.action && body.position_after !== undefined) {
+        // Parse TradingView strategy alert format with position management
+        console.log('📨 Parsing TradingView strategy alert with position management...');
+        signalData = {
+          symbol: body.symbol,
+          price: body.price,
+          action: body.action?.toUpperCase(),
+          quantity: body.quantity || 1,
+          strategy_metadata: body.strategy_metadata || {},
+          signalType: 'strategy',
+          exitReason: body.exit_reason,
+          positionAfter: body.position_after // 1 = long, -1 = short, 0 = flat
+        };
+        console.log('📨 Received TradingView strategy alert:', signalData);
       } else {
         // Direct API call format
         console.log('📨 Using direct API call format...');
@@ -457,8 +492,8 @@ export async function POST(request) {
     }
 
     console.log('🔍 Extracting signal data...');
-    const { symbol, price, action, quantity = 1, strategy_metadata = {}, signalType = 'entry', exitReason } = signalData;
-    console.log('📊 Extracted signal data:', { symbol, price, action, quantity, signalType, exitReason });
+    const { symbol, price, action, quantity = 1, strategy_metadata = {}, signalType = 'entry', exitReason, positionAfter } = signalData;
+    console.log('📊 Extracted signal data:', { symbol, price, action, quantity, signalType, exitReason, positionAfter });
 
     if (!symbol || !action) {
       console.log('❌ Missing required fields:', { symbol, action, price });
@@ -530,6 +565,175 @@ export async function POST(request) {
     let orderResult = null;
     let databaseResult = null;
     let signalSaved = true;
+
+    // Handle TradingView Strategy Alerts with Position Management
+    if (signalType === 'strategy' && positionAfter !== undefined) {
+      console.log('🔄 Processing strategy alert with position management...');
+      
+      try {
+        // Use proxy to check current position and handle reversal automatically
+        const strategyPayload = {
+          action: action, // BUY or SELL
+          symbol: bybitSymbol,
+          positionAfter: positionAfter, // 1 = long, -1 = short, 0 = flat
+          price: currentPrice
+        };
+
+        console.log('📤 Submitting strategy order to proxy:', strategyPayload);
+        
+        const response = await fetch('https://primescope-tradeapi-production.up.railway.app/place-order', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.PROXY_APP_SECRET}`
+          },
+          body: JSON.stringify(strategyPayload)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Strategy order failed: ${response.status} ${response.statusText} - ${errorText}`);
+        }
+
+        orderResult = await response.json();
+        console.log('📥 Strategy order response:', orderResult);
+
+        // Handle database updates based on what actually happened
+        const actualActions = orderResult.actions || []; // Array of actions taken (e.g., ['CLOSE', 'BUY'])
+        
+        for (const actionTaken of actualActions) {
+          try {
+            if (actionTaken === 'CLOSE') {
+              // Find and update original signal
+              const { data: originalSignal } = await supabase
+                .from('signals')
+                .select('*')
+                .eq('symbol', symbol.toUpperCase())
+                .in('type', ['buy', 'sell'])
+                .eq('status', 'active')
+                .eq('exchange', 'bybit')
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+
+              if (originalSignal) {
+                const entryPrice = Number(originalSignal.entry_price);
+                const exitPrice = Number(currentPrice);
+                const pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+                await supabase
+                  .from('signals')
+                  .update({
+                    status: 'closed',
+                    exit_price: exitPrice,
+                    exit_timestamp: validTimestamp,
+                    pnl_percentage: pnlPercentage,
+                    exit_reason: 'strategy_reversal'
+                  })
+                  .eq('id', originalSignal.id);
+
+                console.log('✅ Updated original signal with strategy reversal exit');
+              }
+
+              // Create close signal record
+              await supabase
+                .from('signals')
+                .insert([{
+                  symbol: symbol.toUpperCase(),
+                  type: 'close',
+                  entry_price: currentPrice,
+                  created_at: validTimestamp,
+                  strategy_name: 'Primescope Crypto',
+                  signal_source: 'ai_algorithm',
+                  exchange: 'bybit',
+                  exit_reason: 'strategy_reversal',
+                  status: 'closed',
+                  rsi_value: strategy_metadata?.rsi_value || null,
+                  technical_metadata: strategy_metadata && Object.keys(strategy_metadata).length > 0 ? strategy_metadata : null
+                }]);
+            }
+            
+            if (actionTaken === 'BUY' || actionTaken === 'SELL') {
+              // Create new position signal
+              const { data: signal } = await supabase
+                .from('signals')
+                .insert([{
+                  symbol: symbol.toUpperCase(),
+                  type: actionTaken.toLowerCase(),
+                  entry_price: currentPrice,
+                  created_at: validTimestamp,
+                  strategy_name: 'Primescope Crypto',
+                  signal_source: 'ai_algorithm',
+                  exchange: 'bybit',
+                  status: 'active',
+                  rsi_value: strategy_metadata?.rsi_value || null,
+                  technical_metadata: strategy_metadata && Object.keys(strategy_metadata).length > 0 ? strategy_metadata : null
+                }])
+                .select()
+                .single();
+
+              databaseResult = signal;
+              console.log('✅ Created new position signal:', actionTaken);
+            }
+          } catch (dbError) {
+            console.error('❌ Database error for action:', actionTaken, dbError);
+            signalSaved = false;
+          }
+        }
+
+        // Send Discord notification
+        if (discordWebhookUrl) {
+          const notificationAction = actualActions.length > 1 
+            ? `${actualActions.join(' → ')}` 
+            : actualActions[0] || action;
+            
+          // Use actual Bybit execution price if available
+          const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || currentPrice;
+          
+          await sendSuccessDiscordNotification({
+            symbol: symbol.toUpperCase(),
+            action: notificationAction,
+            price: parseFloat(executionPrice),
+            timestamp: validTimestamp,
+            quantity: orderResult.order?.qty || orderResult.qty || 'N/A',
+            strategy_metadata: strategy_metadata,
+            pnl_percentage: null // PnL will be calculated in individual action handlers
+          }, orderResult.order || orderResult, discordWebhookUrl);
+        }
+
+        return new Response(JSON.stringify({
+          message: 'Strategy order executed successfully',
+          actions_taken: actualActions,
+          order_id: orderResult.order?.orderId || orderResult.orderId,
+          symbol: bybitSymbol,
+          position_after: positionAfter,
+          signal_id: databaseResult?.id || null,
+          signalSaved
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+      } catch (strategyError) {
+        console.error('❌ Strategy order failed:', strategyError);
+        
+        if (discordWebhookUrl) {
+          await sendErrorDiscordNotification({
+            symbol: symbol.toUpperCase(),
+            action: action,
+            price: currentPrice
+          }, strategyError, discordWebhookUrl);
+        }
+        
+        return new Response(JSON.stringify({
+          error: 'Strategy order failed',
+          details: strategyError.message
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    }
 
     // Handle CLOSE action (exit signal from Pine Script)
     if (action.toUpperCase() === 'CLOSE') {
@@ -642,27 +846,70 @@ export async function POST(request) {
 
         // Send success Discord notification
         if (discordWebhookUrl) {
+          // Use actual Bybit execution price and calculate PnL
+          const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || currentPrice;
+          let pnlPercentage = null;
+          
+          // Calculate PnL if we have the original entry price
+          if (databaseResult?.pnl_percentage !== undefined) {
+            pnlPercentage = databaseResult.pnl_percentage;
+          } else if (orderResult.closedPosition) {
+            // Calculate from position data if available
+            const entryPrice = parseFloat(orderResult.closedPosition.avgPrice || orderResult.closedPosition.entryPrice || 0);
+            const exitPrice = parseFloat(executionPrice);
+            const side = orderResult.closedPosition.side;
+            
+            if (entryPrice > 0 && exitPrice > 0) {
+              if (side === 'Buy') {
+                pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
+              } else if (side === 'Sell') {
+                pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100;
+              }
+            }
+          }
+          
           await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
             action: 'CLOSE',
-            price: currentPrice,
+            price: parseFloat(executionPrice),
             timestamp: validTimestamp,
             strategy_metadata: strategy_metadata,
             exitReason: exitReason,
-            dbErrorHint
+            dbErrorHint,
+            pnl_percentage: pnlPercentage
           }, orderResult.order || orderResult, discordWebhookUrl);
         }
         
         // Send to free webhook if it's every 5th trade
         if (isEveryFifthTrade && discordFreeWebhookUrl) {
+          const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || currentPrice;
+          let pnlPercentage = null;
+          
+          if (databaseResult?.pnl_percentage !== undefined) {
+            pnlPercentage = databaseResult.pnl_percentage;
+          } else if (orderResult.closedPosition) {
+            const entryPrice = parseFloat(orderResult.closedPosition.avgPrice || orderResult.closedPosition.entryPrice || 0);
+            const exitPrice = parseFloat(executionPrice);
+            const side = orderResult.closedPosition.side;
+            
+            if (entryPrice > 0 && exitPrice > 0) {
+              if (side === 'Buy') {
+                pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
+              } else if (side === 'Sell') {
+                pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100;
+              }
+            }
+          }
+          
           await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
             action: 'CLOSE',
-            price: currentPrice,
+            price: parseFloat(executionPrice),
             timestamp: validTimestamp,
             strategy_metadata: strategy_metadata,
             exitReason: exitReason,
-            dbErrorHint
+            dbErrorHint,
+            pnl_percentage: pnlPercentage
           }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
         }
 
@@ -687,14 +934,17 @@ export async function POST(request) {
         dbErrorHint = '⚠️ Signal was NOT saved to the database due to rate limit or DB error.';
         // Return success even if database fails
         if (discordWebhookUrl) {
+          const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || currentPrice;
+          
           await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
             action: 'CLOSE',
-            price: currentPrice,
+            price: parseFloat(executionPrice),
             timestamp: validTimestamp,
             strategy_metadata: strategy_metadata,
             exitReason: exitReason,
-            dbErrorHint
+            dbErrorHint,
+            pnl_percentage: null
           }, orderResult.order || orderResult, discordWebhookUrl);
         }
         return new Response(JSON.stringify({ 
@@ -788,14 +1038,18 @@ export async function POST(request) {
 
         // Send success Discord notification
         if (discordWebhookUrl) {
+          // Use actual Bybit execution price
+          const executionPrice = orderResult.avgPrice || orderResult.price || orderResult.order?.avgPrice || currentPrice;
+          
           await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
             action: isBuy ? 'BUY' : 'SELL',
-            price: currentPrice,
+            price: parseFloat(executionPrice),
             timestamp: validTimestamp,
             quantity: orderResult.qty || orderResult.calculatedQuantity,
             strategy_metadata: strategy_metadata,
-            dbErrorHint
+            dbErrorHint,
+            pnl_percentage: null
           }, orderResult, discordWebhookUrl);
         }
 
@@ -819,14 +1073,17 @@ export async function POST(request) {
         dbErrorHint = '⚠️ Signal was NOT saved to the database due to rate limit or DB error.';
 
         if (discordWebhookUrl) {
+          const executionPrice = orderResult.avgPrice || orderResult.price || orderResult.order?.avgPrice || currentPrice;
+          
           await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
             action: isBuy ? 'BUY' : 'SELL',
-            price: currentPrice,
+            price: parseFloat(executionPrice),
             timestamp: validTimestamp,
             quantity: orderResult.qty || orderResult.calculatedQuantity,
             strategy_metadata: strategy_metadata,
-            dbErrorHint
+            dbErrorHint,
+            pnl_percentage: null
           }, orderResult, discordWebhookUrl);
         }
 
