@@ -293,6 +293,88 @@ async function sendSuccessDiscordNotification(signal, orderDetails, webhookUrl, 
   }
 }
 
+// Send profit teaser notification to free Discord webhook
+async function sendProfitTeaserNotification(signal, orderDetails, webhookUrl) {
+  try {
+    if (!webhookUrl || !webhookUrl.includes('discord.com/api/webhooks/')) {
+      console.error('❌ Invalid Discord webhook URL');
+      return false;
+    }
+
+    const embed = {
+      title: `🔥 PREMIUM ALERT: ${signal.symbol} Closed +${signal.pnl_percentage.toFixed(2)}%`,
+      description: `**Premium subscribers just secured a ${signal.pnl_percentage.toFixed(2)}% profit!** 💰\n\n*Want these winning signals? Upgrade to Premium!*`,
+      color: 0x00ff00, // Green for profit
+      fields: [
+        {
+          name: '📈 Symbol',
+          value: signal.symbol,
+          inline: true
+        },
+        {
+          name: '💰 Exit Price',
+          value: `$${signal.price.toFixed(2)}`,
+          inline: true
+        },
+        {
+          name: '🟢 Profit',
+          value: `+${signal.pnl_percentage.toFixed(2)}%`,
+          inline: true
+        },
+        {
+          name: '🚀 Upgrade Now',
+          value: '[**Get Premium Access**](https://primescope.com/pricing) and never miss another winning trade!',
+          inline: false
+        },
+        {
+          name: '✨ Premium Benefits',
+          value: '• Real-time alerts\n• All winning trades\n• Advanced strategies\n• 24/7 signals',
+          inline: false
+        }
+      ],
+      thumbnail: {
+        url: 'https://primescope.com/logo.png'
+      },
+      timestamp: new Date().toISOString(),
+      footer: {
+        text: 'Primescope Premium Strategy - Upgrade to unlock all signals'
+      }
+    };
+
+    const webhookData = {
+      username: 'Primescope Premium Teaser',
+      avatar_url: 'https://primescope.com/logo.png',
+      embeds: [embed]
+    };
+
+    console.log('🎯 Sending profit teaser to free Discord:', {
+      symbol: signal.symbol,
+      pnl: signal.pnl_percentage,
+      price: signal.price
+    });
+
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(webhookData)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Discord webhook failed: ${response.status} ${errorText}`);
+    }
+
+    console.log('✅ Profit teaser sent to free Discord');
+    return true;
+
+  } catch (error) {
+    console.error('❌ Error sending profit teaser:', error);
+    return false;
+  }
+}
+
 // Send error Discord notification
 async function sendErrorDiscordNotification(signal, error, webhookUrl) {
   try {
@@ -603,37 +685,50 @@ export async function POST(request) {
         
         for (const actionTaken of actualActions) {
           try {
-            if (actionTaken === 'CLOSE') {
-              // Find and update original signal
-              const { data: originalSignal } = await supabase
-                .from('signals')
-                .select('*')
-                .eq('symbol', symbol.toUpperCase())
-                .in('type', ['buy', 'sell'])
-                .eq('status', 'active')
-                .eq('exchange', 'bybit')
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
+                         if (actionTaken === 'CLOSE') {
+               // Find and update original signal
+               const { data: originalSignal } = await supabase
+                 .from('signals')
+                 .select('*')
+                 .eq('symbol', symbol.toUpperCase())
+                 .in('type', ['buy', 'sell'])
+                 .eq('status', 'active')
+                 .eq('exchange', 'bybit')
+                 .order('created_at', { ascending: false })
+                 .limit(1)
+                 .single();
 
-              if (originalSignal) {
-                const entryPrice = Number(originalSignal.entry_price);
-                const exitPrice = Number(currentPrice);
-                const pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
+               if (originalSignal) {
+                 const entryPrice = Number(originalSignal.entry_price);
+                 const exitPrice = Number(currentPrice);
+                 const pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
 
-                await supabase
-                  .from('signals')
-                  .update({
-                    status: 'closed',
-                    exit_price: exitPrice,
-                    exit_timestamp: validTimestamp,
-                    pnl_percentage: pnlPercentage,
-                    exit_reason: 'strategy_reversal'
-                  })
-                  .eq('id', originalSignal.id);
+                 await supabase
+                   .from('signals')
+                   .update({
+                     status: 'closed',
+                     exit_price: exitPrice,
+                     exit_timestamp: validTimestamp,
+                     pnl_percentage: pnlPercentage,
+                     exit_reason: 'strategy_reversal'
+                   })
+                   .eq('id', originalSignal.id);
 
-                console.log('✅ Updated original signal with strategy reversal exit');
-              }
+                 console.log('✅ Updated original signal with strategy reversal exit');
+                 
+                 // Send high-profit trades (>2%) to free webhook as teasers
+                 if (pnlPercentage > 2 && discordFreeWebhookUrl) {
+                   console.log(`🎯 Strategy reversal profit detected (${pnlPercentage.toFixed(2)}%), sending teaser to free webhook`);
+                   
+                   const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || currentPrice;
+                   await sendProfitTeaserNotification({
+                     symbol: symbol.toUpperCase(),
+                     price: parseFloat(executionPrice),
+                     pnl_percentage: pnlPercentage,
+                     timestamp: validTimestamp
+                   }, orderResult.order || orderResult, discordFreeWebhookUrl);
+                 }
+               }
 
               // Create close signal record
               await supabase
@@ -878,6 +973,18 @@ export async function POST(request) {
             dbErrorHint,
             pnl_percentage: pnlPercentage
           }, orderResult.order || orderResult, discordWebhookUrl);
+        }
+
+        // Send high-profit trades (>2%) to free webhook as teasers
+        if (pnlPercentage !== null && pnlPercentage > 2 && discordFreeWebhookUrl) {
+          console.log(`🎯 High-profit trade detected (${pnlPercentage.toFixed(2)}%), sending teaser to free webhook`);
+          
+          await sendProfitTeaserNotification({
+            symbol: symbol.toUpperCase(),
+            price: parseFloat(executionPrice),
+            pnl_percentage: pnlPercentage,
+            timestamp: validTimestamp
+          }, orderResult.order || orderResult, discordFreeWebhookUrl);
         }
         
         // Send to free webhook if it's every 5th trade
