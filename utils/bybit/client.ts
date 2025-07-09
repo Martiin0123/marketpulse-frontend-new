@@ -237,6 +237,7 @@ export async function submitBybitOrder(orderData: {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.PROXY_APP_SECRET}`
       },
       body: JSON.stringify(orderPayload)
     });
@@ -327,6 +328,7 @@ export async function submitBybitOrderWithDynamicSizing(orderData: {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.PROXY_APP_SECRET}`
       },
       body: JSON.stringify(orderPayload)
     });
@@ -362,6 +364,7 @@ export async function cancelBybitOrder(orderId: string, symbol: string): Promise
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.PROXY_APP_SECRET}`
       },
       body: JSON.stringify(cancelPayload)
     });
@@ -413,6 +416,7 @@ export async function getBybitOrder(orderId: string, symbol: string): Promise<an
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.PROXY_APP_SECRET}`
       },
       body: JSON.stringify(getOrderPayload)
     });
@@ -466,6 +470,7 @@ export async function closeBybitPosition(symbol: string): Promise<any> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.PROXY_APP_SECRET}`
       },
       body: JSON.stringify(closePayload)
     });
@@ -605,6 +610,7 @@ export async function setBybitLeverage(symbol: string, leverage: number): Promis
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.PROXY_APP_SECRET}`
       },
       body: JSON.stringify(leveragePayload)
     });
@@ -660,6 +666,7 @@ export async function testProxyConnection(): Promise<any> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.PROXY_APP_SECRET}`
       },
       body: JSON.stringify(testPayload)
     });

@@ -1,14 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { 
-  submitBybitOrder,
   submitBybitOrderWithDynamicSizing,
   closeBybitPosition, 
-  getBybitPosition, 
-  getBybitAccount,
-  convertSymbolFormat,
-  getBybitTickerPrice,
-  getBybitSymbolInfo,
-  setBybitLeverage
+  convertSymbolFormat
 } from '@/utils/bybit/client'
 
 // Create Supabase client function to avoid module-level initialization
@@ -529,28 +523,9 @@ export async function POST(request) {
 
     console.log('🔍 Starting Bybit API calls...');
     
-    // Get current price from Bybit if not provided
-    let currentPrice = price;
-    if (!currentPrice || currentPrice === 0) {
-      try {
-        console.log('📊 Fetching current price for symbol:', bybitSymbol);
-        const tickerPrice = await getBybitTickerPrice(bybitSymbol);
-        currentPrice = tickerPrice;
-        console.log('📊 Fetched current price from Bybit:', { symbol: bybitSymbol, price: currentPrice });
-      } catch (priceError) {
-        console.error('❌ Failed to fetch current price:', priceError);
-        currentPrice = price; // Use provided price as fallback
-      }
-    }
-
-    // Get Bybit account info
-    console.log('📊 Fetching Bybit account info...');
-    const account = await getBybitAccount();
-    console.log('📊 Bybit Account:', {
-      totalEquity: account.totalEquity,
-      totalWalletBalance: account.totalWalletBalance,
-      totalAvailableBalance: account.totalAvailableBalance
-    });
+    // Use provided price or fallback to 0 (proxy will fetch current price if needed)
+    let currentPrice = price || 0;
+    console.log('📊 Using price:', currentPrice, '(proxy will fetch current price if needed)');
 
     let orderResult = null;
     let databaseResult = null;
@@ -558,12 +533,13 @@ export async function POST(request) {
 
     // Handle CLOSE action (exit signal from Pine Script)
     if (action.toUpperCase() === 'CLOSE') {
-      // Check if position exists in Bybit
-      const bybitPosition = await getBybitPosition(bybitSymbol);
+      console.log('📊 Submitting close position via proxy for:', bybitSymbol);
       
-      if (!bybitPosition) {
-        const error = new Error('No open position found to close');
-        console.log('⚠️ No position to close for:', bybitSymbol);
+      try {
+        // Submit close position order via proxy (handles position validation automatically)
+        orderResult = await closeBybitPosition(bybitSymbol);
+      } catch (closeError) {
+        console.error('❌ Failed to close position:', closeError);
         
         if (discordWebhookUrl) {
           await sendErrorDiscordNotification({
@@ -571,25 +547,23 @@ export async function POST(request) {
             action: 'CLOSE',
             price: currentPrice,
             dbErrorHint
-          }, error, discordWebhookUrl);
+          }, closeError, discordWebhookUrl);
         }
         
         return new Response(JSON.stringify({ 
-          message: 'No open position found to close',
+          error: 'Failed to close position',
+          details: closeError.message,
           symbol: bybitSymbol,
           dbErrorHint
         }), { 
-          status: 404,
+          status: 400,
           headers: headers
         });
       }
 
-      // Submit close position order via proxy (handles reversing position automatically)
-      orderResult = await closeBybitPosition(bybitSymbol);
-
       console.log('🔴 Bybit position close order submitted:', {
         symbol: bybitSymbol,
-        qty: bybitPosition.size,
+        qty: orderResult.qty || 'N/A',
         order_id: orderResult.orderId,
         status: orderResult.orderStatus,
         exit_reason: exitReason
@@ -696,7 +670,7 @@ export async function POST(request) {
           message: 'Bybit position close order submitted successfully',
           order_id: orderResult.orderId,
           symbol: bybitSymbol,
-          bybit_position: bybitPosition,
+          quantity: orderResult.qty || 'N/A',
           signal_id: signal?.id,
           pnl_percentage: databaseResult?.pnl_percentage || null,
           exit_reason: exitReason,
@@ -727,7 +701,7 @@ export async function POST(request) {
           message: 'Bybit position close order submitted successfully (database update failed)',
           order_id: orderResult.orderId,
           symbol: bybitSymbol,
-          bybit_position: bybitPosition,
+          quantity: orderResult.qty || 'N/A',
           error: 'Database update failed due to rate limit',
           signalSaved,
           dbErrorHint
@@ -742,34 +716,9 @@ export async function POST(request) {
     if (action.toUpperCase() === 'BUY' || action.toUpperCase() === 'SELL') {
       const isBuy = action.toUpperCase() === 'BUY';
 
-      // Check for existing position in Bybit
-      const existingBybitPosition = await getBybitPosition(bybitSymbol);
+      console.log(`📊 Submitting ${isBuy ? 'BUY' : 'SELL'} order via proxy for:`, bybitSymbol);
 
-      if (existingBybitPosition) {
-        const error = new Error('Position already exists');
-        console.log('⚠️ Position already exists:', existingBybitPosition);
-
-        if (discordWebhookUrl) {
-          await sendErrorDiscordNotification({
-            symbol: symbol.toUpperCase(),
-            action: isBuy ? 'BUY' : 'SELL',
-            price: currentPrice,
-            dbErrorHint
-          }, error, discordWebhookUrl);
-        }
-
-        return new Response(JSON.stringify({
-          message: 'Position already exists',
-          symbol: bybitSymbol,
-          position: existingBybitPosition,
-          dbErrorHint
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-
-      // 🧠 Submit order with dynamic position sizing via proxy (handles all calculations automatically)
+      // 🧠 Submit order with dynamic position sizing via proxy (handles all validations automatically)
       try {
         orderResult = await submitBybitOrderWithDynamicSizing({
           symbol: bybitSymbol,
@@ -780,6 +729,16 @@ export async function POST(request) {
         });
       } catch (orderError) {
         console.error('❌ Failed to place order with dynamic sizing:', orderError);
+        
+        if (discordWebhookUrl) {
+          await sendErrorDiscordNotification({
+            symbol: symbol.toUpperCase(),
+            action: isBuy ? 'BUY' : 'SELL',
+            price: currentPrice,
+            dbErrorHint
+          }, orderError, discordWebhookUrl);
+        }
+        
         return new Response(JSON.stringify({
           error: 'Failed to place order with dynamic sizing',
           details: orderError.message
