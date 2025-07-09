@@ -313,8 +313,11 @@ export async function submitBybitOrderWithDynamicSizing(orderData: {
   timeInForce?: string;
 }): Promise<any> {
   try {
+    // Convert side to action format expected by proxy
+    const action = orderData.side === 'Buy' ? 'BUY' : 'SELL';
+    
     const orderPayload = {
-      action: 'placeOrderWithDynamicSizing',
+      action: action,
       symbol: orderData.symbol,
       side: orderData.side,
       orderType: orderData.orderType || 'Market',
@@ -460,7 +463,7 @@ export async function getBybitOrder(orderId: string, symbol: string): Promise<an
 export async function closeBybitPosition(symbol: string): Promise<any> {
   try {
     const closePayload = {
-      action: 'closePosition',
+      action: 'CLOSE',
       symbol: symbol
     };
 
