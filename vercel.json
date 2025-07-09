@@ -13,22 +13,7 @@
       "maxDuration": 60
     }
   },
-  "routes": [
-    {
-      "src": "/api/webhook/(.*)",
-      "methods": ["POST"],
-      "headers": {
-        "Access-Control-Allow-Origin": "*"
-      }
-    },
-    {
-      "src": "/api/bybit/tradingview",
-      "methods": ["POST"],
-      "headers": {
-        "Access-Control-Allow-Origin": "*"
-      }
-    }
-  ],
+
   "crons": [
     {
       "path": "/api/cron/check-referral-payouts",
