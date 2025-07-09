@@ -214,6 +214,46 @@ export async function submitBybitOrder(orderData: {
   orderLinkId?: string;
 }): Promise<any> {
   try {
+    // NEW: Submit order to external trade API - using placeBybitOrder function
+    const orderPayload = {
+      action: 'placeOrder',
+      symbol: orderData.symbol,
+      side: orderData.side,
+      qty: orderData.qty,
+      orderType: orderData.orderType || 'Market',
+      category: 'linear',
+      timeInForce: orderData.timeInForce === 'GTC' ? 'GoodTillCancel' : 
+                   orderData.timeInForce === 'IOC' ? 'ImmediateOrCancel' : 
+                   orderData.timeInForce === 'FOK' ? 'FillOrKill' : 'GoodTillCancel',
+      price: orderData.price,
+      reduceOnly: orderData.reduceOnly,
+      closeOnTrigger: orderData.closeOnTrigger,
+      orderLinkId: orderData.orderLinkId
+    };
+
+    console.log('📤 Submitting order to external API with data:', orderPayload);
+    
+    const response = await fetch('https://primescope-tradeapi-production.up.railway.app/place-order', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(orderPayload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`External API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    
+    console.log('📥 External API response:', result);
+    
+    return result;
+
+    /* ORIGINAL BYBIT CLIENT CODE - KEEP FOR REFERENCE:
+    
     const client = getBybitClient();
     if (!client) throw new Error('Bybit client not initialized');
     
@@ -254,14 +294,88 @@ export async function submitBybitOrder(orderData: {
     }
     
     return response.result;
+    
+    END ORIGINAL CODE */
+    
   } catch (error) {
-    console.error('Error submitting Bybit order:', error);
+    console.error('Error submitting order:', error);
+    throw error;
+  }
+}
+
+// NEW: Submit order with dynamic sizing (matches your placeBybitOrderWithDynamicSizing)
+export async function submitBybitOrderWithDynamicSizing(orderData: {
+  symbol: string;
+  side: 'Buy' | 'Sell';
+  orderType?: 'Market' | 'Limit';
+  category?: string;
+  timeInForce?: string;
+}): Promise<any> {
+  try {
+    const orderPayload = {
+      action: 'placeOrderWithDynamicSizing',
+      symbol: orderData.symbol,
+      side: orderData.side,
+      orderType: orderData.orderType || 'Market',
+      category: orderData.category || 'linear',
+      timeInForce: orderData.timeInForce || 'GoodTillCancel'
+    };
+
+    console.log('📤 Submitting dynamic sizing order to external API:', orderPayload);
+    
+    const response = await fetch('https://primescope-tradeapi-production.up.railway.app/place-order', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(orderPayload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`External API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('📥 Dynamic sizing order response:', result);
+    
+    return result;
+  } catch (error) {
+    console.error('Error submitting dynamic sizing order:', error);
     throw error;
   }
 }
 
 export async function cancelBybitOrder(orderId: string, symbol: string): Promise<void> {
   try {
+    // NEW: Cancel order via external API
+    const cancelPayload = {
+      action: 'cancelOrder',
+      orderId: orderId,
+      symbol: symbol,
+      category: 'linear'
+    };
+
+    console.log('📤 Canceling order via external API:', cancelPayload);
+    
+    const response = await fetch('https://primescope-tradeapi-production.up.railway.app/place-order', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(cancelPayload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`External API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('📥 Cancel order response:', result);
+
+    /* ORIGINAL BYBIT CLIENT CODE - KEEP FOR REFERENCE:
+    
     const client = getBybitClient();
     if (!client) throw new Error('Bybit client not initialized');
     
@@ -274,14 +388,47 @@ export async function cancelBybitOrder(orderId: string, symbol: string): Promise
     if (response.retCode !== 0) {
       throw new Error(`Bybit API error: ${response.retMsg}`);
     }
+    
+    END ORIGINAL CODE */
+    
   } catch (error) {
-    console.error('Error canceling Bybit order:', error);
+    console.error('Error canceling order:', error);
     throw error;
   }
 }
 
 export async function getBybitOrder(orderId: string, symbol: string): Promise<any> {
   try {
+    // NEW: Get order via external API
+    const getOrderPayload = {
+      action: 'getOrder',
+      orderId: orderId,
+      symbol: symbol,
+      category: 'linear'
+    };
+
+    console.log('📤 Getting order via external API:', getOrderPayload);
+    
+    const response = await fetch('https://primescope-tradeapi-production.up.railway.app/place-order', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(getOrderPayload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`External API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('📥 Get order response:', result);
+    
+    return result;
+
+    /* ORIGINAL BYBIT CLIENT CODE - KEEP FOR REFERENCE:
+    
     const client = getBybitClient();
     if (!client) throw new Error('Bybit client not initialized');
     
@@ -296,8 +443,44 @@ export async function getBybitOrder(orderId: string, symbol: string): Promise<an
     }
     
     return response.result.list[0];
+    
+    END ORIGINAL CODE */
+    
   } catch (error) {
-    console.error('Error fetching Bybit order:', error);
+    console.error('Error fetching order:', error);
+    throw error;
+  }
+}
+
+// NEW: Close position function (matches your closeBybitPosition)
+export async function closeBybitPosition(symbol: string): Promise<any> {
+  try {
+    const closePayload = {
+      action: 'closePosition',
+      symbol: symbol
+    };
+
+    console.log('📤 Closing position via external API:', closePayload);
+    
+    const response = await fetch('https://primescope-tradeapi-production.up.railway.app/place-order', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(closePayload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`External API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('📥 Close position response:', result);
+    
+    return result;
+  } catch (error) {
+    console.error('Error closing position:', error);
     throw error;
   }
 }
@@ -409,6 +592,33 @@ export async function getBybitSymbolInfo(symbol: string): Promise<any> {
 // Set leverage for a symbol
 export async function setBybitLeverage(symbol: string, leverage: number): Promise<void> {
   try {
+    // NEW: Set leverage via external API (matches your setBybitLeverage)
+    const leveragePayload = {
+      action: 'setLeverage',
+      symbol: symbol,
+      leverage: leverage
+    };
+
+    console.log('📤 Setting leverage via external API:', leveragePayload);
+    
+    const response = await fetch('https://primescope-tradeapi-production.up.railway.app/place-order', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(leveragePayload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`External API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('📥 Set leverage response:', result);
+
+    /* ORIGINAL BYBIT CLIENT CODE - KEEP FOR REFERENCE:
+    
     console.log(`🔧 Setting leverage for ${symbol} to ${leverage}x...`);
     const client = getBybitClient();
     if (!client) throw new Error('Bybit client not initialized');
@@ -428,8 +638,43 @@ export async function setBybitLeverage(symbol: string, leverage: number): Promis
     if (response.retCode !== 0) {
       throw new Error(`Bybit API error: ${response.retMsg}`);
     }
+    
+    END ORIGINAL CODE */
+    
   } catch (error) {
     console.error(`❌ Error setting leverage for ${symbol}:`, error);
+    throw error;
+  }
+}
+
+// NEW: Test proxy connection
+export async function testProxyConnection(): Promise<any> {
+  try {
+    const testPayload = {
+      action: 'testConnection'
+    };
+
+    console.log('📤 Testing proxy connection...');
+    
+    const response = await fetch('https://primescope-tradeapi-production.up.railway.app/place-order', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(testPayload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`External API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('📥 Proxy connection test response:', result);
+    
+    return result;
+  } catch (error) {
+    console.error('Error testing proxy connection:', error);
     throw error;
   }
 }

@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { 
-  submitBybitOrder, 
+  submitBybitOrder,
+  submitBybitOrderWithDynamicSizing,
+  closeBybitPosition, 
   getBybitPosition, 
   getBybitAccount,
   convertSymbolFormat,
@@ -355,8 +357,44 @@ async function sendErrorDiscordNotification(signal, error, webhookUrl) {
   }
 }
 
+// Handle preflight requests
+export async function OPTIONS(request) {
+  return new Response(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
+}
+
+// Simple GET handler for testing accessibility
+export async function GET(request) {
+  return new Response(JSON.stringify({ 
+    message: 'TradingView webhook endpoint is accessible',
+    timestamp: new Date().toISOString(),
+    endpoint: '/api/bybit/tradingview'
+  }), {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Content-Type': 'application/json'
+    }
+  });
+}
+
 export async function POST(request) {
   console.log('🚀 API endpoint hit: /api/bybit/tradingview');
+  
+  // Add CORS headers for external requests
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Content-Type': 'application/json'
+  };
+  
   try {
     // Create Supabase client
     const supabase = createSupabaseClient()
@@ -372,22 +410,41 @@ export async function POST(request) {
     const body = await request.json();
     console.log('📨 Request body parsed successfully:', body);
     
-    // Handle both direct API calls and Pine Script alerts
+    // Handle multiple alert formats
     console.log('🔍 About to parse signal data...');
     let signalData;
     try {
       if (body.alert_message) {
-        // Parse Pine Script alert message
+        // Parse Pine Script alert message (text format)
         console.log('📨 Parsing Pine Script alert message...');
         signalData = parseAIAlgorithmAlert(body.alert_message);
         console.log('📨 Received Pine Script alert for Bybit:', signalData);
+      } else if (body.message) {
+        // Parse JSON message from Pine Script alert() function
+        console.log('📨 Parsing JSON message from Pine Script alert() function...');
+        try {
+          const parsedMessage = JSON.parse(body.message);
+          signalData = {
+            symbol: parsedMessage.symbol,
+            price: parsedMessage.price,
+            action: parsedMessage.action?.toUpperCase(),
+            quantity: parsedMessage.quantity || 1,
+            strategy_metadata: parsedMessage.strategy_metadata || {},
+            signalType: parsedMessage.signal_type || 'entry',
+            exitReason: parsedMessage.exit_reason
+          };
+          console.log('📨 Parsed JSON message:', signalData);
+        } catch (jsonError) {
+          console.error('❌ Failed to parse JSON message:', jsonError);
+          throw new Error('Invalid JSON in message field');
+        }
       } else {
         // Direct API call format
         console.log('📨 Using direct API call format...');
         signalData = {
           symbol: body.symbol,
           price: body.price,
-          action: body.action,
+          action: body.action?.toUpperCase(),
           quantity: body.quantity || 1,
           strategy_metadata: body.strategy_metadata || {},
           signalType: body.signal_type || 'entry',
@@ -401,7 +458,7 @@ export async function POST(request) {
         details: parseError.message
       }), { 
         status: 400,
-        headers: { 'Content-Type': 'application/json' }
+        headers: headers
       });
     }
 
@@ -416,7 +473,7 @@ export async function POST(request) {
         received: body
       }), { 
         status: 400,
-        headers: { 'Content-Type': 'application/json' }
+        headers: headers
       });
     }
 
@@ -523,18 +580,12 @@ export async function POST(request) {
           dbErrorHint
         }), { 
           status: 404,
-          headers: { 'Content-Type': 'application/json' }
+          headers: headers
         });
       }
 
-      // Submit sell order to close position
-      orderResult = await submitBybitOrder({
-        symbol: bybitSymbol,
-        side: bybitPosition.side === 'Buy' ? 'Sell' : 'Buy', // Reverse the position
-        orderType: 'Market',
-        qty: bybitPosition.size,
-        reduceOnly: true
-      });
+      // Submit close position order via proxy (handles reversing position automatically)
+      orderResult = await closeBybitPosition(bybitSymbol);
 
       console.log('🔴 Bybit position close order submitted:', {
         symbol: bybitSymbol,
@@ -718,98 +769,33 @@ export async function POST(request) {
         });
       }
 
-      // 🧠 Dynamic position sizing: use 45% of available margin
-      const leverage = 10; // Or fetch dynamically from your config
-      const riskPercent = 0.45;
-
-      let quantity;
+      // 🧠 Submit order with dynamic position sizing via proxy (handles all calculations automatically)
       try {
-        const account = await getBybitAccount();
-        const availableMargin = Number(account.totalAvailableBalance);
-        const tradeAllocation = availableMargin * riskPercent;
-
-        const tickerPrice = await getBybitTickerPrice(bybitSymbol);
-        quantity = (tradeAllocation * leverage) / tickerPrice;
-
-        // Validate and round quantity based on Bybit requirements
-        if (quantity <= 0) {
-          throw new Error('Calculated quantity is zero or negative.');
-        }
-
-        // Get symbol info to determine proper quantity validation
-        let symbolInfo;
-        try {
-          symbolInfo = await getBybitSymbolInfo(bybitSymbol);
-        } catch (symbolError) {
-          console.warn(`⚠️ Could not fetch symbol info for ${bybitSymbol}, using default values:`, symbolError.message);
-          symbolInfo = null;
-        }
-
-        // Use symbol info for proper quantity validation
-        let minQuantity = 0.001; // Default minimum
-        let qtyStep = 0.001; // Default step size
-        
-        if (symbolInfo) {
-          minQuantity = parseFloat(symbolInfo.lotSizeFilter?.minOrderQty || '0.001');
-          qtyStep = parseFloat(symbolInfo.lotSizeFilter?.qtyStep || '0.001');
-        }
-
-        // Round quantity to meet step size requirements
-        const steps = Math.floor(quantity / qtyStep);
-        quantity = steps * qtyStep;
-
-        // Ensure minimum quantity
-        if (quantity < minQuantity) {
-          console.log(`⚠️ Calculated quantity ${quantity} is below minimum ${minQuantity}, using minimum`);
-          quantity = minQuantity;
-        }
-
-        // Fix floating-point precision issues by converting to string with proper decimal places
-        const decimalPlaces = qtyStep.toString().split('.')[1]?.length || 0;
-        quantity = parseFloat(quantity.toFixed(decimalPlaces));
-
-        console.log(`📏 Final quantity after validation: ${quantity} (min: ${minQuantity}, step: ${qtyStep})`);
-
-        console.log('📏 Calculated dynamic position size:', {
-          availableMargin,
-          tradeAllocation,
-          tickerPrice,
-          leverage,
-          quantity
+        orderResult = await submitBybitOrderWithDynamicSizing({
+          symbol: bybitSymbol,
+          side: isBuy ? 'Buy' : 'Sell',
+          orderType: 'Market',
+          category: 'linear',
+          timeInForce: 'GoodTillCancel'
         });
-
-        // Set leverage before placing order
-        try {
-          await setBybitLeverage(bybitSymbol, leverage);
-          console.log(`✅ Leverage set to ${leverage}x for ${bybitSymbol}`);
-        } catch (leverageError) {
-          console.warn(`⚠️ Could not set leverage for ${bybitSymbol}:`, leverageError.message);
-          // Continue with order placement even if leverage setting fails
-        }
-      } catch (calcError) {
-        console.error('❌ Failed to calculate position size:', calcError);
+      } catch (orderError) {
+        console.error('❌ Failed to place order with dynamic sizing:', orderError);
         return new Response(JSON.stringify({
-          error: 'Failed to calculate position size',
-          details: calcError.message
+          error: 'Failed to place order with dynamic sizing',
+          details: orderError.message
         }), {
           status: 400,
           headers: { 'Content-Type': 'application/json' }
         });
       }
 
-      // Submit buy/sell order
-      orderResult = await submitBybitOrder({
-        symbol: bybitSymbol,
-        side: isBuy ? 'Buy' : 'Sell',
-        orderType: 'Market',
-        qty: quantity.toString()
-      });
-
       console.log(`${isBuy ? '🟢 Buy' : '🔴 Sell'} order submitted:`, {
         symbol: bybitSymbol,
-        qty: quantity,
+        qty: orderResult.qty || orderResult.calculatedQuantity,
         order_id: orderResult.orderId,
-        status: orderResult.orderStatus
+        status: orderResult.orderStatus,
+        leverage: orderResult.leverage,
+        riskPercent: orderResult.riskPercent
       });
 
       // Try to update database (but don't fail if it doesn't work)
@@ -848,7 +834,7 @@ export async function POST(request) {
             action: isBuy ? 'BUY' : 'SELL',
             price: currentPrice,
             timestamp: validTimestamp,
-            quantity: quantity,
+            quantity: orderResult.qty || orderResult.calculatedQuantity,
             strategy_metadata: strategy_metadata,
             dbErrorHint
           }, orderResult, discordWebhookUrl);
@@ -879,7 +865,7 @@ export async function POST(request) {
             action: isBuy ? 'BUY' : 'SELL',
             price: currentPrice,
             timestamp: validTimestamp,
-            quantity: quantity,
+            quantity: orderResult.qty || orderResult.calculatedQuantity,
             strategy_metadata: strategy_metadata,
             dbErrorHint
           }, orderResult, discordWebhookUrl);
@@ -914,10 +900,11 @@ export async function POST(request) {
     console.error('❌ Top-level error in POST handler:', error);
     return new Response(JSON.stringify({ 
       error: 'Unexpected error in POST handler',
-      details: error.message
+      details: error.message,
+      timestamp: new Date().toISOString()
     }), { 
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: headers
     });
   }
 } 
