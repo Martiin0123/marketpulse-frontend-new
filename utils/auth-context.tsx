@@ -79,11 +79,14 @@ export function AuthProvider({
         setLoading(true);
         setError(null);
 
-        // Get current user session
+        // Use getSession instead of getUser to reduce API calls
         const {
-          data: { user: currentUser },
-          error: userError
-        } = await supabase.auth.getUser();
+          data: { session },
+          error: sessionError
+        } = await supabase.auth.getSession();
+        
+        const currentUser = session?.user || null;
+        const userError = sessionError;
 
         if (!mountedLocal) return;
 
@@ -174,111 +177,11 @@ export function AuthProvider({
       setLoading(false);
     }
 
-    // Listen for auth state changes (only if Supabase client exists)
-    let authSubscription: { unsubscribe: () => void } | null = null;
-
-    if (supabase) {
-      const {
-        data: { subscription: authSub }
-      } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (!mountedLocal) return;
-
-        console.log('Auth state change:', event, !!session);
-
-        if (event === 'SIGNED_IN' && session?.user) {
-          setUser(session.user);
-          setError(null);
-
-          // Add retry logic for subscription fetch since it might take time for webhook to process
-          const fetchSubscriptionWithRetry = async (retries = 3) => {
-            for (let i = 0; i < retries; i++) {
-              try {
-                const { data: subData, error: subError } = await supabase
-                  .from('subscriptions')
-                  .select(
-                    `
-                      id,
-                      status,
-                      price_id,
-                      cancel_at,
-                      cancel_at_period_end,
-                      canceled_at,
-                      created,
-                      current_period_start,
-                      current_period_end,
-                      ended_at,
-                      trial_end,
-                      trial_start,
-                      user_id,
-                      metadata,
-                      quantity,
-                      role,
-                      prices:price_id (
-                        id,
-                        unit_amount,
-                        currency,
-                        interval,
-                        interval_count,
-                        trial_period_days,
-                        type,
-                        products:product_id (
-                          id,
-                          name,
-                          description,
-                          image,
-                          metadata
-                        )
-                      )
-                    `
-                  )
-                  .eq('user_id', session.user.id)
-                  .eq('status', 'active')
-                  .single();
-
-                if (!subError && mountedLocal) {
-                  // Ensure currency is always a string
-                  if (
-                    subData?.prices?.currency &&
-                    typeof subData.prices.currency !== 'string'
-                  ) {
-                    subData.prices.currency = String(subData.prices.currency);
-                  }
-                  setSubscription(subData);
-                  console.log('Subscription loaded successfully');
-                  return;
-                } else if (i === retries - 1) {
-                  // On last retry, accept no subscription (user might be on free plan)
-                  console.log('No active subscription found after retries');
-                  setSubscription(null);
-                }
-              } catch (subError) {
-                console.error(`Subscription fetch error (attempt ${i + 1}):`, subError);
-                if (i < retries - 1) {
-                  // Wait before retry (exponential backoff)
-                  await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
-                }
-              }
-            }
-          };
-
-          fetchSubscriptionWithRetry();
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setSubscription(null);
-          setError(null);
-        } else if (event === 'TOKEN_REFRESHED') {
-          console.log('Token refreshed - no action needed');
-        }
-      });
-
-      authSubscription = { unsubscribe: authSub.unsubscribe };
-    }
+    // Don't set up auth listener here - it's already handled in the Supabase client
+    // This prevents multiple listeners which cause token refresh spam
 
     return () => {
       mountedLocal = false;
-      if (authSubscription) {
-        authSubscription.unsubscribe();
-      }
     };
   }, [initialUser, initialSubscription]); // Keep stable dependencies only
 

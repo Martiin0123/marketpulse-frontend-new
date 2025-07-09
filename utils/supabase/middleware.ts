@@ -4,14 +4,14 @@ import { User } from '@supabase/supabase-js';
 
 const PROTECTED_ROUTES = ['/dashboard', '/signals', '/account', '/referrals', '/performance-reports'];
 
-// Simple cache to reduce auth requests
+// Aggressive cache to reduce auth requests
 const authCache = new Map<string, { user: User | null; timestamp: number }>();
-const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes cache duration
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache duration (increased)
 
-// Rate limiting for auth requests - more conservative
+// Very conservative rate limiting for auth requests
 const rateLimitMap = new Map<string, { count: number; timestamp: number }>();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const MAX_REQUESTS_PER_WINDOW = 5; // Reduced to 5 auth requests per minute per IP
+const MAX_REQUESTS_PER_WINDOW = 2; // Reduced to 2 auth requests per minute per IP
 
 // Clean up old cache entries periodically
 setInterval(() => {
