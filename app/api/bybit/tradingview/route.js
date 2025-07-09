@@ -79,14 +79,12 @@ async function closeSignalManually(signalId, exitPrice, exitReason = 'manual') {
 function parseAIAlgorithmAlert(alertMessage) {
   console.log('🔍 Parsing Pine Script alert for Bybit:', alertMessage);
   
-  // Extract symbol and price from alert message
-  // Format: "Primescope LONG Entry! Symbol: SOLUSDT, Price: 45.20"
+  // Extract symbol from alert message
+  // Format: "Primescope LONG Entry! Symbol: SOLUSDT" 
   // OR simplified: "BTCUSD BUY" or "SOLUSDT SELL"
   const symbolMatch = alertMessage.match(/Symbol:\s*([A-Z]+)/);
-  const priceMatch = alertMessage.match(/Price:\s*([\d.]+)/);
   
   let symbol = symbolMatch ? symbolMatch[1] : null;
-  let price = priceMatch ? parseFloat(priceMatch[1]) : null;
   
   // Handle simplified format: "BTCUSD BUY" or "SOLUSDT SELL"
   if (!symbol) {
@@ -121,22 +119,15 @@ function parseAIAlgorithmAlert(alertMessage) {
     }
   }
   
-  // If no price provided, we'll get it from Bybit API
-  if (!price) {
-    console.log('📊 No price in alert, will fetch from Bybit API');
-  }
-  
-  console.log('📊 Parsed signal data:', {
+    console.log('📊 Parsed signal data:', {
     symbol,
-    price,
     action,
     signalType,
     exitReason
   });
-  
+
   return {
     symbol,
-    price,
     action,
     signalType,
     exitReason,
@@ -508,7 +499,6 @@ export async function POST(request) {
           const parsedMessage = JSON.parse(body.message);
           signalData = {
             symbol: parsedMessage.symbol,
-            price: parsedMessage.price,
             action: parsedMessage.action?.toUpperCase(),
             quantity: parsedMessage.quantity || 1,
             strategy_metadata: parsedMessage.strategy_metadata || {},
@@ -525,7 +515,6 @@ export async function POST(request) {
         console.log('📨 Parsing TradingView strategy alert with position management...');
         signalData = {
           symbol: body.symbol,
-          price: body.price,
           action: body.action?.toUpperCase(),
           quantity: body.quantity || 1,
           strategy_metadata: body.strategy_metadata || {},
@@ -539,7 +528,6 @@ export async function POST(request) {
         console.log('📨 Using direct API call format...');
         signalData = {
           symbol: body.symbol,
-          price: body.price,
           action: body.action?.toUpperCase(),
           quantity: body.quantity || 1,
           strategy_metadata: body.strategy_metadata || {},
@@ -559,11 +547,11 @@ export async function POST(request) {
     }
 
     console.log('🔍 Extracting signal data...');
-    const { symbol, price, action, quantity = 1, strategy_metadata = {}, signalType = 'entry', exitReason, positionAfter } = signalData;
-    console.log('📊 Extracted signal data:', { symbol, price, action, quantity, signalType, exitReason, positionAfter });
+    const { symbol, action, quantity = 1, strategy_metadata = {}, signalType = 'entry', exitReason, positionAfter } = signalData;
+    console.log('📊 Extracted signal data:', { symbol, action, quantity, signalType, exitReason, positionAfter });
 
     if (!symbol || !action) {
-      console.log('❌ Missing required fields:', { symbol, action, price });
+      console.log('❌ Missing required fields:', { symbol, action });
       return new Response(JSON.stringify({ 
         error: 'Missing required fields: symbol, action',
         received: body
@@ -625,9 +613,8 @@ export async function POST(request) {
 
     console.log('🔍 Starting Bybit API calls...');
     
-    // Use provided price or fallback to 0 (proxy will fetch current price if needed)
-    let currentPrice = price || 0;
-    console.log('📊 Using price:', currentPrice, '(proxy will fetch current price if needed)');
+    // Proxy will fetch current price from Bybit
+    console.log('📊 Price will be fetched from Bybit via proxy');
 
     let orderResult = null;
     let databaseResult = null;
@@ -642,8 +629,8 @@ export async function POST(request) {
         const strategyPayload = {
           action: action, // BUY or SELL
           symbol: bybitSymbol,
-          positionAfter: positionAfter, // 1 = long, -1 = short, 0 = flat
-          price: currentPrice
+          positionAfter: positionAfter // 1 = long, -1 = short, 0 = flat
+          // Price will be fetched from Bybit by proxy
         };
 
         console.log('📤 Submitting strategy order to proxy:', strategyPayload);
@@ -686,7 +673,7 @@ export async function POST(request) {
 
               if (originalSignal) {
                 const entryPrice = Number(originalSignal.entry_price);
-                const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || currentPrice;
+                const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.closePrice || 0;
                 const exitPrice = Number(executionPrice);
                 
                 // Calculate PnL based on position side
@@ -753,12 +740,13 @@ export async function POST(request) {
               }
 
               // Create close signal record
+              const closeExecutionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.closePrice || 0;
               await supabase
                 .from('signals')
                 .insert([{
                   symbol: symbol.toUpperCase(),
                   type: 'close',
-                  entry_price: currentPrice,
+                  entry_price: Number(closeExecutionPrice),
                   created_at: validTimestamp,
                   strategy_name: 'Primescope Crypto',
                   signal_source: 'ai_algorithm',
@@ -772,12 +760,13 @@ export async function POST(request) {
             
             if (actionTaken === 'BUY' || actionTaken === 'SELL') {
               // Create new position signal
+              const openExecutionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.openPrice || 0;
               const { data: signal } = await supabase
                 .from('signals')
                 .insert([{
                   symbol: symbol.toUpperCase(),
                   type: actionTaken.toLowerCase(),
-                  entry_price: currentPrice,
+                  entry_price: Number(openExecutionPrice),
                   created_at: validTimestamp,
                   strategy_name: 'Primescope Crypto',
                   signal_source: 'ai_algorithm',
@@ -794,7 +783,7 @@ export async function POST(request) {
               
               // Send individual notification for new position
               if (discordWebhookUrl) {
-                const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || currentPrice;
+                const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.openPrice || 0;
                 
                 await sendSuccessDiscordNotification({
                   symbol: symbol.toUpperCase(),
@@ -842,7 +831,7 @@ export async function POST(request) {
           await sendErrorDiscordNotification({
             symbol: symbol.toUpperCase(),
             action: action,
-            price: currentPrice
+            price: 0
           }, strategyError, discordWebhookUrl);
         }
         
@@ -870,7 +859,7 @@ export async function POST(request) {
           await sendErrorDiscordNotification({
             symbol: symbol.toUpperCase(),
             action: 'CLOSE',
-            price: currentPrice,
+            price: 0,
             dbErrorHint
           }, closeError, discordWebhookUrl);
         }
@@ -896,12 +885,12 @@ export async function POST(request) {
 
       // Try to update database (but don't fail if it doesn't work)
       try {
-        // Find and update the original BUY signal with exit information
+        // Find and update the original signal with exit information (BUY or SELL)
         const { data: originalSignal, error: findError } = await supabase
           .from('signals')
           .select('*')
           .eq('symbol', symbol.toUpperCase())
-          .eq('type', 'buy')
+          .in('type', ['buy', 'sell'])
           .eq('status', 'active')
           .eq('exchange', 'bybit')
           .order('created_at', { ascending: false })
@@ -910,10 +899,20 @@ export async function POST(request) {
 
         if (originalSignal) {
           const entryPrice = Number(originalSignal.entry_price);
-          const exitPrice = Number(currentPrice);
-          const pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
+          const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.closePrice || 0;
+          const exitPrice = Number(executionPrice);
+          
+          // Calculate PnL based on position type
+          let pnlPercentage;
+          if (originalSignal.type === 'buy') {
+            pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
+          } else if (originalSignal.type === 'sell') {
+            pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100;
+          } else {
+            pnlPercentage = 0;
+          }
 
-          // Update the original BUY signal with exit information
+          // Update the original signal with exit information
           const { data: updatedSignal, error: updateSignalError } = await supabase
             .from('signals')
             .update({
@@ -943,12 +942,13 @@ export async function POST(request) {
         }
 
         // Create close signal with Pine Script metadata
+        const closeExecutionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.closePrice || 0;
         const { data: signal, error: signalError } = await supabase
           .from('signals')
           .insert([{
             symbol: symbol.toUpperCase(),
             type: 'close',
-            entry_price: currentPrice,
+            entry_price: Number(closeExecutionPrice),
             created_at: validTimestamp,
             strategy_name: 'Primescope Crypto',
             signal_source: 'ai_algorithm',
@@ -968,7 +968,7 @@ export async function POST(request) {
         // Send success Discord notification
         if (discordWebhookUrl) {
           // Use actual Bybit execution price and calculate PnL
-          const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || currentPrice;
+          const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.closePrice || 0;
           let pnlPercentage = null;
           
           // Calculate PnL if we have the original entry price
@@ -1015,7 +1015,7 @@ export async function POST(request) {
         
         // Send to free webhook if it's every 5th trade
         if (isEveryFifthTrade && discordFreeWebhookUrl) {
-          const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || currentPrice;
+          const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.closePrice || 0;
           let pnlPercentage = null;
           
           if (databaseResult?.pnl_percentage !== undefined) {
@@ -1117,7 +1117,7 @@ export async function POST(request) {
           await sendErrorDiscordNotification({
             symbol: symbol.toUpperCase(),
             action: isBuy ? 'BUY' : 'SELL',
-            price: currentPrice,
+            price: 0,
             dbErrorHint
           }, orderError, discordWebhookUrl);
         }
@@ -1142,12 +1142,13 @@ export async function POST(request) {
 
       // Try to update database (but don't fail if it doesn't work)
       try {
+        const executionPrice = orderResult.avgPrice || orderResult.price || orderResult.order?.avgPrice || 0;
         const { data: signal, error: signalError } = await supabase
           .from('signals')
           .insert([{
             symbol: symbol.toUpperCase(),
             type: isBuy ? 'buy' : 'sell',
-            entry_price: currentPrice,
+            entry_price: Number(executionPrice),
             created_at: validTimestamp,
             strategy_name: 'Primescope Crypto',
             signal_source: 'ai_algorithm',
@@ -1172,7 +1173,7 @@ export async function POST(request) {
         // Send success Discord notification
         if (discordWebhookUrl) {
           // Use actual Bybit execution price
-          const executionPrice = orderResult.avgPrice || orderResult.price || orderResult.order?.avgPrice || currentPrice;
+          const executionPrice = orderResult.avgPrice || orderResult.price || orderResult.order?.avgPrice || 0;
           
           await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
@@ -1191,7 +1192,7 @@ export async function POST(request) {
           order_id: orderResult.orderId,
           signal_id: signal?.id || null,
           symbol: bybitSymbol,
-          entry_price: currentPrice,
+          entry_price: Number(executionPrice),
           rsi_value: strategy_metadata.rsi_value,
           signalSaved,
           dbErrorHint
@@ -1206,7 +1207,7 @@ export async function POST(request) {
         dbErrorHint = '⚠️ Signal was NOT saved to the database due to rate limit or DB error.';
 
         if (discordWebhookUrl) {
-          const executionPrice = orderResult.avgPrice || orderResult.price || orderResult.order?.avgPrice || currentPrice;
+          const executionPrice = orderResult.avgPrice || orderResult.price || orderResult.order?.avgPrice || 0;
           
           await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
@@ -1224,7 +1225,7 @@ export async function POST(request) {
           message: `Bybit ${isBuy ? 'buy' : 'sell'} order submitted successfully (database update failed)`,
           order_id: orderResult.orderId,
           symbol: bybitSymbol,
-          entry_price: currentPrice,
+          entry_price: Number(executionPrice),
           error: 'Database update failed due to rate limit',
           signalSaved,
           dbErrorHint
