@@ -44,12 +44,45 @@ export const createClient = () => {
       throw new Error('Environment variables missing. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Railway dashboard.');
     }
 
+    // Create custom storage with error handling
+    const customStorage = {
+      getItem: (key: string) => {
+        try {
+          if (typeof window === 'undefined') return null;
+          return window.localStorage?.getItem(key) || null;
+        } catch (error) {
+          console.warn('localStorage getItem error:', error);
+          return null;
+        }
+      },
+      setItem: (key: string, value: string) => {
+        try {
+          if (typeof window !== 'undefined' && window.localStorage) {
+            window.localStorage.setItem(key, value);
+          }
+        } catch (error) {
+          console.warn('localStorage setItem error:', error);
+        }
+      },
+      removeItem: (key: string) => {
+        try {
+          if (typeof window !== 'undefined' && window.localStorage) {
+            window.localStorage.removeItem(key);
+          }
+        } catch (error) {
+          console.warn('localStorage removeItem error:', error);
+        }
+      }
+    };
+
     supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
-        autoRefreshToken: false, // Disable auto refresh to prevent spam
+        autoRefreshToken: true, // Re-enable but we'll control it with our guards
         persistSession: true,
         detectSessionInUrl: false, // Disable automatic session detection to reduce requests
-        flowType: 'pkce'
+        flowType: 'pkce',
+        storage: customStorage,
+        storageKey: 'supabase.auth.token'
       }
     });
 
@@ -79,6 +112,12 @@ export const createClient = () => {
           refreshPromise = null;
           lastRefreshTime = 0;
           console.log('User signed out');
+          
+          // Clear any stored auth data
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('supabase.auth.token');
+            sessionStorage.clear();
+          }
         } else if (event === 'SIGNED_IN') {
           isRefreshing = false;
           refreshPromise = null;

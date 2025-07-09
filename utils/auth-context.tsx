@@ -15,6 +15,7 @@ import {
   debounceAuth,
   authCircuitBreaker
 } from '@/utils/supabase/auth-guards';
+import { checkAndRecoverSession } from '@/utils/supabase/session-recovery';
 
 type Subscription = Tables<'subscriptions'>;
 
@@ -79,14 +80,41 @@ export function AuthProvider({
         setLoading(true);
         setError(null);
 
-        // Use getSession instead of getUser to reduce API calls
-        const {
-          data: { session },
-          error: sessionError
-        } = await supabase.auth.getSession();
+        // Check and recover from corrupted session first
+        const wasCorrupted = await checkAndRecoverSession();
+        if (wasCorrupted) {
+          console.log('Session was corrupted and cleared, waiting for reload...');
+          return; // Page will reload
+        }
+
+        // Use getSession with error handling for refresh token issues
+        let session = null;
+        let currentUser = null;
+        let userError = null;
         
-        const currentUser = session?.user || null;
-        const userError = sessionError;
+        try {
+          const sessionResult = await supabase.auth.getSession();
+          session = sessionResult.data.session;
+          currentUser = session?.user || null;
+          userError = sessionResult.error;
+        } catch (error: any) {
+          console.error('Session fetch failed:', error);
+          
+          // Handle refresh token errors gracefully
+          if (error.message?.includes('refresh_token_not_found') || 
+              error.message?.includes('Invalid Refresh Token') ||
+              error.message?.includes('Cannot read properties of undefined')) {
+            console.log('Session error detected, triggering recovery');
+            
+            // Trigger session recovery
+            const recovered = await checkAndRecoverSession();
+            if (recovered) {
+              return; // Page will reload
+            }
+          }
+          
+          userError = error;
+        }
 
         if (!mountedLocal) return;
 
