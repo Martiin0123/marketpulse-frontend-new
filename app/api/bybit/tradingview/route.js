@@ -162,8 +162,8 @@ async function sendSuccessDiscordNotification(signal, orderDetails, webhookUrl, 
     };
 
     const embed = {
-      title: `✅ Bybit Order Executed: ${signal.symbol}`,
-      description: `**${signal.action}** order completed successfully on Bybit`,
+      title: `✅ ${signal.symbol} ${signal.action}${signal.action === 'CLOSE' ? 'D' : ''}`,
+      description: `**${signal.action}** ${signal.action === 'CLOSE' ? 'position closed' : 'order executed'} successfully`,
       color: getColor(signal.action),
       fields: [
         {
@@ -172,28 +172,13 @@ async function sendSuccessDiscordNotification(signal, orderDetails, webhookUrl, 
           inline: true
         },
         {
-          name: '📈 Symbol',
+          name: '📈 Symbol', 
           value: signal.symbol,
           inline: true
         },
         {
-          name: '💰 Price',
+          name: '💰 Execution Price',
           value: `$${signal.price.toFixed(2)}`,
-          inline: true
-        },
-        {
-          name: '📦 Quantity',
-          value: signal.quantity?.toString() || 'N/A',
-          inline: true
-        },
-        {
-          name: '🆔 Order ID',
-          value: orderDetails.orderId || 'N/A',
-          inline: true
-        },
-        {
-          name: '🏢 Exchange',
-          value: 'Bybit',
           inline: true
         }
       ],
@@ -680,55 +665,92 @@ export async function POST(request) {
         orderResult = await response.json();
         console.log('📥 Strategy order response:', orderResult);
 
-        // Handle database updates based on what actually happened
+        // Handle database updates and send individual notifications for each action
         const actualActions = orderResult.actions || []; // Array of actions taken (e.g., ['CLOSE', 'BUY'])
+        let pnlPercentage = null;
         
         for (const actionTaken of actualActions) {
           try {
-                         if (actionTaken === 'CLOSE') {
-               // Find and update original signal
-               const { data: originalSignal } = await supabase
-                 .from('signals')
-                 .select('*')
-                 .eq('symbol', symbol.toUpperCase())
-                 .in('type', ['buy', 'sell'])
-                 .eq('status', 'active')
-                 .eq('exchange', 'bybit')
-                 .order('created_at', { ascending: false })
-                 .limit(1)
-                 .single();
+            if (actionTaken === 'CLOSE') {
+              // Find and update original signal
+              const { data: originalSignal } = await supabase
+                .from('signals')
+                .select('*')
+                .eq('symbol', symbol.toUpperCase())
+                .in('type', ['buy', 'sell'])
+                .eq('status', 'active')
+                .eq('exchange', 'bybit')
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
 
-               if (originalSignal) {
-                 const entryPrice = Number(originalSignal.entry_price);
-                 const exitPrice = Number(currentPrice);
-                 const pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
+              if (originalSignal) {
+                const entryPrice = Number(originalSignal.entry_price);
+                const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || currentPrice;
+                const exitPrice = Number(executionPrice);
+                
+                // Calculate PnL based on position side
+                if (originalSignal.type === 'buy') {
+                  pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
+                } else if (originalSignal.type === 'sell') {
+                  pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100;
+                }
 
-                 await supabase
-                   .from('signals')
-                   .update({
-                     status: 'closed',
-                     exit_price: exitPrice,
-                     exit_timestamp: validTimestamp,
-                     pnl_percentage: pnlPercentage,
-                     exit_reason: 'strategy_reversal'
-                   })
-                   .eq('id', originalSignal.id);
+                await supabase
+                  .from('signals')
+                  .update({
+                    status: 'closed',
+                    exit_price: exitPrice,
+                    exit_timestamp: validTimestamp,
+                    pnl_percentage: pnlPercentage,
+                    exit_reason: 'strategy_reversal'
+                  })
+                  .eq('id', originalSignal.id);
 
-                 console.log('✅ Updated original signal with strategy reversal exit');
-                 
-                 // Send high-profit trades (>2%) to free webhook as teasers
-                 if (pnlPercentage > 2 && discordFreeWebhookUrl) {
-                   console.log(`🎯 Strategy reversal profit detected (${pnlPercentage.toFixed(2)}%), sending teaser to free webhook`);
-                   
-                   const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || currentPrice;
-                   await sendProfitTeaserNotification({
-                     symbol: symbol.toUpperCase(),
-                     price: parseFloat(executionPrice),
-                     pnl_percentage: pnlPercentage,
-                     timestamp: validTimestamp
-                   }, orderResult.order || orderResult, discordFreeWebhookUrl);
-                 }
-               }
+                console.log('✅ Updated original signal with strategy reversal exit:', {
+                  entry_price: entryPrice,
+                  exit_price: exitPrice,
+                  pnl_percentage: pnlPercentage
+                });
+                
+                // Send CLOSE notification with PnL
+                if (discordWebhookUrl) {
+                  await sendSuccessDiscordNotification({
+                    symbol: symbol.toUpperCase(),
+                    action: 'CLOSE',
+                    price: parseFloat(executionPrice),
+                    timestamp: validTimestamp,
+                    strategy_metadata: strategy_metadata,
+                    pnl_percentage: pnlPercentage,
+                    exitReason: 'strategy_reversal'
+                  }, orderResult.order || orderResult, discordWebhookUrl);
+                  
+                  // Send to free webhook if it's every 5th trade
+                  if (isEveryFifthTrade && discordFreeWebhookUrl) {
+                    await sendSuccessDiscordNotification({
+                      symbol: symbol.toUpperCase(),
+                      action: 'CLOSE',
+                      price: parseFloat(executionPrice),
+                      timestamp: validTimestamp,
+                      strategy_metadata: strategy_metadata,
+                      pnl_percentage: pnlPercentage,
+                      exitReason: 'strategy_reversal'
+                    }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
+                  }
+                }
+                
+                // Send high-profit trades (>2%) to free webhook as teasers
+                if (pnlPercentage > 2 && discordFreeWebhookUrl) {
+                  console.log(`🎯 Strategy reversal profit detected (${pnlPercentage.toFixed(2)}%), sending teaser to free webhook`);
+                  
+                  await sendProfitTeaserNotification({
+                    symbol: symbol.toUpperCase(),
+                    price: parseFloat(executionPrice),
+                    pnl_percentage: pnlPercentage,
+                    timestamp: validTimestamp
+                  }, orderResult.order || orderResult, discordFreeWebhookUrl);
+                }
+              }
 
               // Create close signal record
               await supabase
@@ -769,31 +791,35 @@ export async function POST(request) {
 
               databaseResult = signal;
               console.log('✅ Created new position signal:', actionTaken);
+              
+              // Send individual notification for new position
+              if (discordWebhookUrl) {
+                const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || currentPrice;
+                
+                await sendSuccessDiscordNotification({
+                  symbol: symbol.toUpperCase(),
+                  action: actionTaken,
+                  price: parseFloat(executionPrice),
+                  timestamp: validTimestamp,
+                  strategy_metadata: strategy_metadata
+                }, orderResult.order || orderResult, discordWebhookUrl);
+                
+                // Send to free webhook if it's every 5th trade
+                if (isEveryFifthTrade && discordFreeWebhookUrl) {
+                  await sendSuccessDiscordNotification({
+                    symbol: symbol.toUpperCase(),
+                    action: actionTaken,
+                    price: parseFloat(executionPrice),
+                    timestamp: validTimestamp,
+                    strategy_metadata: strategy_metadata
+                  }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
+                }
+              }
             }
           } catch (dbError) {
             console.error('❌ Database error for action:', actionTaken, dbError);
             signalSaved = false;
           }
-        }
-
-        // Send Discord notification
-        if (discordWebhookUrl) {
-          const notificationAction = actualActions.length > 1 
-            ? `${actualActions.join(' → ')}` 
-            : actualActions[0] || action;
-            
-          // Use actual Bybit execution price if available
-          const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || currentPrice;
-          
-          await sendSuccessDiscordNotification({
-            symbol: symbol.toUpperCase(),
-            action: notificationAction,
-            price: parseFloat(executionPrice),
-            timestamp: validTimestamp,
-            quantity: orderResult.order?.qty || orderResult.qty || 'N/A',
-            strategy_metadata: strategy_metadata,
-            pnl_percentage: null // PnL will be calculated in individual action handlers
-          }, orderResult.order || orderResult, discordWebhookUrl);
         }
 
         return new Response(JSON.stringify({
