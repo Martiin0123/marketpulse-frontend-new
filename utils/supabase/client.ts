@@ -1,7 +1,7 @@
 import { createBrowserClient } from '@supabase/ssr';
 import { Database } from '@/types_db';
 
-// Super simple client with minimal configuration
+// Optimized client with proper configuration to reduce auth requests
 let supabaseClient: ReturnType<typeof createBrowserClient<Database>> | null = null;
 
 export const createClient = () => {
@@ -13,14 +13,7 @@ export const createClient = () => {
       throw new Error('Missing Supabase environment variables');
     }
 
-    supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: false, // Disable auto refresh completely
-        persistSession: false,   // Disable session persistence
-        detectSessionInUrl: false,
-        flowType: 'pkce'
-      }
-    });
+    supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey);
   }
   return supabaseClient;
 };

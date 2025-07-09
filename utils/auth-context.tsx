@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useState,
+  useRef,
   ReactNode
 } from 'react';
 import { User } from '@supabase/supabase-js';
@@ -48,7 +49,7 @@ export function AuthProvider({
     setMounted(true);
   }, []);
 
-  // Initialize auth state once
+  // Initialize auth state with listener to reduce manual requests
   useEffect(() => {
     if (initialUser) {
       setUser(initialUser);
@@ -58,50 +59,61 @@ export function AuthProvider({
     }
 
     let mounted = true;
+    const supabase = createClient();
 
-    const initAuth = async () => {
+    // Set up auth state listener to automatically handle auth changes
+    const {
+      data: { subscription: authSubscription }
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
+      console.log('Auth state changed:', event);
+
       try {
-        const supabase = createClient();
+        const currentUser = session?.user || null;
+        setUser(currentUser);
+        setError(null);
 
-        // Clear any corrupted data first
-        const storedToken = localStorage.getItem('supabase.auth.token');
-        if (storedToken) {
-          try {
-            JSON.parse(storedToken);
-          } catch {
-            console.log('Corrupted token found, clearing...');
-            localStorage.removeItem('supabase.auth.token');
-          }
-        }
-
-        // Get current session
-        const {
-          data: { session },
-          error: sessionError
-        } = await supabase!.auth.getSession();
-
-        if (sessionError) {
-          console.error('Session error:', sessionError);
-          setError(sessionError.message);
-          setUser(null);
+        // Fetch subscription if user exists and this is a sign-in event
+        if (
+          currentUser &&
+          (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')
+        ) {
+          await fetchSubscription(currentUser.id);
+        } else if (!currentUser) {
           setSubscription(null);
-        } else if (mounted) {
-          const currentUser = session?.user || null;
-          setUser(currentUser);
-          setError(null);
-
-          // Fetch subscription if user exists
-          if (currentUser) {
-            await fetchSubscription(currentUser.id);
-          }
         }
       } catch (err) {
-        console.error('Auth initialization error:', err);
+        console.error('Auth state change error:', err);
         if (mounted) {
           setError('Authentication failed');
-          setUser(null);
-          setSubscription(null);
         }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    });
+
+    // Initial session check (only once)
+    const getInitialSession = async () => {
+      try {
+        const {
+          data: { session },
+          error
+        } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error('Initial session error:', error);
+          setError(error.message);
+        }
+
+        if (mounted && session?.user) {
+          setUser(session.user);
+          await fetchSubscription(session.user.id);
+        }
+      } catch (err) {
+        console.error('Initial session fetch error:', err);
       } finally {
         if (mounted) {
           setLoading(false);
@@ -109,81 +121,97 @@ export function AuthProvider({
       }
     };
 
-    initAuth();
+    getInitialSession();
 
     return () => {
       mounted = false;
+      authSubscription.unsubscribe();
     };
   }, [initialUser, initialSubscription]);
 
-  const fetchSubscription = async (userId: string) => {
-    try {
-      const supabase = createClient();
-      if (!supabase) {
-        console.error('Failed to create Supabase client');
-        return;
-      }
+  // Rate limiting for subscription fetches
+  const lastFetchTime = useRef<number>(0);
+  const fetchTimeout = useRef<NodeJS.Timeout | null>(null);
 
-      const { data: subscriptions, error } = await supabase
-        .from('subscriptions')
-        .select(
-          `
-          id,
-          status,
-          price_id,
-          cancel_at,
-          cancel_at_period_end,
-          canceled_at,
-          created,
-          current_period_start,
-          current_period_end,
-          ended_at,
-          trial_end,
-          trial_start,
-          user_id,
-          metadata,
-          quantity,
-          role,
-          prices:price_id (
-            id,
-            unit_amount,
-            currency,
-            interval,
-            interval_count,
-            trial_period_days,
-            type,
-            products:product_id (
-              id,
-              name,
-              description,
-              image,
-              metadata
-            )
-          )
-        `
-        )
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .order('created', { ascending: false });
-
-      const data = subscriptions?.[0] || null;
-
-      // Log warning if multiple active subscriptions exist
-      if (subscriptions && subscriptions.length > 1) {
-        console.warn(
-          `Warning: User ${userId} has ${subscriptions.length} active subscriptions. Using most recent.`
-        );
-      }
-
-      if (error && error.code !== 'PGRST116') {
-        // PGRST116 is "not found"
-        console.error('Subscription fetch error:', error);
-      } else {
-        setSubscription(data || null);
-      }
-    } catch (err) {
-      console.error('Subscription fetch failed:', err);
+  const fetchSubscription = async (userId: string, force = false) => {
+    // Rate limit: only allow one request every 5 seconds unless forced
+    const now = Date.now();
+    if (!force && now - lastFetchTime.current < 5000) {
+      console.log('Subscription fetch rate limited, skipping...');
+      return;
     }
+
+    // Debounce: cancel any pending requests
+    if (fetchTimeout.current) {
+      clearTimeout(fetchTimeout.current);
+    }
+
+    fetchTimeout.current = setTimeout(async () => {
+      try {
+        lastFetchTime.current = now;
+        const supabase = createClient();
+
+        const { data: subscriptions, error } = await supabase
+          .from('subscriptions')
+          .select(
+            `
+            id,
+            status,
+            price_id,
+            cancel_at,
+            cancel_at_period_end,
+            canceled_at,
+            created,
+            current_period_start,
+            current_period_end,
+            ended_at,
+            trial_end,
+            trial_start,
+            user_id,
+            metadata,
+            quantity,
+            role,
+            prices:price_id (
+              id,
+              unit_amount,
+              currency,
+              interval,
+              interval_count,
+              trial_period_days,
+              type,
+              products:product_id (
+                id,
+                name,
+                description,
+                image,
+                metadata
+              )
+            )
+          `
+          )
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .order('created', { ascending: false });
+
+        const data = subscriptions?.[0] || null;
+
+        // Log warning if multiple active subscriptions exist
+        if (subscriptions && subscriptions.length > 1) {
+          console.warn(
+            `Warning: User ${userId} has ${subscriptions.length} active subscriptions. Using most recent.`
+          );
+        }
+
+        if (error && error.code !== 'PGRST116') {
+          // PGRST116 is "not found"
+          console.error('Subscription fetch error:', error);
+        } else {
+          setSubscription(data || null);
+        }
+      } catch (err) {
+        console.error('Subscription fetch failed:', err);
+      }
+    }, 500); // 500ms debounce
   };
 
   const signOut = async () => {
@@ -215,7 +243,7 @@ export function AuthProvider({
     if (!user) return;
 
     try {
-      await fetchSubscription(user.id);
+      await fetchSubscription(user.id, true); // Force refresh
     } catch (err) {
       console.error('Refresh data error:', err);
     }

@@ -4,14 +4,23 @@ import { User } from '@supabase/supabase-js';
 
 const PROTECTED_ROUTES = ['/dashboard', '/signals', '/account', '/referrals', '/performance-reports'];
 
-// Aggressive cache to reduce auth requests
+// Extremely aggressive cache to reduce auth requests in production
 const authCache = new Map<string, { user: User | null; timestamp: number }>();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache duration (increased)
+const CACHE_DURATION = process.env.NODE_ENV === 'production' ? 15 * 60 * 1000 : 5 * 60 * 1000; // 15 min in prod, 5 min in dev
 
-// Very conservative rate limiting for auth requests
+// Circuit breaker for Supabase auth failures
+let authCircuitBreaker = {
+  failureCount: 0,
+  lastFailureTime: 0,
+  isOpen: false
+};
+const CIRCUIT_BREAKER_THRESHOLD = 3;
+const CIRCUIT_BREAKER_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+
+// Extremely conservative rate limiting for auth requests
 const rateLimitMap = new Map<string, { count: number; timestamp: number }>();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const MAX_REQUESTS_PER_WINDOW = 2; // Reduced to 2 auth requests per minute per IP
+const MAX_REQUESTS_PER_WINDOW = process.env.NODE_ENV === 'production' ? 1 : 2; // 1 request per minute in production
 
 // Helper function to clean up expired cache entries on-demand
 const cleanupExpiredEntries = () => {
@@ -26,6 +35,27 @@ const cleanupExpiredEntries = () => {
       rateLimitMap.delete(key);
     }
   });
+};
+
+// Circuit breaker helper functions
+const checkCircuitBreaker = () => {
+  const now = Date.now();
+  if (authCircuitBreaker.isOpen && 
+      now - authCircuitBreaker.lastFailureTime > CIRCUIT_BREAKER_TIMEOUT) {
+    authCircuitBreaker.isOpen = false;
+    authCircuitBreaker.failureCount = 0;
+    console.log('🔄 Circuit breaker closed, resuming auth requests');
+  }
+  return authCircuitBreaker.isOpen;
+};
+
+const recordAuthFailure = () => {
+  authCircuitBreaker.failureCount++;
+  authCircuitBreaker.lastFailureTime = Date.now();
+  if (authCircuitBreaker.failureCount >= CIRCUIT_BREAKER_THRESHOLD) {
+    authCircuitBreaker.isOpen = true;
+    console.log('⚠️ Circuit breaker opened, stopping auth requests for 5 minutes');
+  }
 };
 
 export const createClient = (request: NextRequest) => {
@@ -103,38 +133,42 @@ export const updateSession = async (request: NextRequest) => {
       return response;
     }
 
-    // Skip auth checks in development if DISABLE_AUTH_MIDDLEWARE is set
-    if (process.env.NODE_ENV === 'development' && process.env.DISABLE_AUTH_MIDDLEWARE === 'true') {
-      console.log('🔧 Auth middleware disabled in development');
+    // Skip auth checks if DISABLE_AUTH_MIDDLEWARE is set (works in both dev and prod)
+    if (process.env.DISABLE_AUTH_MIDDLEWARE === 'true') {
+      console.log('🔧 Auth middleware disabled');
       return response;
     }
 
-    // Skip auth checks for public routes in development
-    if (process.env.NODE_ENV === 'development' && (
-        pathname === '/' || 
+    // Skip auth checks for public routes (both dev and production to reduce load)
+    if (pathname === '/' || 
         pathname.startsWith('/pricing') ||
-        pathname.startsWith('/legal')
-    )) {
+        pathname.startsWith('/legal') ||
+        pathname.startsWith('/signin') ||
+        pathname.startsWith('/ref/')) {
       return response;
     }
 
-    // Rate limiting check - only for production
-    if (process.env.NODE_ENV === 'production') {
-      const clientIP = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
-      const now = Date.now();
-      const rateLimitKey = `${clientIP}:${pathname}`;
-      const rateLimit = rateLimitMap.get(rateLimitKey);
-      
-      if (rateLimit && (now - rateLimit.timestamp) < RATE_LIMIT_WINDOW) {
-        if (rateLimit.count >= MAX_REQUESTS_PER_WINDOW) {
-          console.log('Rate limit exceeded for:', pathname);
-          // Allow the request to continue but skip auth checks
-          return response;
-        }
-        rateLimit.count++;
-      } else {
-        rateLimitMap.set(rateLimitKey, { count: 1, timestamp: now });
+    // Check circuit breaker first - if open, skip ALL auth checks
+    if (checkCircuitBreaker()) {
+      console.log('🚫 Circuit breaker open, skipping auth for:', pathname);
+      return response;
+    }
+
+    // Rate limiting check - more aggressive for production
+    const clientIP = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
+    const now = Date.now();
+    const rateLimitKey = `${clientIP}:${pathname}`;
+    const rateLimit = rateLimitMap.get(rateLimitKey);
+    
+    if (rateLimit && (now - rateLimit.timestamp) < RATE_LIMIT_WINDOW) {
+      if (rateLimit.count >= MAX_REQUESTS_PER_WINDOW) {
+        console.log('Rate limit exceeded for:', pathname);
+        // COMPLETELY skip auth checks when rate limited
+        return response;
       }
+      rateLimit.count++;
+    } else {
+      rateLimitMap.set(rateLimitKey, { count: 1, timestamp: now });
     }
 
     // Check if this is a protected route
@@ -169,6 +203,15 @@ export const updateSession = async (request: NextRequest) => {
           user = data.user;
           userError = error;
           
+          // Check for rate limit errors and trigger circuit breaker
+          if (userError && (userError.message?.includes('rate limit') || userError.status === 429)) {
+            console.log('🚨 Rate limit error from Supabase, triggering circuit breaker');
+            recordAuthFailure();
+            // Cache null for extended period and return early
+            authCache.set(cacheKey, { user: null, timestamp: now + (CACHE_DURATION * 4) });
+            return response;
+          }
+          
           // Cache the result (even if there's an error, cache null to prevent repeated requests)
           authCache.set(cacheKey, { user: user || null, timestamp: now });
           
@@ -185,10 +228,20 @@ export const updateSession = async (request: NextRequest) => {
               authCache.set(cacheKey, { user: null, timestamp: now + (CACHE_DURATION * 2) });
             } else {
               console.log('⚠️ Auth error in middleware (cached to prevent spam):', userError.message);
+              recordAuthFailure(); // Record any auth failures
             }
           }
         } catch (error: any) {
           console.error('❌ Auth error in middleware:', error);
+          
+          // Check for rate limit errors in catch block
+          if (error?.message?.includes('rate limit') || error?.status === 429 || error?.code === 'over_request_rate_limit') {
+            console.log('🚨 Rate limit error caught, triggering circuit breaker');
+            recordAuthFailure();
+            authCache.set(cacheKey, { user: null, timestamp: now + (CACHE_DURATION * 4) });
+            return response;
+          }
+          
           // Handle specific error types
           if (error?.message?.includes('refresh_token_not_found') || 
               error?.message?.includes('Invalid Refresh Token') ||
@@ -202,6 +255,7 @@ export const updateSession = async (request: NextRequest) => {
           } else {
             // Cache null to prevent repeated failed requests
             authCache.set(cacheKey, { user: null, timestamp: now });
+            recordAuthFailure(); // Record the failure
           }
           // If there's an auth error (like rate limiting), allow the request to continue
           // The page will handle authentication itself
