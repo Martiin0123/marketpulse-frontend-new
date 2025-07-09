@@ -563,9 +563,9 @@ export async function POST(request) {
 
       console.log('🔴 Bybit position close order submitted:', {
         symbol: bybitSymbol,
-        qty: orderResult.qty || 'N/A',
-        order_id: orderResult.orderId,
-        status: orderResult.orderStatus,
+        qty: orderResult.order?.qty || 'N/A',
+        order_id: orderResult.order?.orderId,
+        status: orderResult.order?.status,
         exit_reason: exitReason
       });
 
@@ -630,8 +630,8 @@ export async function POST(request) {
             exchange: 'bybit',
             exit_reason: exitReason || 'ma_cross',
             status: 'closed',
-            rsi_value: strategy_metadata.rsi_value,
-            technical_metadata: strategy_metadata
+            rsi_value: strategy_metadata?.rsi_value || null,
+            technical_metadata: strategy_metadata && Object.keys(strategy_metadata).length > 0 ? strategy_metadata : null
           }])
           .select()
           .single();
@@ -650,7 +650,7 @@ export async function POST(request) {
             strategy_metadata: strategy_metadata,
             exitReason: exitReason,
             dbErrorHint
-          }, orderResult, discordWebhookUrl);
+          }, orderResult.order || orderResult, discordWebhookUrl);
         }
         
         // Send to free webhook if it's every 5th trade
@@ -663,14 +663,14 @@ export async function POST(request) {
             strategy_metadata: strategy_metadata,
             exitReason: exitReason,
             dbErrorHint
-          }, orderResult, discordFreeWebhookUrl, true);
+          }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
         }
 
         return new Response(JSON.stringify({ 
           message: 'Bybit position close order submitted successfully',
-          order_id: orderResult.orderId,
+          order_id: orderResult.order?.orderId,
           symbol: bybitSymbol,
-          quantity: orderResult.qty || 'N/A',
+          quantity: orderResult.order?.qty || 'N/A',
           signal_id: signal?.id,
           pnl_percentage: databaseResult?.pnl_percentage || null,
           exit_reason: exitReason,
@@ -695,13 +695,13 @@ export async function POST(request) {
             strategy_metadata: strategy_metadata,
             exitReason: exitReason,
             dbErrorHint
-          }, orderResult, discordWebhookUrl);
+          }, orderResult.order || orderResult, discordWebhookUrl);
         }
         return new Response(JSON.stringify({ 
           message: 'Bybit position close order submitted successfully (database update failed)',
-          order_id: orderResult.orderId,
+          order_id: orderResult.order?.orderId,
           symbol: bybitSymbol,
-          quantity: orderResult.qty || 'N/A',
+          quantity: orderResult.order?.qty || 'N/A',
           error: 'Database update failed due to rate limit',
           signalSaved,
           dbErrorHint
