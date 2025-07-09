@@ -650,7 +650,7 @@ export async function POST(request) {
         }
 
         orderResult = await response.json();
-        console.log('📥 Strategy order response:', orderResult);
+        console.log('📥 Strategy order response:', JSON.stringify(orderResult, null, 2));
 
         // Handle database updates and send individual notifications for each action
         const actualActions = orderResult.actions || []; // Array of actions taken (e.g., ['CLOSE', 'BUY'])
@@ -673,7 +673,8 @@ export async function POST(request) {
 
               if (originalSignal) {
                 const entryPrice = Number(originalSignal.entry_price);
-                const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.closePrice || 0;
+                // Use currentPrice for close operations, avgPrice for others
+                const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
                 const exitPrice = Number(executionPrice);
                 
                 // Calculate PnL based on position side
@@ -704,7 +705,7 @@ export async function POST(request) {
                 if (discordWebhookUrl) {
                   await sendSuccessDiscordNotification({
                     symbol: symbol.toUpperCase(),
-                    action: 'CLOSE',
+                    action: orderResult.action || 'CLOSE', // Use proxy response action
                     price: parseFloat(executionPrice),
                     timestamp: validTimestamp,
                     strategy_metadata: strategy_metadata,
@@ -716,7 +717,7 @@ export async function POST(request) {
                   if (isEveryFifthTrade && discordFreeWebhookUrl) {
                     await sendSuccessDiscordNotification({
                       symbol: symbol.toUpperCase(),
-                      action: 'CLOSE',
+                      action: orderResult.action || 'CLOSE', // Use proxy response action
                       price: parseFloat(executionPrice),
                       timestamp: validTimestamp,
                       strategy_metadata: strategy_metadata,
@@ -740,7 +741,7 @@ export async function POST(request) {
               }
 
               // Create close signal record
-              const closeExecutionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.closePrice || 0;
+              const closeExecutionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
               await supabase
                 .from('signals')
                 .insert([{
@@ -760,7 +761,7 @@ export async function POST(request) {
             
             if (actionTaken === 'BUY' || actionTaken === 'SELL') {
               // Create new position signal
-              const openExecutionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.openPrice || 0;
+              const openExecutionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
               const { data: signal } = await supabase
                 .from('signals')
                 .insert([{
@@ -783,7 +784,7 @@ export async function POST(request) {
               
               // Send individual notification for new position
               if (discordWebhookUrl) {
-                const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.openPrice || 0;
+                const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
                 
                 await sendSuccessDiscordNotification({
                   symbol: symbol.toUpperCase(),
@@ -899,7 +900,7 @@ export async function POST(request) {
 
         if (originalSignal) {
           const entryPrice = Number(originalSignal.entry_price);
-          const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.closePrice || 0;
+          const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
           const exitPrice = Number(executionPrice);
           
           // Calculate PnL based on position type
@@ -942,7 +943,7 @@ export async function POST(request) {
         }
 
         // Create close signal with Pine Script metadata
-        const closeExecutionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.closePrice || 0;
+        const closeExecutionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
         const { data: signal, error: signalError } = await supabase
           .from('signals')
           .insert([{
@@ -968,7 +969,7 @@ export async function POST(request) {
         // Send success Discord notification
         if (discordWebhookUrl) {
           // Use actual Bybit execution price and calculate PnL
-          const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.closePrice || 0;
+          const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
           let pnlPercentage = null;
           
           // Calculate PnL if we have the original entry price
@@ -991,7 +992,7 @@ export async function POST(request) {
           
           await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
-            action: 'CLOSE',
+            action: orderResult.action || 'CLOSE', // Use proxy response action
             price: parseFloat(executionPrice),
             timestamp: validTimestamp,
             strategy_metadata: strategy_metadata,
@@ -1015,7 +1016,7 @@ export async function POST(request) {
         
         // Send to free webhook if it's every 5th trade
         if (isEveryFifthTrade && discordFreeWebhookUrl) {
-          const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.closePrice || 0;
+          const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
           let pnlPercentage = null;
           
           if (databaseResult?.pnl_percentage !== undefined) {
@@ -1036,7 +1037,7 @@ export async function POST(request) {
           
           await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
-            action: 'CLOSE',
+            action: orderResult.action || 'CLOSE', // Use proxy response action
             price: parseFloat(executionPrice),
             timestamp: validTimestamp,
             strategy_metadata: strategy_metadata,
@@ -1142,7 +1143,7 @@ export async function POST(request) {
 
       // Try to update database (but don't fail if it doesn't work)
       try {
-        const executionPrice = orderResult.avgPrice || orderResult.price || orderResult.order?.avgPrice || 0;
+        const executionPrice = orderResult.currentPrice || orderResult.avgPrice || orderResult.price || orderResult.order?.avgPrice || 0;
         const { data: signal, error: signalError } = await supabase
           .from('signals')
           .insert([{
@@ -1173,7 +1174,7 @@ export async function POST(request) {
         // Send success Discord notification
         if (discordWebhookUrl) {
           // Use actual Bybit execution price
-          const executionPrice = orderResult.avgPrice || orderResult.price || orderResult.order?.avgPrice || 0;
+          const executionPrice = orderResult.currentPrice || orderResult.avgPrice || orderResult.price || orderResult.order?.avgPrice || 0;
           
           await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
@@ -1207,7 +1208,7 @@ export async function POST(request) {
         dbErrorHint = '⚠️ Signal was NOT saved to the database due to rate limit or DB error.';
 
         if (discordWebhookUrl) {
-          const executionPrice = orderResult.avgPrice || orderResult.price || orderResult.order?.avgPrice || 0;
+          const executionPrice = orderResult.currentPrice || orderResult.avgPrice || orderResult.price || orderResult.order?.avgPrice || 0;
           
           await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
