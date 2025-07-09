@@ -1,6 +1,12 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode
+} from 'react';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/utils/supabase/client';
 import { Tables } from '@/types_db';
@@ -30,7 +36,9 @@ export function AuthProvider({
   initialSubscription = null
 }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(initialUser);
-  const [subscription, setSubscription] = useState<Subscription | null>(initialSubscription);
+  const [subscription, setSubscription] = useState<Subscription | null>(
+    initialSubscription
+  );
   const [loading, setLoading] = useState(!initialUser);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -42,7 +50,9 @@ export function AuthProvider({
 
   // Initialize auth state once
   useEffect(() => {
-    if (initialUser && initialSubscription) {
+    if (initialUser) {
+      setUser(initialUser);
+      setSubscription(initialSubscription);
       setLoading(false);
       return;
     }
@@ -52,7 +62,7 @@ export function AuthProvider({
     const initAuth = async () => {
       try {
         const supabase = createClient();
-        
+
         // Clear any corrupted data first
         const storedToken = localStorage.getItem('supabase.auth.token');
         if (storedToken) {
@@ -65,8 +75,11 @@ export function AuthProvider({
         }
 
         // Get current session
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
+        const {
+          data: { session },
+          error: sessionError
+        } = await supabase!.auth.getSession();
+
         if (sessionError) {
           console.error('Session error:', sessionError);
           setError(sessionError.message);
@@ -106,9 +119,15 @@ export function AuthProvider({
   const fetchSubscription = async (userId: string) => {
     try {
       const supabase = createClient();
-      const { data, error } = await supabase
+      if (!supabase) {
+        console.error('Failed to create Supabase client');
+        return;
+      }
+
+      const { data: subscriptions, error } = await supabase
         .from('subscriptions')
-        .select(`
+        .select(
+          `
           id,
           status,
           price_id,
@@ -141,12 +160,23 @@ export function AuthProvider({
               metadata
             )
           )
-        `)
+        `
+        )
         .eq('user_id', userId)
         .eq('status', 'active')
-        .single();
+        .order('created', { ascending: false });
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+      const data = subscriptions?.[0] || null;
+
+      // Log warning if multiple active subscriptions exist
+      if (subscriptions && subscriptions.length > 1) {
+        console.warn(
+          `Warning: User ${userId} has ${subscriptions.length} active subscriptions. Using most recent.`
+        );
+      }
+
+      if (error && error.code !== 'PGRST116') {
+        // PGRST116 is "not found"
         console.error('Subscription fetch error:', error);
       } else {
         setSubscription(data || null);
@@ -159,19 +189,19 @@ export function AuthProvider({
   const signOut = async () => {
     try {
       const supabase = createClient();
-      
+
       // Clear state immediately
       setUser(null);
       setSubscription(null);
       setError(null);
-      
+
       // Clear storage
       localStorage.removeItem('supabase.auth.token');
       sessionStorage.clear();
-      
+
       // Sign out from Supabase
-      await supabase.auth.signOut();
-      
+      await supabase!.auth.signOut();
+
       // Force redirect to home
       window.location.href = '/';
     } catch (err) {
@@ -211,11 +241,7 @@ export function AuthProvider({
     );
   }
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

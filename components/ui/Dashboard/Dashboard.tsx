@@ -103,7 +103,7 @@ export default function Dashboard({
       try {
         // Avoid duplicate subscriptions
         if (isSubscribed) return;
-        
+
         channel = supabase
           .channel('signals-changes-dashboard')
           .on(
@@ -117,7 +117,9 @@ export default function Dashboard({
               if (payload.eventType === 'INSERT') {
                 setSignals((current) => {
                   // Prevent duplicate signals
-                  const existingSignal = current.find(s => s.id === payload.new.id);
+                  const existingSignal = current.find(
+                    (s) => s.id === payload.new.id
+                  );
                   if (existingSignal) return current;
                   return [payload.new as Signal, ...current];
                 });

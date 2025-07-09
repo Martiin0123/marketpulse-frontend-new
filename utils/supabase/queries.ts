@@ -20,8 +20,8 @@ export const getSubscription = cache(async (supabase: SupabaseClient) => {
     return null;
   }
 
-  // Single query to get active subscription with all relations
-  const { data: subscription, error } = await supabase
+  // Get the most recent active subscription (handle multiple active subscriptions)
+  const { data: subscriptions, error } = await supabase
     .from('subscriptions')
     .select(`
       id,
@@ -59,7 +59,14 @@ export const getSubscription = cache(async (supabase: SupabaseClient) => {
     `)
     .eq('user_id', user.user.id)
     .eq('status', 'active')
-    .single();
+    .order('created', { ascending: false });
+
+  const subscription = subscriptions?.[0] || null;
+
+  // Log warning if multiple active subscriptions exist
+  if (subscriptions && subscriptions.length > 1) {
+    console.warn(`Warning: User ${user.user.id} has ${subscriptions.length} active subscriptions. Using most recent.`);
+  }
 
   if (error) {
     console.error('Error fetching subscription:', error);
@@ -67,7 +74,7 @@ export const getSubscription = cache(async (supabase: SupabaseClient) => {
   }
 
   // Ensure currency is always a string
-  if (subscription?.prices?.currency && typeof subscription.prices.currency !== 'string') {
+  if (subscription?.prices && 'currency' in subscription.prices && typeof subscription.prices.currency !== 'string') {
     subscription.prices.currency = String(subscription.prices.currency);
   }
 
@@ -491,15 +498,19 @@ export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClie
     return null;
   }
 
-  // Get user's active subscription
-  const { data: subscription, error: subscriptionError } = await supabase
+  // Get user's active subscription (handle multiple subscriptions)
+  const { data: subscriptions, error: subscriptionError } = await supabase
     .from('subscriptions')
     .select('current_period_start, current_period_end, created, status')
     .eq('user_id', user.id)
     .in('status', ['active', 'trialing'])
-    .order('created', { ascending: false })
-    .limit(1)
-    .single();
+    .order('created', { ascending: false });
+
+  const subscription = subscriptions?.[0] || null;
+
+  if (subscriptions && subscriptions.length > 1) {
+    console.warn(`Performance check: User ${user.id} has ${subscriptions.length} active subscriptions.`);
+  }
 
   if (!subscription) {
     // Let's check what subscriptions exist for this user

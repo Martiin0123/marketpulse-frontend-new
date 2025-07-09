@@ -23,11 +23,25 @@ COPY . .
 # Disable telemetry during build
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Build the application
+# Debug environment variables before build
+RUN echo "=== Build Environment Debug ===" && \
+    echo "NODE_ENV: $NODE_ENV" && \
+    echo "NEXT_TELEMETRY_DISABLED: $NEXT_TELEMETRY_DISABLED" && \
+    echo "=== End Environment Debug ==="
+
+# Build the application with verbose output
 RUN npm run build
 
-# Verify standalone output was created
-RUN ls -la .next/ && test -f .next/standalone/server.js
+# Debug: Show what was built
+RUN echo "=== Build Output Debug ===" && \
+    ls -la .next/ && \
+    echo "=== Standalone check ===" && \
+    ls -la .next/standalone/ && \
+    echo "=== Server.js check ===" && \
+    test -f .next/standalone/server.js && echo "server.js exists" || echo "server.js missing" && \
+    echo "=== Static check ===" && \
+    ls -la .next/static/ && \
+    echo "=== Debug complete ==="
 
 # Production image, copy all the files and run next
 FROM base AS runner
@@ -49,6 +63,15 @@ RUN chown nextjs:nodejs .next
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Debug: Verify files were copied correctly in production
+RUN echo "=== Production Debug ===" && \
+    ls -la ./ && \
+    echo "=== .next dir ===" && \
+    ls -la .next/ && \
+    echo "=== server.js check ===" && \
+    test -f server.js && echo "server.js found" || echo "server.js missing" && \
+    echo "=== Production debug complete ==="
 
 USER nextjs
 

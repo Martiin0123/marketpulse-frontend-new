@@ -227,12 +227,14 @@ export const updateSession = async (request: NextRequest) => {
       // Only check subscription if we have a user
       if (user) {
         try {
-          const { data: subscription } = await supabase
+          const { data: subscriptions } = await supabase
             .from('subscriptions')
             .select('status')
             .eq('user_id', user.id)
             .in('status', ['trialing', 'active'])
-            .maybeSingle();
+            .order('created', { ascending: false });
+
+          const subscription = subscriptions?.[0] || null;
 
           if (!subscription) {
             // If no active subscription, redirect to pricing with message

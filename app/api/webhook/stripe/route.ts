@@ -33,6 +33,10 @@ export async function POST(request: NextRequest) {
         await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session, supabase);
         break;
 
+      case 'customer.subscription.created':
+        await handleSubscriptionCreated(event.data.object as Stripe.Subscription, supabase);
+        break;
+
       case 'invoice.payment_succeeded':
         await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice, supabase);
         break;
@@ -72,21 +76,31 @@ async function handleCheckoutSessionCompleted(
   supabase: any
 ) {
   if (session.mode === 'subscription' && session.subscription) {
-    const customerId = session.customer as string;
-    const subscriptionId = session.subscription as string;
+    console.log('Checkout session completed for subscription:', session.subscription);
+    // Note: Subscription creation is now handled by customer.subscription.created event
+    // This handler only logs successful checkout completion
+  }
+}
+
+async function handleSubscriptionCreated(
+  subscription: Stripe.Subscription,
+  supabase: any
+) {
+  try {
+    console.log('Processing subscription.created event:', subscription.id);
     
     // Get customer details
-    const customer = await stripe.customers.retrieve(customerId);
+    const customer = await stripe.customers.retrieve(subscription.customer as string);
     
     if (customer.deleted) {
-      console.log('Customer was deleted');
+      console.log('Customer was deleted, skipping subscription creation');
       return;
     }
     
     const userEmail = customer.email;
     
     if (!userEmail) {
-      console.error('No email found for customer:', customerId);
+      console.error('No email found for customer:', subscription.customer);
       return;
     }
     
@@ -99,31 +113,47 @@ async function handleCheckoutSessionCompleted(
       return;
     }
     
-    // Create or update subscription record
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-    
     console.log('Creating subscription record for user:', userRecord.id);
     
+    // Check if subscription already exists to prevent duplicates
+    const { data: existingSubscription } = await supabase
+      .from('subscriptions')
+      .select('id')
+      .eq('id', subscription.id)
+      .single();
+    
+    if (existingSubscription) {
+      console.log('Subscription already exists, skipping:', subscription.id);
+      return;
+    }
+    
+    // Create subscription record with idempotent upsert
     const { error } = await supabase
       .from('subscriptions')
       .upsert({
-        id: subscriptionId,
+        id: subscription.id,
         user_id: userRecord.id,
         status: subscription.status,
         price_id: subscription.items.data[0]?.price.id,
-        quantity: subscription.items.data[0]?.quantity,
+        quantity: subscription.items.data[0]?.quantity || 1,
         cancel_at_period_end: subscription.cancel_at_period_end,
         created: new Date(subscription.created * 1000).toISOString(),
         current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
         current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+        trial_start: subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null,
+        trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
         metadata: subscription.metadata
+      }, {
+        onConflict: 'id'
       });
     
     if (error) {
       console.error('Error creating subscription record:', error);
     } else {
-      console.log('Subscription record created successfully');
+      console.log('Subscription record created successfully:', subscription.id);
     }
+  } catch (error) {
+    console.error('Error in handleSubscriptionCreated:', error);
   }
 }
 
