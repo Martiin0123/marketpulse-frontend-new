@@ -494,24 +494,24 @@ export async function POST(request) {
         console.log('📨 Attempting to clean malformed JSON...');
         
         // Try to extract valid JSON from malformed content
-        const jsonMatch = rawBody.match(/\{.*\}/s);
-        if (jsonMatch) {
-          try {
-            body = JSON.parse(jsonMatch[0]);
-            console.log('📨 Cleaned JSON parsed successfully:', body);
-          } catch (cleanError) {
-            console.error('❌ Failed to clean JSON:', cleanError.message);
-            return new Response(JSON.stringify({ 
-              error: 'Invalid JSON format',
-              details: 'Request body contains malformed JSON',
-              received: rawBody.substring(0, 200) + '...'
-            }), { 
-              status: 400,
-              headers: headers
-            });
-          }
-        } else {
-          console.error('❌ No valid JSON found in request body');
+        let cleanedJson = rawBody.trim();
+        
+        // Handle missing braces - add them if missing
+        if (!cleanedJson.startsWith('{')) {
+          cleanedJson = '{' + cleanedJson;
+        }
+        if (!cleanedJson.endsWith('}')) {
+          // Remove trailing comma if present
+          cleanedJson = cleanedJson.replace(/,\s*$/, '') + '}';
+        }
+        
+        console.log('📨 Attempting to parse cleaned JSON:', cleanedJson);
+        
+        try {
+          body = JSON.parse(cleanedJson);
+          console.log('📨 Cleaned JSON parsed successfully:', body);
+        } catch (cleanError) {
+          console.error('❌ Failed to clean JSON:', cleanError.message);
           console.log('📨 Attempting to parse as text alert...');
           
           // Try to parse as text alert (Pine Script format)
@@ -650,17 +650,51 @@ export async function POST(request) {
     let unixTimestamp;
     try {
       const timestamp = body.timestamp || body.time || Date.now();
+      
+      // Validate and parse timestamp
+      let parsedDate;
       if (typeof timestamp === 'string') {
-        validTimestamp = new Date(timestamp).toISOString();
-        unixTimestamp = Math.floor(new Date(timestamp).getTime() / 1000);
+        // Handle string timestamps
+        parsedDate = new Date(timestamp);
+      } else if (typeof timestamp === 'number') {
+        // Handle numeric timestamps (seconds or milliseconds)
+        if (timestamp > 1000000000000) {
+          // Likely milliseconds
+          parsedDate = new Date(timestamp);
+        } else {
+          // Likely seconds
+          parsedDate = new Date(timestamp * 1000);
+        }
       } else {
-        validTimestamp = new Date(Number(timestamp) * 1000).toISOString();
-        unixTimestamp = Math.floor(Date.now() / 1000);
+        // Fallback to current time
+        parsedDate = new Date();
       }
-      if (isNaN(new Date(validTimestamp).getTime())) {
-        throw new Error('Invalid timestamp');
+      
+      // Validate the parsed date
+      if (isNaN(parsedDate.getTime())) {
+        throw new Error('Invalid timestamp format');
       }
+      
+      // Check for reasonable date range (not too far in past/future)
+      const now = new Date();
+      const diffYears = Math.abs(parsedDate.getFullYear() - now.getFullYear());
+      if (diffYears > 10) {
+        console.warn('⚠️ Timestamp seems unreasonable, using current time instead');
+        parsedDate = new Date();
+      }
+      
+      validTimestamp = parsedDate.toISOString();
+      unixTimestamp = Math.floor(parsedDate.getTime() / 1000);
+      
+      console.log('📅 Timestamp parsed:', {
+        original: timestamp,
+        parsed: validTimestamp,
+        unix: unixTimestamp
+      });
+      
     } catch (error) {
+      console.error('❌ Timestamp parsing error:', error.message);
+      console.log('📅 Using current timestamp as fallback');
       validTimestamp = new Date().toISOString();
       unixTimestamp = Math.floor(Date.now() / 1000);
     }
