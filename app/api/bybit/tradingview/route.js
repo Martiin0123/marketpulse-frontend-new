@@ -1355,8 +1355,49 @@ export async function POST(request) {
           console.log('🔍 This might be a standalone close signal or the signal was already closed');
         }
 
-        // Discord notifications are handled in the main proxy API call section
-        // No duplicate notifications here
+        // Send Discord notifications for CLOSE action
+        if (discordWebhookUrl && databaseResult) {
+          const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
+          
+          // Determine the action type for Discord
+          const closeAction = originalSignal?.type === 'buy' ? 'BUY_CLOSED' : 'SELL_CLOSED';
+          
+          console.log('📊 Sending CLOSE Discord notification with PnL:', databaseResult.pnl_percentage);
+          
+          await sendSuccessDiscordNotification({
+            symbol: symbol.toUpperCase(),
+            action: closeAction,
+            price: parseFloat(executionPrice),
+            timestamp: validTimestamp,
+            strategy_metadata: strategy_metadata,
+            pnl_percentage: databaseResult.pnl_percentage,
+            exitReason: exitReason
+          }, orderResult.order || orderResult, discordWebhookUrl);
+          
+          // Check if this is every 5th trade for free webhook
+          if (discordFreeWebhookUrl) {
+            const { count: totalSignals } = await supabase
+              .from('signals')
+              .select('*', { count: 'exact', head: true });
+            
+            const isEveryFifthTrade = totalSignals && (totalSignals % 5 === 0);
+            
+            if (isEveryFifthTrade) {
+              console.log(`🎯 Sending CLOSE to free webhook (total signals: ${totalSignals})`);
+              await sendSuccessDiscordNotification({
+                symbol: symbol.toUpperCase(),
+                action: closeAction,
+                price: parseFloat(executionPrice),
+                timestamp: validTimestamp,
+                strategy_metadata: strategy_metadata,
+                pnl_percentage: databaseResult.pnl_percentage,
+                exitReason: exitReason
+              }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
+            } else {
+              console.log(`📊 Not sending CLOSE to free webhook (total signals: ${totalSignals}, not divisible by 5)`);
+            }
+          }
+        }
 
         return new Response(JSON.stringify({ 
           message: 'Bybit position close order submitted successfully',
@@ -1385,16 +1426,54 @@ export async function POST(request) {
         if (discordWebhookUrl) {
           const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.currentPrice || 0;
           
+          // Try to calculate PnL even if database failed
+          let calculatedPnlPercentage = pnlPercentage;
+          if (originalSignal && executionPrice) {
+            const entryPrice = Number(originalSignal.entry_price);
+            const exitPrice = Number(executionPrice);
+            
+            if (originalSignal.type === 'buy') {
+              calculatedPnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
+            } else if (originalSignal.type === 'sell') {
+              calculatedPnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100;
+            }
+          }
+          
+          const closeAction = originalSignal?.type === 'buy' ? 'BUY_CLOSED' : 'SELL_CLOSED';
+          
+          console.log('📊 Sending CLOSE Discord notification (database failed) with PnL:', calculatedPnlPercentage);
+          
           await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
-            action: 'CLOSE',
+            action: closeAction,
             price: parseFloat(executionPrice),
             timestamp: validTimestamp,
             strategy_metadata: strategy_metadata,
-            exitReason: exitReason,
-            dbErrorHint,
-            pnl_percentage: pnlPercentage
+            pnl_percentage: calculatedPnlPercentage,
+            exitReason: exitReason
           }, orderResult.order || orderResult, discordWebhookUrl);
+          
+          // Check if this is every 5th trade for free webhook
+          if (discordFreeWebhookUrl) {
+            const { count: totalSignals } = await supabase
+              .from('signals')
+              .select('*', { count: 'exact', head: true });
+            
+            const isEveryFifthTrade = totalSignals && (totalSignals % 5 === 0);
+            
+            if (isEveryFifthTrade) {
+              console.log(`🎯 Sending CLOSE to free webhook (database failed, total signals: ${totalSignals})`);
+              await sendSuccessDiscordNotification({
+                symbol: symbol.toUpperCase(),
+                action: closeAction,
+                price: parseFloat(executionPrice),
+                timestamp: validTimestamp,
+                strategy_metadata: strategy_metadata,
+                pnl_percentage: calculatedPnlPercentage,
+                exitReason: exitReason
+              }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
+            }
+          }
         }
         return new Response(JSON.stringify({ 
           message: 'Bybit position close order submitted successfully (database update failed)',
