@@ -19,61 +19,6 @@ function createSupabaseClient() {
   
   return createClient(supabaseUrl, supabaseKey)
 }
-
-// Helper function to manually close a signal (for testing)
-async function closeSignalManually(signalId, exitPrice, exitReason = 'manual') {
-  try {
-    const supabase = createSupabaseClient()
-    const { data: signal, error: fetchError } = await supabase
-      .from('signals')
-      .select('*')
-      .eq('id', signalId)
-      .single()
-
-    if (fetchError || !signal) {
-      throw new Error(`Signal not found: ${signalId}`);
-    }
-
-    if (signal.status === 'closed') {
-      throw new Error(`Signal already closed: ${signalId}`);
-    }
-
-    const entryPrice = Number(signal.entry_price)
-    const exitPriceNum = Number(exitPrice)
-    const pnlPercentage = ((exitPriceNum - entryPrice) / entryPrice) * 100
-
-    const { data: updatedSignal, error: updateError } = await supabase
-      .from('signals')
-      .update({
-        status: 'closed',
-        exit_price: exitPriceNum,
-        exit_timestamp: new Date().toISOString(),
-        pnl_percentage: pnlPercentage,
-        exit_reason: exitReason
-      })
-      .eq('id', signalId)
-      .select()
-      .single()
-
-    if (updateError) {
-      throw updateError;
-    }
-
-    console.log('✅ Manually closed signal:', {
-      signal_id: signalId,
-      symbol: signal.symbol,
-      entry_price: entryPrice,
-      exit_price: exitPriceNum,
-      pnl_percentage: pnlPercentage
-    });
-
-    return updatedSignal;
-  } catch (error) {
-    console.error('❌ Error manually closing signal:', error);
-    throw error;
-  }
-}
-
 // Parse Pine Script alert message to extract signal data
 function parseAIAlgorithmAlert(alertMessage) {
   console.log('🔍 Parsing Pine Script alert for Bybit:', alertMessage);
@@ -300,8 +245,8 @@ async function sendProfitTeaserNotification(signal, orderDetails, webhookUrl) {
     }
 
     const embed = {
-      title: `🔥 PREMIUM ALERT: ${signal.symbol} Closed +${signal.pnl_percentage.toFixed(2)}%`,
-      description: `**Premium subscribers just secured a ${signal.pnl_percentage.toFixed(2)}% profit!** 💰\n\n*Want these winning signals? Upgrade to Premium!*`,
+      title: `🔥 PREMIUM ALERT: ${signal.symbol} Closed +${signal.pnl_percentage.toFixed(1)}%`,
+      description: `**Premium subscribers just secured a ${signal.pnl_percentage.toFixed(1)}% profit!** 💰\n\n*Want these winning signals? Upgrade to Premium!*`,
       color: 0x00ff00, // Green for profit
       fields: [
         {
@@ -316,7 +261,7 @@ async function sendProfitTeaserNotification(signal, orderDetails, webhookUrl) {
         },
         {
           name: '🟢 Profit',
-          value: `+${signal.pnl_percentage.toFixed(2)}%`,
+          value: `+${signal.pnl_percentage.toFixed(1)}%`,
           inline: true
         },
         {
@@ -747,8 +692,8 @@ export async function POST(request) {
     let databaseResult = null;
     let signalSaved = true;
 
-    // Handle direct BUY/SELL signals (no position management needed)
-    if (signalType === 'direct' || signalType === 'entry') {
+    // Handle entry BUY/SELL signals (no position management needed)
+    if (signalType === 'entry') {
       console.log('🔄 Processing direct BUY/SELL signal...');
       console.log('🔍 Entering proxy API call section...');
       
@@ -982,15 +927,20 @@ export async function POST(request) {
             
             // Check if this is every 5th trade for free webhook (reversals)
             if (discordFreeWebhookUrl) {
-              // Count total signals to determine if this is every 5th trade
-              const { count: totalSignals } = await supabase
+              // Count total signals BEFORE the new signal was inserted
+              const { count: totalSignalsBefore } = await supabase
                 .from('signals')
                 .select('*', { count: 'exact', head: true });
               
-              const isEveryFifthTrade = totalSignals && (totalSignals % 5 === 0);
+              // The new signal will be the next one, so check if (count + 1) is divisible by 5
+              const totalSignalsAfter = totalSignalsBefore + 1;
+              const isEveryFifthTrade = totalSignalsAfter % 5 === 0;
+              
+              console.log(`📊 Reversal - Total signals before: ${totalSignalsBefore}, after: ${totalSignalsAfter}`);
+              console.log(`🔢 Is every 5th trade? ${isEveryFifthTrade} (${totalSignalsAfter} % 5 = ${totalSignalsAfter % 5})`);
               
               if (isEveryFifthTrade) {
-                console.log(`🎯 Sending reversal to free webhook (total signals: ${totalSignals})`);
+                console.log(`🎯 Sending reversal to free webhook (trade #${totalSignalsAfter})`);
                 await sendSuccessDiscordNotification({
                   symbol: symbol.toUpperCase(),
                   action: actionTaken === 'reversed_to_buy' ? 'BUY' : 'SELL',
@@ -1001,7 +951,7 @@ export async function POST(request) {
                   exitReason: null
                 }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
               } else {
-                console.log(`📊 Not sending reversal to free webhook (total signals: ${totalSignals}, not divisible by 5)`);
+                console.log(`📊 Not sending reversal to free webhook (trade #${totalSignalsAfter}, not divisible by 5)`);
               }
             }
           } else if (actionTaken === 'ignored_signal') {
@@ -1162,19 +1112,20 @@ export async function POST(request) {
             if (discordFreeWebhookUrl && (actionTaken === 'opened_buy' || actionTaken === 'opened_sell')) {
               console.log('🔍 Checking free webhook for new position...');
               
-              // Count total signals to determine if this is every 5th trade
-              const { count: totalSignals } = await supabase
+              // Count total signals BEFORE the new signal was inserted
+              const { count: totalSignalsBefore } = await supabase
                 .from('signals')
                 .select('*', { count: 'exact', head: true });
               
-              console.log(`📊 Total signals in database: ${totalSignals}`);
+              // The new signal will be the next one, so check if (count + 1) is divisible by 5
+              const totalSignalsAfter = totalSignalsBefore + 1;
+              const isEveryFifthTrade = totalSignalsAfter % 5 === 0;
               
-              const isEveryFifthTrade = totalSignals && (totalSignals % 5 === 0);
-              
-              console.log(`🔢 Is every 5th trade? ${isEveryFifthTrade} (${totalSignals} % 5 = ${totalSignals % 5})`);
+              console.log(`📊 Total signals before: ${totalSignalsBefore}, after: ${totalSignalsAfter}`);
+              console.log(`🔢 Is every 5th trade? ${isEveryFifthTrade} (${totalSignalsAfter} % 5 = ${totalSignalsAfter % 5})`);
               
               if (isEveryFifthTrade) {
-                console.log(`🎯 Sending ${actionTaken === 'opened_buy' ? 'BUY' : 'SELL'} to free webhook (total signals: ${totalSignals})`);
+                console.log(`🎯 Sending ${actionTaken === 'opened_buy' ? 'BUY' : 'SELL'} to free webhook (trade #${totalSignalsAfter})`);
                 await sendSuccessDiscordNotification({
                   symbol: symbol.toUpperCase(),
                   action: actionTaken === 'opened_buy' ? 'BUY' : 'SELL',
@@ -1185,7 +1136,7 @@ export async function POST(request) {
                   exitReason: null
                 }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
               } else {
-                console.log(`📊 Not sending to free webhook (total signals: ${totalSignals}, not divisible by 5)`);
+                console.log(`📊 Not sending to free webhook (trade #${totalSignalsAfter}, not divisible by 5)`);
               }
             } else {
               console.log(`⚠️ Free webhook check skipped: discordFreeWebhookUrl=${!!discordFreeWebhookUrl}, actionTaken=${actionTaken}`);
