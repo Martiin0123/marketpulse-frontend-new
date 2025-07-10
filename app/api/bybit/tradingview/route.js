@@ -780,11 +780,13 @@ export async function POST(request) {
         const actionTaken = orderResult.action || action;
         let pnlPercentage = null;
         
-        // Check if the proxy response indicates this is closing a position
+        // Check if this signal should close an existing position
         let shouldClosePosition = false;
-        if (actionTaken === 'SELL' || actionTaken === 'CLOSE') {
+        let positionToClose = null;
+        
+        if (actionTaken === 'SELL') {
           // Check if there's an active BUY position to close
-          const { data: activePosition } = await supabase
+          const { data: activeBuyPosition } = await supabase
             .from('signals')
             .select('*')
             .eq('symbol', symbol.toUpperCase())
@@ -795,16 +797,83 @@ export async function POST(request) {
             .limit(1)
             .single();
             
-          if (activePosition) {
+          if (activeBuyPosition) {
             shouldClosePosition = true;
-            console.log('🔄 Proxy response indicates position close:', actionTaken);
+            positionToClose = activeBuyPosition;
+            console.log('🔄 SELL signal will close existing BUY position');
+          }
+        } else if (actionTaken === 'BUY') {
+          // Check if there's an active SELL position to close
+          const { data: activeSellPosition } = await supabase
+            .from('signals')
+            .select('*')
+            .eq('symbol', symbol.toUpperCase())
+            .eq('type', 'sell')
+            .eq('status', 'active')
+            .eq('exchange', 'bybit')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+            
+          if (activeSellPosition) {
+            shouldClosePosition = true;
+            positionToClose = activeSellPosition;
+            console.log('🔄 BUY signal will close existing SELL position');
           }
         }
         
         try {
-          if (actionTaken === 'CLOSE' || shouldClosePosition) {
-            // Find and update original signal
-            const { data: originalSignal } = await supabase
+          if (shouldClosePosition && positionToClose) {
+            // Close the specific position that was found
+            console.log('🔍 Closing specific position:', positionToClose.id);
+            
+            const entryPrice = Number(positionToClose.entry_price);
+            const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
+            const exitPrice = Number(executionPrice);
+            
+            // Calculate PnL based on position side
+            if (positionToClose.type === 'buy') {
+              pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
+            } else if (positionToClose.type === 'sell') {
+              pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100;
+            }
+
+            await supabase
+              .from('signals')
+              .update({
+                status: 'closed',
+                exit_price: exitPrice,
+                exit_timestamp: validTimestamp,
+                pnl_percentage: pnlPercentage,
+                exit_reason: 'signal_reversal'
+              })
+              .eq('id', positionToClose.id);
+
+            console.log('✅ Updated position with signal reversal exit:', {
+              position_id: positionToClose.id,
+              entry_price: entryPrice,
+              exit_price: exitPrice,
+              pnl_percentage: pnlPercentage
+            });
+          } else if (actionTaken === 'CLOSE') {
+            // Handle explicit CLOSE action (if any)
+            console.log('🔍 Looking for active signal to close for symbol:', symbol.toUpperCase());
+            
+            // First, let's see what signals exist for this symbol
+            const { data: allSignalsForSymbol } = await supabase
+              .from('signals')
+              .select('*')
+              .eq('symbol', symbol.toUpperCase())
+              .order('created_at', { ascending: false });
+            
+            console.log('📊 All signals for symbol:', symbol.toUpperCase(), ':', allSignalsForSymbol?.length || 0);
+            if (allSignalsForSymbol && allSignalsForSymbol.length > 0) {
+              allSignalsForSymbol.slice(0, 3).forEach((sig, i) => {
+                console.log(`  ${i + 1}. ${sig.symbol} ${sig.type} - Status: ${sig.status} - Exchange: ${sig.exchange}`);
+              });
+            }
+            
+            const { data: originalSignal, error: findError } = await supabase
               .from('signals')
               .select('*')
               .eq('symbol', symbol.toUpperCase())
@@ -815,7 +884,18 @@ export async function POST(request) {
               .limit(1)
               .single();
 
+            if (findError) {
+              console.error('❌ Error finding active signal:', findError);
+            }
+
             if (originalSignal) {
+              console.log('✅ Found active signal to close:', {
+                id: originalSignal.id,
+                symbol: originalSignal.symbol,
+                type: originalSignal.type,
+                entry_price: originalSignal.entry_price,
+                created_at: originalSignal.created_at
+              });
               const entryPrice = Number(originalSignal.entry_price);
               const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
               const exitPrice = Number(executionPrice);
@@ -843,6 +923,9 @@ export async function POST(request) {
                 exit_price: exitPrice,
                 pnl_percentage: pnlPercentage
               });
+            } else {
+              console.log('⚠️ No active signal found to close for symbol:', symbol.toUpperCase());
+              console.log('🔍 This might be a standalone close signal or the signal was already closed');
             }
 
 
@@ -874,8 +957,9 @@ export async function POST(request) {
           if (discordWebhookUrl) {
             const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
             
-            // Use the actual action from proxy response, but show CLOSE when closing positions
+            // Show CLOSE when closing positions, otherwise show the actual action
             const displayAction = shouldClosePosition ? 'CLOSE' : actionTaken;
+            const exitReason = shouldClosePosition ? 'signal_reversal' : null;
             
             await sendSuccessDiscordNotification({
               symbol: symbol.toUpperCase(),
@@ -884,7 +968,7 @@ export async function POST(request) {
               timestamp: validTimestamp,
               strategy_metadata: strategy_metadata,
               pnl_percentage: pnlPercentage,
-              exitReason: shouldClosePosition ? 'direct_signal' : null
+              exitReason: exitReason
             }, orderResult.order || orderResult, discordWebhookUrl);
             
             // Send to free webhook if it's every 5th trade
@@ -896,7 +980,7 @@ export async function POST(request) {
                 timestamp: validTimestamp,
                 strategy_metadata: strategy_metadata,
                 pnl_percentage: pnlPercentage,
-                exitReason: shouldClosePosition ? 'direct_signal' : null
+                exitReason: exitReason
               }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
             }
 
@@ -991,6 +1075,22 @@ export async function POST(request) {
       // Try to update database (but don't fail if it doesn't work)
       try {
         // Find and update the original signal with exit information (BUY or SELL)
+        console.log('🔍 Looking for active signal to close for CLOSE action:', symbol.toUpperCase());
+        
+        // First, let's see what signals exist for this symbol
+        const { data: allSignalsForSymbol } = await supabase
+          .from('signals')
+          .select('*')
+          .eq('symbol', symbol.toUpperCase())
+          .order('created_at', { ascending: false });
+        
+        console.log('📊 All signals for symbol:', symbol.toUpperCase(), ':', allSignalsForSymbol?.length || 0);
+        if (allSignalsForSymbol && allSignalsForSymbol.length > 0) {
+          allSignalsForSymbol.slice(0, 3).forEach((sig, i) => {
+            console.log(`  ${i + 1}. ${sig.symbol} ${sig.type} - Status: ${sig.status} - Exchange: ${sig.exchange}`);
+          });
+        }
+        
         const { data: originalSignal, error: findError } = await supabase
           .from('signals')
           .select('*')
@@ -1002,7 +1102,18 @@ export async function POST(request) {
           .limit(1)
           .single();
 
+        if (findError) {
+          console.error('❌ Error finding active signal for CLOSE:', findError);
+        }
+
         if (originalSignal) {
+          console.log('✅ Found active signal to close for CLOSE action:', {
+            id: originalSignal.id,
+            symbol: originalSignal.symbol,
+            type: originalSignal.type,
+            entry_price: originalSignal.entry_price,
+            created_at: originalSignal.created_at
+          });
           const entryPrice = Number(originalSignal.entry_price);
           const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
           const exitPrice = Number(executionPrice);
@@ -1044,9 +1155,10 @@ export async function POST(request) {
             });
             databaseResult = updatedSignal;
           }
+        } else {
+          console.log('⚠️ No active signal found to close for CLOSE action:', symbol.toUpperCase());
+          console.log('🔍 This might be a standalone close signal or the signal was already closed');
         }
-
-
 
         // Send success Discord notification
         if (discordWebhookUrl) {
