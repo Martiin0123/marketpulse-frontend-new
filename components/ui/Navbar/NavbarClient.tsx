@@ -48,7 +48,10 @@ export default function NavbarClient() {
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsDropdownOpen(false);
       }
     };
@@ -56,7 +59,8 @@ export default function NavbarClient() {
     // Only add event listener on client-side
     if (typeof window !== 'undefined') {
       document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      return () =>
+        document.removeEventListener('mousedown', handleClickOutside);
     }
   }, []);
 
@@ -110,7 +114,12 @@ export default function NavbarClient() {
   const navigationLinks = [
     { href: '/', label: 'Home', icon: Home },
     { href: '/pricing', label: 'Pricing', icon: DollarSign },
-    { href: '/performance-reports', label: 'Reports', icon: FileText, protected: true },
+    {
+      href: '/performance-reports',
+      label: 'Reports',
+      icon: FileText,
+      protected: true
+    }
   ];
 
   if (showSkeleton) {
@@ -135,9 +144,9 @@ export default function NavbarClient() {
         {navigationLinks.map((link) => {
           const Icon = link.icon;
           const shouldShow = !link.protected || (user && subscription);
-          
+
           if (!shouldShow) return null;
-          
+
           return (
             <Link
               key={link.href}
@@ -165,8 +174,8 @@ export default function NavbarClient() {
                 <Button
                   variant="slim"
                   className={`flex items-center space-x-2 h-9 px-4 py-2 ${
-                    isActive('/dashboard') 
-                      ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' 
+                    isActive('/dashboard')
+                      ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
                       : ''
                   }`}
                 >
@@ -182,10 +191,14 @@ export default function NavbarClient() {
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 className="flex items-center space-x-2 p-1 rounded-full hover:bg-slate-800/50 transition-colors duration-200"
               >
-                <div className={`w-8 h-8 rounded-full ${getAvatarColor()} flex items-center justify-center text-white text-sm font-medium`}>
+                <div
+                  className={`w-8 h-8 rounded-full ${getAvatarColor()} flex items-center justify-center text-white text-sm font-medium`}
+                >
                   {getInitials(user?.user_metadata?.full_name)}
                 </div>
-                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                  className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}
+                />
               </button>
 
               {/* Dropdown Menu */}
@@ -196,12 +209,16 @@ export default function NavbarClient() {
                     <p className="text-sm font-medium text-white">
                       {user?.user_metadata?.full_name || 'User'}
                     </p>
-                    <p className="text-xs text-slate-400 truncate">{user?.email}</p>
+                    <p className="text-xs text-slate-400 truncate">
+                      {user?.email}
+                    </p>
                     {subscription && (
                       <div className="flex items-center space-x-1 mt-1">
                         <Crown className="w-3 h-3 text-yellow-400" />
                         <span className="text-xs text-yellow-400 font-medium">
-                          {(subscription as any)?.prices?.products?.name || 'Pro'} Plan
+                          {(subscription as any)?.prices?.products?.name ||
+                            'Pro'}{' '}
+                          Plan
                         </span>
                       </div>
                     )}
@@ -235,7 +252,9 @@ export default function NavbarClient() {
                       className="flex items-center space-x-3 px-4 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200 w-full"
                     >
                       <LogOut className="w-4 h-4" />
-                      <span>{isSigningOut ? 'Signing out...' : 'Sign out'}</span>
+                      <span>
+                        {isSigningOut ? 'Signing out...' : 'Sign out'}
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -246,12 +265,12 @@ export default function NavbarClient() {
           /* Auth Buttons for non-authenticated users */
           <div className="flex items-center space-x-3">
             <Link href="/signin">
-              <Button variant="slim" className="text-sm">
+              <Button variant="slim" className="text-sm h-9 px-2">
                 Sign in
               </Button>
             </Link>
             <Link href="/signin">
-              <Button className="text-sm flex items-center space-x-2">
+              <Button className="text-sm flex items-center space-x-2 h-9 px-2">
                 <Zap className="w-4 h-4" />
                 <span>Get Started</span>
               </Button>
@@ -279,9 +298,9 @@ export default function NavbarClient() {
             {navigationLinks.map((link) => {
               const Icon = link.icon;
               const shouldShow = !link.protected || (user && subscription);
-              
+
               if (!shouldShow) return null;
-              
+
               return (
                 <Link
                   key={link.href}
