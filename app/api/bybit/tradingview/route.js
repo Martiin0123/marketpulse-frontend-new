@@ -163,6 +163,8 @@ async function sendSuccessDiscordNotification(signal, orderDetails, webhookUrl, 
         case 'CLOSE': return 0xffa500; // Orange
         case 'BUY_CLOSED': return 0x00ff00; // Green (will be overridden by PnL)
         case 'SELL_CLOSED': return 0xff0000; // Red (will be overridden by PnL)
+        case 'CLOSE_BUY': return 0x00ff00; // Green (will be overridden by PnL)
+        case 'CLOSE_SELL': return 0xff0000; // Red (will be overridden by PnL)
         default: return 0x0099ff; // Blue
       }
     };
@@ -183,6 +185,14 @@ async function sendSuccessDiscordNotification(signal, orderDetails, webhookUrl, 
         description = '**BUY** position closed successfully';
         break;
       case 'SELL_CLOSED':
+        title = `✅ ${signal.symbol} SELL closed`;
+        description = '**SELL** position closed successfully';
+        break;
+      case 'CLOSE_BUY':
+        title = `✅ ${signal.symbol} BUY closed`;
+        description = '**BUY** position closed successfully';
+        break;
+      case 'CLOSE_SELL':
         title = `✅ ${signal.symbol} SELL closed`;
         description = '**SELL** position closed successfully';
         break;
@@ -258,7 +268,8 @@ async function sendSuccessDiscordNotification(signal, orderDetails, webhookUrl, 
     
     // Add PnL if available (for CLOSE signals or strategy reversals)
     if (signal.pnl_percentage !== null && signal.pnl_percentage !== undefined && 
-        (signal.action === 'CLOSE' || signal.action === 'BUY_CLOSED' || signal.action === 'SELL_CLOSED')) {
+        (signal.action === 'CLOSE' || signal.action === 'BUY_CLOSED' || signal.action === 'SELL_CLOSED' || 
+         signal.action === 'CLOSE_BUY' || signal.action === 'CLOSE_SELL')) {
       const pnlColor = signal.pnl_percentage >= 0 ? '🟢' : '🔴';
       const pnlSign = signal.pnl_percentage >= 0 ? '+' : '';
       embed.fields.push({
@@ -268,7 +279,8 @@ async function sendSuccessDiscordNotification(signal, orderDetails, webhookUrl, 
       });
       
       // Update embed color based on PnL for close actions
-      if (signal.action === 'CLOSE' || signal.action === 'BUY_CLOSED' || signal.action === 'SELL_CLOSED') {
+      if (signal.action === 'CLOSE' || signal.action === 'BUY_CLOSED' || signal.action === 'SELL_CLOSED' || 
+          signal.action === 'CLOSE_BUY' || signal.action === 'CLOSE_SELL') {
         if (signal.pnl_percentage >= 0) {
           embed.color = 0x00ff00; // Green for profit
         } else {
@@ -875,18 +887,41 @@ export async function POST(request) {
                 pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100;
               }
 
+              // Update the original signal to closed
               await supabase
                 .from('signals')
                 .update({
                   status: 'closed',
                   exit_price: exitPrice,
                   exit_timestamp: validTimestamp,
-                  pnl_percentage: pnlPercentage,
-                  exit_reason: 'direct_signal'
+                  pnl_percentage: pnlPercentage
                 })
                 .eq('id', originalSignal.id);
 
-              console.log('✅ Updated original signal with exit:', {
+              // Create a separate close signal for Discord
+              const closeSignalType = originalSignal.type === 'buy' ? 'close_buy' : 'close_sell';
+              const { data: closeSignal } = await supabase
+                .from('signals')
+                .insert([{
+                  symbol: symbol.toUpperCase(),
+                  type: closeSignalType,
+                  entry_price: exitPrice, // Use exit price as entry for close signal
+                  created_at: validTimestamp,
+                  strategy_name: 'Primescope Crypto',
+                  signal_source: 'ai_algorithm',
+                  exchange: 'bybit',
+                  status: 'closed',
+                  order_id: orderResult.order?.orderId || orderResult.orderId || null,
+                  executed_at: validTimestamp,
+                  exit_price: exitPrice,
+                  exit_timestamp: validTimestamp,
+                  pnl_percentage: pnlPercentage
+                }])
+                .select()
+                .single();
+
+              databaseResult = closeSignal;
+              console.log('✅ Created separate close signal:', {
                 entry_price: entryPrice,
                 exit_price: exitPrice,
                 pnl_percentage: pnlPercentage,
@@ -949,29 +984,48 @@ export async function POST(request) {
                 pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100;
               }
 
-              // Update the existing signal with close data
-              const { data: updatedSignal } = await supabase
+              // Update the existing signal to closed
+              await supabase
                 .from('signals')
                 .update({
                   status: 'closed',
                   exit_price: exitPrice,
                   exit_timestamp: validTimestamp,
-                  pnl_percentage: pnlPercentage,
-                  exit_reason: 'signal_reversal'
+                  pnl_percentage: pnlPercentage
                 })
-                .eq('id', originalSignal.id)
+                .eq('id', originalSignal.id);
+
+              // Create a separate close signal for Discord
+              const closeSignalType = originalSignal.type === 'buy' ? 'close_buy' : 'close_sell';
+              const { data: closeSignal } = await supabase
+                .from('signals')
+                .insert([{
+                  symbol: symbol.toUpperCase(),
+                  type: closeSignalType,
+                  entry_price: exitPrice, // Use exit price as entry for close signal
+                  created_at: validTimestamp,
+                  strategy_name: 'Primescope Crypto',
+                  signal_source: 'ai_algorithm',
+                  exchange: 'bybit',
+                  status: 'closed',
+                  order_id: orderResult.order?.orderId || orderResult.orderId || null,
+                  executed_at: validTimestamp,
+                  exit_price: exitPrice,
+                  exit_timestamp: validTimestamp,
+                  pnl_percentage: pnlPercentage
+                }])
                 .select()
                 .single();
 
-              console.log('✅ Updated existing signal with close data for reversal:', {
+              console.log('✅ Created separate close signal for reversal:', {
                 signal_id: originalSignal.id,
                 entry_price: entryPrice,
                 exit_price: exitPrice,
                 pnl_percentage: pnlPercentage
               });
 
-              // Set databaseResult to the updated signal for Discord notification
-              databaseResult = updatedSignal;
+              // Set databaseResult to the close signal for Discord notification
+              databaseResult = closeSignal;
             }
 
             // Then create new position
@@ -1271,8 +1325,7 @@ export async function POST(request) {
               status: 'closed',
               exit_price: exitPrice,
               exit_timestamp: validTimestamp,
-              pnl_percentage: pnlPercentage,
-              exit_reason: exitReason || 'ma_cross'
+              pnl_percentage: pnlPercentage
             })
             .eq('id', originalSignal.id)
             .select()
