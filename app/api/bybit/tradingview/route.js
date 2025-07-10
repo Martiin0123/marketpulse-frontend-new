@@ -898,30 +898,8 @@ export async function POST(request) {
                 })
                 .eq('id', originalSignal.id);
 
-              // Create a separate close signal for Discord
-              const closeSignalType = originalSignal.type === 'buy' ? 'close_buy' : 'close_sell';
-              const { data: closeSignal } = await supabase
-                .from('signals')
-                .insert([{
-                  symbol: symbol.toUpperCase(),
-                  type: closeSignalType,
-                  entry_price: exitPrice, // Use exit price as entry for close signal
-                  created_at: validTimestamp,
-                  strategy_name: 'Primescope Crypto',
-                  signal_source: 'ai_algorithm',
-                  exchange: 'bybit',
-                  status: 'closed',
-                  order_id: orderResult.order?.orderId || orderResult.orderId || null,
-                  executed_at: validTimestamp,
-                  exit_price: exitPrice,
-                  exit_timestamp: validTimestamp,
-                  pnl_percentage: pnlPercentage
-                }])
-                .select()
-                .single();
-
-              databaseResult = closeSignal;
-              console.log('✅ Created separate close signal:', {
+              databaseResult = originalSignal; // Use original signal for Discord
+              console.log('✅ Updated original signal to closed:', {
                 entry_price: entryPrice,
                 exit_price: exitPrice,
                 pnl_percentage: pnlPercentage,
@@ -995,37 +973,12 @@ export async function POST(request) {
                 })
                 .eq('id', originalSignal.id);
 
-              // Create a separate close signal for Discord
-              const closeSignalType = originalSignal.type === 'buy' ? 'close_buy' : 'close_sell';
-              const { data: closeSignal } = await supabase
-                .from('signals')
-                .insert([{
-                  symbol: symbol.toUpperCase(),
-                  type: closeSignalType,
-                  entry_price: exitPrice, // Use exit price as entry for close signal
-                  created_at: validTimestamp,
-                  strategy_name: 'Primescope Crypto',
-                  signal_source: 'ai_algorithm',
-                  exchange: 'bybit',
-                  status: 'closed',
-                  order_id: orderResult.order?.orderId || orderResult.orderId || null,
-                  executed_at: validTimestamp,
-                  exit_price: exitPrice,
-                  exit_timestamp: validTimestamp,
-                  pnl_percentage: pnlPercentage
-                }])
-                .select()
-                .single();
-
-              console.log('✅ Created separate close signal for reversal:', {
+              console.log('✅ Updated existing signal to closed for reversal:', {
                 signal_id: originalSignal.id,
                 entry_price: entryPrice,
                 exit_price: exitPrice,
                 pnl_percentage: pnlPercentage
               });
-
-              // Set databaseResult to the close signal for Discord notification
-              databaseResult = closeSignal;
             }
 
             // Then create new position
@@ -1061,6 +1014,29 @@ export async function POST(request) {
           if (discordWebhookUrl) {
             const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
             
+            // Ensure originalSignal is available for Discord notifications
+            let originalSignalForDiscord = null;
+            if (actionTaken === 'reversed_to_buy' || actionTaken === 'reversed_to_sell' || actionTaken === 'closed_position') {
+              // Find the original signal for Discord notifications
+              const { data: foundOriginalSignal } = await supabase
+                .from('signals')
+                .select('*')
+                .eq('symbol', symbol.toUpperCase())
+                .in('type', ['buy', 'sell'])
+                .eq('status', 'closed')
+                .eq('exchange', 'bybit')
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+              
+              originalSignalForDiscord = foundOriginalSignal;
+              console.log('🔍 Found original signal for Discord:', originalSignalForDiscord ? {
+                id: originalSignalForDiscord.id,
+                type: originalSignalForDiscord.type,
+                status: originalSignalForDiscord.status
+              } : 'None found');
+            }
+            
             switch (actionTaken) {
               case 'opened_buy':
                 // Send "BUY opened" notification
@@ -1090,8 +1066,10 @@ export async function POST(request) {
                 
               case 'reversed_to_buy':
                 // Send "SELL closed (xxx PnL)" then "BUY opened"
+                console.log('🔄 Sending reversal Discord notifications for BUY');
                 // First, send close notification using the original signal data
-                if (originalSignal) {
+                if (originalSignalForDiscord) {
+                  console.log('📤 Sending SELL_CLOSED Discord notification');
                   await sendSuccessDiscordNotification({
                     symbol: symbol.toUpperCase(),
                     action: 'SELL_CLOSED',
@@ -1101,9 +1079,12 @@ export async function POST(request) {
                     pnl_percentage: pnlPercentage,
                     exitReason: 'signal_reversal'
                   }, orderResult.order || orderResult, discordWebhookUrl);
+                } else {
+                  console.log('⚠️ No original signal found for SELL_CLOSED notification');
                 }
                 
                 // Then send "BUY opened" notification
+                console.log('📤 Sending BUY opened Discord notification');
                 await sendSuccessDiscordNotification({
                   symbol: symbol.toUpperCase(),
                   action: 'BUY',
@@ -1117,8 +1098,10 @@ export async function POST(request) {
                 
               case 'reversed_to_sell':
                 // Send "BUY closed (xxx PnL)" then "SELL opened"
+                console.log('🔄 Sending reversal Discord notifications for SELL');
                 // First, send close notification using the original signal data
-                if (originalSignal) {
+                if (originalSignalForDiscord) {
+                  console.log('📤 Sending BUY_CLOSED Discord notification');
                   await sendSuccessDiscordNotification({
                     symbol: symbol.toUpperCase(),
                     action: 'BUY_CLOSED',
@@ -1128,9 +1111,12 @@ export async function POST(request) {
                     pnl_percentage: pnlPercentage,
                     exitReason: 'signal_reversal'
                   }, orderResult.order || orderResult, discordWebhookUrl);
+                } else {
+                  console.log('⚠️ No original signal found for BUY_CLOSED notification');
                 }
                 
                 // Then send "SELL opened" notification
+                console.log('📤 Sending SELL opened Discord notification');
                 await sendSuccessDiscordNotification({
                   symbol: symbol.toUpperCase(),
                   action: 'SELL',
@@ -1144,7 +1130,7 @@ export async function POST(request) {
                 
               case 'closed_position':
                 // Send "BUY/SELL closed (xxx PnL)" notification
-                const closedAction = originalSignal?.type === 'buy' ? 'BUY_CLOSED' : 'SELL_CLOSED';
+                const closedAction = originalSignalForDiscord?.type === 'buy' ? 'BUY_CLOSED' : 'SELL_CLOSED';
                 await sendSuccessDiscordNotification({
                   symbol: symbol.toUpperCase(),
                   action: closedAction,
@@ -1349,86 +1335,8 @@ export async function POST(request) {
           console.log('🔍 This might be a standalone close signal or the signal was already closed');
         }
 
-        // Send success Discord notification
-        if (discordWebhookUrl) {
-          // Use actual Bybit execution price and calculate PnL
-          const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
-          let pnlPercentage = null;
-          
-          // Calculate PnL if we have the original entry price
-          if (databaseResult?.pnl_percentage !== undefined) {
-            pnlPercentage = databaseResult.pnl_percentage;
-          } else if (orderResult.closedPosition) {
-            // Calculate from position data if available
-            const entryPrice = parseFloat(orderResult.closedPosition.avgPrice || orderResult.closedPosition.entryPrice || 0);
-            const exitPrice = parseFloat(executionPrice);
-            const side = orderResult.closedPosition.side;
-            
-            if (entryPrice > 0 && exitPrice > 0) {
-              if (side === 'Buy') {
-                pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
-              } else if (side === 'Sell') {
-                pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100;
-              }
-            }
-          }
-          
-          await sendSuccessDiscordNotification({
-            symbol: symbol.toUpperCase(),
-            action: orderResult.action || 'CLOSE', // Use proxy response action
-            price: parseFloat(executionPrice),
-            timestamp: validTimestamp,
-            strategy_metadata: strategy_metadata,
-            exitReason: exitReason,
-            dbErrorHint,
-            pnl_percentage: pnlPercentage
-          }, orderResult.order || orderResult, discordWebhookUrl);
-        }
-
-        // Send high-profit trades (>2%) to free webhook as teasers
-        if (pnlPercentage !== null && pnlPercentage > 2 && discordFreeWebhookUrl) {
-          console.log(`🎯 High-profit trade detected (${pnlPercentage.toFixed(2)}%), sending teaser to free webhook`);
-          
-          await sendProfitTeaserNotification({
-            symbol: symbol.toUpperCase(),
-            price: parseFloat(executionPrice),
-            pnl_percentage: pnlPercentage,
-            timestamp: validTimestamp
-          }, orderResult.order || orderResult, discordFreeWebhookUrl);
-        }
-        
-        // Send to free webhook if it's every 5th trade
-        if (isEveryFifthTrade && discordFreeWebhookUrl) {
-          const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
-          let pnlPercentage = null;
-          
-          if (databaseResult?.pnl_percentage !== undefined) {
-            pnlPercentage = databaseResult.pnl_percentage;
-          } else if (orderResult.closedPosition) {
-            const entryPrice = parseFloat(orderResult.closedPosition.avgPrice || orderResult.closedPosition.entryPrice || 0);
-            const exitPrice = parseFloat(executionPrice);
-            const side = orderResult.closedPosition.side;
-            
-            if (entryPrice > 0 && exitPrice > 0) {
-              if (side === 'Buy') {
-                pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
-              } else if (side === 'Sell') {
-                pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100;
-              }
-            }
-          }
-          
-          await sendSuccessDiscordNotification({
-            symbol: symbol.toUpperCase(),
-            action: orderResult.action || 'CLOSE', // Use proxy response action
-            price: parseFloat(executionPrice),
-            timestamp: validTimestamp,
-            strategy_metadata: strategy_metadata,
-            exitReason: exitReason,
-            dbErrorHint,
-            pnl_percentage: pnlPercentage
-          }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
-        }
+        // Discord notifications are handled in the main proxy API call section
+        // No duplicate notifications here
 
         return new Response(JSON.stringify({ 
           message: 'Bybit position close order submitted successfully',
