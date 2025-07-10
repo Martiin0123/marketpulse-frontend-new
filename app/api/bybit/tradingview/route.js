@@ -232,39 +232,6 @@ async function sendSuccessDiscordNotification(signal, orderDetails, webhookUrl, 
       }
     };
 
-    // Add technical indicators if available
-    if (signal.strategy_metadata) {
-      const techFields = [];
-      
-      if (signal.strategy_metadata.rsi_value) {
-        techFields.push({
-          name: '📊 RSI',
-          value: signal.strategy_metadata.rsi_value.toFixed(2),
-          inline: true
-        });
-      }
-      
-      if (signal.strategy_metadata.smoothing_ma) {
-        techFields.push({
-          name: '📈 MA',
-          value: signal.strategy_metadata.smoothing_ma.toFixed(2),
-          inline: true
-        });
-      }
-
-      if (techFields.length > 0) {
-        embed.fields.push(...techFields);
-      }
-    }
-
-    // Add exit reason if available
-    if (signal.exitReason) {
-      embed.fields.push({
-        name: '🚪 Exit Reason',
-        value: signal.exitReason.replace('_', ' ').toUpperCase(),
-        inline: true
-      });
-    }
     
     // Add PnL if available (for CLOSE signals or strategy reversals)
     if (signal.pnl_percentage !== null && signal.pnl_percentage !== undefined && 
@@ -885,6 +852,13 @@ export async function POST(request) {
               } else if (originalSignal.type === 'sell') {
                 pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100;
               }
+              
+              console.log('📊 Calculated PnL for closed_position:', {
+                entry_price: entryPrice,
+                exit_price: exitPrice,
+                pnl_percentage: pnlPercentage,
+                signal_type: originalSignal.type
+              });
 
               // Update the original signal to closed
               await supabase
@@ -1006,22 +980,29 @@ export async function POST(request) {
             // and the new signal for the open message
             databaseResult = newSignal;
             
-            // Check if either the closed signal or new signal ID is divisible by 5 for free webhook
-            const closedSignalId = originalSignal?.id;
-            const newSignalId = newSignal?.id;
-            const shouldSendToFreeWebhook = (closedSignalId && closedSignalId % 5 === 0) || (newSignalId && newSignalId % 5 === 0);
-            
-            if (shouldSendToFreeWebhook && discordFreeWebhookUrl) {
-              console.log(`🎯 Sending reversal to free webhook (closed signal ID: ${closedSignalId}, new signal ID: ${newSignalId})`);
-              await sendSuccessDiscordNotification({
-                symbol: symbol.toUpperCase(),
-                action: actionTaken === 'reversed_to_buy' ? 'BUY' : 'SELL',
-                price: parseFloat(executionPrice),
-                timestamp: validTimestamp,
-                strategy_metadata: strategy_metadata,
-                pnl_percentage: null,
-                exitReason: null
-              }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
+            // Check if this is every 5th trade for free webhook (reversals)
+            if (discordFreeWebhookUrl) {
+              // Count total signals to determine if this is every 5th trade
+              const { count: totalSignals } = await supabase
+                .from('signals')
+                .select('*', { count: 'exact', head: true });
+              
+              const isEveryFifthTrade = totalSignals && (totalSignals % 5 === 0);
+              
+              if (isEveryFifthTrade) {
+                console.log(`🎯 Sending reversal to free webhook (total signals: ${totalSignals})`);
+                await sendSuccessDiscordNotification({
+                  symbol: symbol.toUpperCase(),
+                  action: actionTaken === 'reversed_to_buy' ? 'BUY' : 'SELL',
+                  price: parseFloat(executionPrice),
+                  timestamp: validTimestamp,
+                  strategy_metadata: strategy_metadata,
+                  pnl_percentage: null,
+                  exitReason: null
+                }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
+              } else {
+                console.log(`📊 Not sending reversal to free webhook (total signals: ${totalSignals}, not divisible by 5)`);
+              }
             }
           } else if (actionTaken === 'ignored_signal') {
             console.log('ℹ️ Signal ignored - no action taken');
@@ -1050,7 +1031,8 @@ export async function POST(request) {
               console.log('🔍 Found original signal for Discord:', originalSignalForDiscord ? {
                 id: originalSignalForDiscord.id,
                 type: originalSignalForDiscord.type,
-                status: originalSignalForDiscord.status
+                status: originalSignalForDiscord.status,
+                pnl_percentage: originalSignalForDiscord.pnl_percentage
               } : 'None found');
             }
             
@@ -1148,13 +1130,22 @@ export async function POST(request) {
               case 'closed_position':
                 // Send "BUY/SELL closed (xxx PnL)" notification
                 const closedAction = originalSignalForDiscord?.type === 'buy' ? 'BUY_CLOSED' : 'SELL_CLOSED';
+                
+                // Get PnL from the updated signal data
+                let closePnlPercentage = pnlPercentage;
+                if (originalSignalForDiscord && originalSignalForDiscord.pnl_percentage !== null) {
+                  closePnlPercentage = originalSignalForDiscord.pnl_percentage;
+                }
+                
+                console.log('📊 Sending CLOSE Discord notification with PnL:', closePnlPercentage);
+                
                 await sendSuccessDiscordNotification({
                   symbol: symbol.toUpperCase(),
                   action: closedAction,
                   price: parseFloat(executionPrice),
                   timestamp: validTimestamp,
                   strategy_metadata: strategy_metadata,
-                  pnl_percentage: pnlPercentage,
+                  pnl_percentage: closePnlPercentage,
                   exitReason: 'direct_signal'
                 }, orderResult.order || orderResult, discordWebhookUrl);
                 break;
@@ -1164,20 +1155,29 @@ export async function POST(request) {
                 break;
             }
             
-            // Send to free webhook if signal ID is divisible by 5 (only for new positions)
-            if (databaseResult?.id && (databaseResult.id % 5 === 0) && discordFreeWebhookUrl && (actionTaken === 'opened_buy' || actionTaken === 'opened_sell')) {
-              console.log(`🎯 Sending ${actionTaken === 'opened_buy' ? 'BUY' : 'SELL'} to free webhook (signal ID: ${databaseResult.id})`);
-              await sendSuccessDiscordNotification({
-                symbol: symbol.toUpperCase(),
-                action: actionTaken === 'opened_buy' ? 'BUY' : 'SELL',
-                price: parseFloat(executionPrice),
-                timestamp: validTimestamp,
-                strategy_metadata: strategy_metadata,
-                pnl_percentage: null,
-                exitReason: null
-              }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
-            } else if (databaseResult?.id && (databaseResult.id % 5 === 0) && (actionTaken === 'opened_buy' || actionTaken === 'opened_sell')) {
-              console.log(`⚠️ Would send to free webhook but no free webhook URL configured (signal ID: ${databaseResult.id})`);
+            // Send to free webhook if it's every 5th trade (only for new positions)
+            if (discordFreeWebhookUrl && (actionTaken === 'opened_buy' || actionTaken === 'opened_sell')) {
+              // Count total signals to determine if this is every 5th trade
+              const { count: totalSignals } = await supabase
+                .from('signals')
+                .select('*', { count: 'exact', head: true });
+              
+              const isEveryFifthTrade = totalSignals && (totalSignals % 5 === 0);
+              
+              if (isEveryFifthTrade) {
+                console.log(`🎯 Sending ${actionTaken === 'opened_buy' ? 'BUY' : 'SELL'} to free webhook (total signals: ${totalSignals})`);
+                await sendSuccessDiscordNotification({
+                  symbol: symbol.toUpperCase(),
+                  action: actionTaken === 'opened_buy' ? 'BUY' : 'SELL',
+                  price: parseFloat(executionPrice),
+                  timestamp: validTimestamp,
+                  strategy_metadata: strategy_metadata,
+                  pnl_percentage: null,
+                  exitReason: null
+                }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
+              } else {
+                console.log(`📊 Not sending to free webhook (total signals: ${totalSignals}, not divisible by 5)`);
+              }
             }
 
             // Send high-profit trades (>2%) to free webhook as teasers
