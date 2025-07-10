@@ -1391,7 +1391,7 @@ export async function POST(request) {
         dbErrorHint = '⚠️ Signal was NOT saved to the database due to rate limit or DB error.';
         // Return success even if database fails
         if (discordWebhookUrl) {
-          const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || currentPrice;
+          const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.currentPrice || 0;
           
           await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
