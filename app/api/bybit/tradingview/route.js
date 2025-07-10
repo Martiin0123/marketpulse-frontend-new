@@ -819,6 +819,13 @@ export async function POST(request) {
         const actionTaken = orderResult.action || action;
         let pnlPercentage = null;
         
+        // Initialize pnlPercentage to avoid undefined errors
+        if (orderResult.currentPrice && orderResult.order?.avgPrice) {
+          // Calculate PnL if we have price data
+          const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
+          // Note: PnL calculation will be done in specific sections based on action_taken
+        }
+        
         // Handle database operations based on proxy response
         try {
           // Check what action the proxy actually took
@@ -1389,6 +1396,10 @@ export async function POST(request) {
         console.error('❌ Database error (rate limit?), but order was successful:', dbError);
         signalSaved = false;
         dbErrorHint = '⚠️ Signal was NOT saved to the database due to rate limit or DB error.';
+        
+        // Initialize pnlPercentage to avoid undefined error
+        let pnlPercentage = null;
+        
         // Return success even if database fails
         if (discordWebhookUrl) {
           const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.currentPrice || 0;
@@ -1401,7 +1412,7 @@ export async function POST(request) {
             strategy_metadata: strategy_metadata,
             exitReason: exitReason,
             dbErrorHint,
-            pnl_percentage: null
+            pnl_percentage: pnlPercentage
           }, orderResult.order || orderResult, discordWebhookUrl);
         }
         return new Response(JSON.stringify({ 
