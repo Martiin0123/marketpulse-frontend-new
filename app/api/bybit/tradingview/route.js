@@ -755,29 +755,10 @@ export async function POST(request) {
     const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
     const discordFreeWebhookUrl = process.env.DISCORD_WEBHOOK_URL_FREE;
     
-    // Get trade counter from database or initialize (make it optional to avoid rate limits)
+    // Simplified trade counter - skip database operations to avoid hanging
     let tradeCounter = 1;
     let isEveryFifthTrade = false;
     let dbErrorHint = null;
-    try {
-      const { data: counterData } = await supabase
-        .from('trade_counter')
-        .select('counter')
-        .single();
-      if (counterData) {
-        tradeCounter = counterData.counter + 1;
-      }
-      // Update counter in database
-      await supabase
-        .from('trade_counter')
-        .upsert({ id: 1, counter: tradeCounter, updated_at: new Date().toISOString() });
-      isEveryFifthTrade = tradeCounter % 5 === 0;
-      console.log(`📊 Trade counter: ${tradeCounter}${isEveryFifthTrade ? ' (5th trade - sending to both webhooks)' : ''}`);
-    } catch (error) {
-      dbErrorHint = '⚠️ Signal was NOT saved to the database due to rate limit or DB error.';
-      console.log('⚠️ Could not get trade counter (rate limit?), using default:', error.message);
-      // Don't fail the entire request if trade counter fails
-    }
 
     console.log('🔍 Starting Bybit API calls...');
     
@@ -789,8 +770,9 @@ export async function POST(request) {
     let signalSaved = true;
 
     // Handle direct BUY/SELL signals (no position management needed)
-    if (signalType === 'direct') {
+    if (signalType === 'direct' || signalType === 'entry') {
       console.log('🔄 Processing direct BUY/SELL signal...');
+      console.log('🔍 Entering proxy API call section...');
       
       try {
         // Use proxy to execute the signal directly
@@ -801,23 +783,37 @@ export async function POST(request) {
         };
 
         console.log('📤 Submitting direct signal to proxy:', signalPayload);
+        console.log('🔑 Proxy secret available:', !!process.env.PROXY_APP_SECRET);
         
-        const response = await fetch('https://primescope-tradeapi-production.up.railway.app/place-order', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.PROXY_APP_SECRET}`
-          },
-          body: JSON.stringify(signalPayload)
-        });
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+          
+          const response = await fetch('https://primescope-tradeapi-production.up.railway.app/place-order', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.PROXY_APP_SECRET}`
+            },
+            body: JSON.stringify(signalPayload),
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Direct signal failed: ${response.status} ${response.statusText} - ${errorText}`);
+          console.log('📡 Proxy response status:', response.status);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Direct signal failed: ${response.status} ${response.statusText} - ${errorText}`);
+          }
+
+          orderResult = await response.json();
+          console.log('📥 Direct signal response:', JSON.stringify(orderResult, null, 2));
+        } catch (fetchError) {
+          console.error('❌ Error calling proxy API:', fetchError);
+          throw new Error(`Proxy API call failed: ${fetchError.message}`);
         }
-
-        orderResult = await response.json();
-        console.log('📥 Direct signal response:', JSON.stringify(orderResult, null, 2));
 
         // Use the actual action from Bybit proxy response
         const actionTaken = orderResult.action || action;
