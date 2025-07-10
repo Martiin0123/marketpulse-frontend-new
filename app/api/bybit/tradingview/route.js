@@ -1010,6 +1010,7 @@ export async function POST(request) {
 
           // Send Discord notification based on action_taken
           if (discordWebhookUrl) {
+            console.log('📤 Sending Discord notifications for action:', actionTaken);
             const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
             
             // Ensure originalSignal is available for Discord notifications
@@ -1039,6 +1040,7 @@ export async function POST(request) {
             switch (actionTaken) {
               case 'opened_buy':
                 // Send "BUY opened" notification
+                console.log('📤 Sending BUY opened Discord notification');
                 await sendSuccessDiscordNotification({
                   symbol: symbol.toUpperCase(),
                   action: 'BUY',
@@ -1052,6 +1054,7 @@ export async function POST(request) {
                 
               case 'opened_sell':
                 // Send "SELL opened" notification
+                console.log('📤 Sending SELL opened Discord notification');
                 await sendSuccessDiscordNotification({
                   symbol: symbol.toUpperCase(),
                   action: 'SELL',
@@ -1157,12 +1160,18 @@ export async function POST(request) {
             
             // Send to free webhook if it's every 5th trade (only for new positions)
             if (discordFreeWebhookUrl && (actionTaken === 'opened_buy' || actionTaken === 'opened_sell')) {
+              console.log('🔍 Checking free webhook for new position...');
+              
               // Count total signals to determine if this is every 5th trade
               const { count: totalSignals } = await supabase
                 .from('signals')
                 .select('*', { count: 'exact', head: true });
               
+              console.log(`📊 Total signals in database: ${totalSignals}`);
+              
               const isEveryFifthTrade = totalSignals && (totalSignals % 5 === 0);
+              
+              console.log(`🔢 Is every 5th trade? ${isEveryFifthTrade} (${totalSignals} % 5 = ${totalSignals % 5})`);
               
               if (isEveryFifthTrade) {
                 console.log(`🎯 Sending ${actionTaken === 'opened_buy' ? 'BUY' : 'SELL'} to free webhook (total signals: ${totalSignals})`);
@@ -1178,6 +1187,8 @@ export async function POST(request) {
               } else {
                 console.log(`📊 Not sending to free webhook (total signals: ${totalSignals}, not divisible by 5)`);
               }
+            } else {
+              console.log(`⚠️ Free webhook check skipped: discordFreeWebhookUrl=${!!discordFreeWebhookUrl}, actionTaken=${actionTaken}`);
             }
 
             // Send high-profit trades (>2%) to free webhook as teasers
