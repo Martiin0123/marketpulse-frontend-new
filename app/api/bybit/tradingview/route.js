@@ -767,8 +767,7 @@ export async function POST(request) {
     const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
     const discordFreeWebhookUrl = process.env.DISCORD_WEBHOOK_URL_FREE;
     
-    // Simplified trade counter - skip database operations to avoid hanging
-    let tradeCounter = 1;
+    // Trade counter for Discord webhook management - using signal ID
     let isEveryFifthTrade = false;
     let dbErrorHint = null;
 
@@ -1006,6 +1005,24 @@ export async function POST(request) {
             // For Discord notifications, we'll use the updated signal for the close message
             // and the new signal for the open message
             databaseResult = newSignal;
+            
+            // Check if either the closed signal or new signal ID is divisible by 5 for free webhook
+            const closedSignalId = originalSignal?.id;
+            const newSignalId = newSignal?.id;
+            const shouldSendToFreeWebhook = (closedSignalId && closedSignalId % 5 === 0) || (newSignalId && newSignalId % 5 === 0);
+            
+            if (shouldSendToFreeWebhook && discordFreeWebhookUrl) {
+              console.log(`🎯 Sending reversal to free webhook (closed signal ID: ${closedSignalId}, new signal ID: ${newSignalId})`);
+              await sendSuccessDiscordNotification({
+                symbol: symbol.toUpperCase(),
+                action: actionTaken === 'reversed_to_buy' ? 'BUY' : 'SELL',
+                price: parseFloat(executionPrice),
+                timestamp: validTimestamp,
+                strategy_metadata: strategy_metadata,
+                pnl_percentage: null,
+                exitReason: null
+              }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
+            }
           } else if (actionTaken === 'ignored_signal') {
             console.log('ℹ️ Signal ignored - no action taken');
           }
@@ -1147,8 +1164,9 @@ export async function POST(request) {
                 break;
             }
             
-            // Send to free webhook if it's every 5th trade (only for new positions)
-            if (isEveryFifthTrade && discordFreeWebhookUrl && (actionTaken === 'opened_buy' || actionTaken === 'opened_sell')) {
+            // Send to free webhook if signal ID is divisible by 5 (only for new positions)
+            if (databaseResult?.id && (databaseResult.id % 5 === 0) && discordFreeWebhookUrl && (actionTaken === 'opened_buy' || actionTaken === 'opened_sell')) {
+              console.log(`🎯 Sending ${actionTaken === 'opened_buy' ? 'BUY' : 'SELL'} to free webhook (signal ID: ${databaseResult.id})`);
               await sendSuccessDiscordNotification({
                 symbol: symbol.toUpperCase(),
                 action: actionTaken === 'opened_buy' ? 'BUY' : 'SELL',
@@ -1158,6 +1176,8 @@ export async function POST(request) {
                 pnl_percentage: null,
                 exitReason: null
               }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
+            } else if (databaseResult?.id && (databaseResult.id % 5 === 0) && (actionTaken === 'opened_buy' || actionTaken === 'opened_sell')) {
+              console.log(`⚠️ Would send to free webhook but no free webhook URL configured (signal ID: ${databaseResult.id})`);
             }
 
             // Send high-profit trades (>2%) to free webhook as teasers
