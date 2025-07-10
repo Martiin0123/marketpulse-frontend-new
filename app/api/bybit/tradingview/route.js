@@ -925,35 +925,7 @@ export async function POST(request) {
             // and the new signal for the open message
             databaseResult = newSignal;
             
-            // Check if this is every 5th trade for free webhook (reversals)
-            if (discordFreeWebhookUrl) {
-              // Count total signals BEFORE the new signal was inserted
-              const { count: totalSignalsBefore } = await supabase
-                .from('signals')
-                .select('*', { count: 'exact', head: true });
-              
-              // The new signal will be the next one, so check if (count + 1) is divisible by 5
-              const totalSignalsAfter = totalSignalsBefore + 1;
-              const isEveryFifthTrade = totalSignalsAfter % 5 === 0;
-              
-              console.log(`📊 Reversal - Total signals before: ${totalSignalsBefore}, after: ${totalSignalsAfter}`);
-              console.log(`🔢 Is every 5th trade? ${isEveryFifthTrade} (${totalSignalsAfter} % 5 = ${totalSignalsAfter % 5})`);
-              
-              if (isEveryFifthTrade) {
-                console.log(`🎯 Sending reversal to free webhook (trade #${totalSignalsAfter})`);
-                await sendSuccessDiscordNotification({
-                  symbol: symbol.toUpperCase(),
-                  action: actionTaken === 'reversed_to_buy' ? 'BUY' : 'SELL',
-                  price: parseFloat(executionPrice),
-                  timestamp: validTimestamp,
-                  strategy_metadata: strategy_metadata,
-                  pnl_percentage: null,
-                  exitReason: null
-                }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
-              } else {
-                console.log(`📊 Not sending reversal to free webhook (trade #${totalSignalsAfter}, not divisible by 5)`);
-              }
-            }
+
           } else if (actionTaken === 'ignored_signal') {
             console.log('ℹ️ Signal ignored - no action taken');
           }
@@ -1108,9 +1080,9 @@ export async function POST(request) {
                 break;
             }
             
-            // Send to free webhook if it's every 5th trade (only for new positions)
-            if (discordFreeWebhookUrl && (actionTaken === 'opened_buy' || actionTaken === 'opened_sell')) {
-              console.log('🔍 Checking free webhook for new position...');
+            // Send to free webhook if it's every 5th trade
+            if (discordFreeWebhookUrl) {
+              console.log('🔍 Checking free webhook...');
               
               // Count total signals BEFORE the new signal was inserted
               const { count: totalSignalsBefore } = await supabase
@@ -1125,10 +1097,10 @@ export async function POST(request) {
               console.log(`🔢 Is every 5th trade? ${isEveryFifthTrade} (${totalSignalsAfter} % 5 = ${totalSignalsAfter % 5})`);
               
               if (isEveryFifthTrade) {
-                console.log(`🎯 Sending ${actionTaken === 'opened_buy' ? 'BUY' : 'SELL'} to free webhook (trade #${totalSignalsAfter})`);
+                console.log(`🎯 Sending to free webhook (trade #${totalSignalsAfter})`);
                 await sendSuccessDiscordNotification({
                   symbol: symbol.toUpperCase(),
-                  action: actionTaken === 'opened_buy' ? 'BUY' : 'SELL',
+                  action: actionTaken === 'opened_buy' ? 'BUY' : actionTaken === 'opened_sell' ? 'SELL' : actionTaken === 'reversed_to_buy' ? 'BUY' : actionTaken === 'reversed_to_sell' ? 'SELL' : 'CLOSE',
                   price: parseFloat(executionPrice),
                   timestamp: validTimestamp,
                   strategy_metadata: strategy_metadata,
@@ -1138,8 +1110,6 @@ export async function POST(request) {
               } else {
                 console.log(`📊 Not sending to free webhook (trade #${totalSignalsAfter}, not divisible by 5)`);
               }
-            } else {
-              console.log(`⚠️ Free webhook check skipped: discordFreeWebhookUrl=${!!discordFreeWebhookUrl}, actionTaken=${actionTaken}`);
             }
 
             // Send high-profit trades (>2%) to free webhook as teasers
