@@ -480,13 +480,94 @@ export async function POST(request) {
     });
     
     console.log('📨 About to parse request body...');
-    const body = await request.json();
-    console.log('📨 Request body parsed successfully:', body);
+    let body;
+    try {
+      const rawBody = await request.text();
+      console.log('📨 Raw request body:', rawBody);
+      
+      // Try to parse JSON, handle malformed JSON
+      try {
+        body = JSON.parse(rawBody);
+        console.log('📨 Request body parsed successfully:', body);
+      } catch (jsonError) {
+        console.error('❌ JSON parse error:', jsonError.message);
+        console.log('📨 Attempting to clean malformed JSON...');
+        
+        // Try to extract valid JSON from malformed content
+        const jsonMatch = rawBody.match(/\{.*\}/s);
+        if (jsonMatch) {
+          try {
+            body = JSON.parse(jsonMatch[0]);
+            console.log('📨 Cleaned JSON parsed successfully:', body);
+          } catch (cleanError) {
+            console.error('❌ Failed to clean JSON:', cleanError.message);
+            return new Response(JSON.stringify({ 
+              error: 'Invalid JSON format',
+              details: 'Request body contains malformed JSON',
+              received: rawBody.substring(0, 200) + '...'
+            }), { 
+              status: 400,
+              headers: headers
+            });
+          }
+        } else {
+          console.error('❌ No valid JSON found in request body');
+          console.log('📨 Attempting to parse as text alert...');
+          
+          // Try to parse as text alert (Pine Script format)
+          try {
+            const textAlert = parseAIAlgorithmAlert(rawBody);
+            if (textAlert.symbol && textAlert.action) {
+              body = {
+                alert_message: rawBody,
+                ...textAlert
+              };
+              console.log('📨 Parsed as text alert:', body);
+            } else {
+              return new Response(JSON.stringify({ 
+                error: 'No valid JSON or text alert found',
+                details: 'Request body does not contain valid JSON or recognizable alert format',
+                received: rawBody.substring(0, 200) + '...'
+              }), { 
+                status: 400,
+                headers: headers
+              });
+            }
+          } catch (textError) {
+            console.error('❌ Failed to parse as text alert:', textError);
+            return new Response(JSON.stringify({ 
+              error: 'No valid JSON or text alert found',
+              details: 'Request body does not contain valid JSON or recognizable alert format',
+              received: rawBody.substring(0, 200) + '...'
+            }), { 
+              status: 400,
+              headers: headers
+            });
+          }
+        }
+      }
+    } catch (requestError) {
+      console.error('❌ Error reading request body:', requestError);
+      return new Response(JSON.stringify({ 
+        error: 'Failed to read request body',
+        details: requestError.message
+      }), { 
+        status: 400,
+        headers: headers
+      });
+    }
     
     // Handle multiple alert formats
     console.log('🔍 About to parse signal data...');
     let signalData;
     try {
+      // Validate that body is an object
+      if (!body || typeof body !== 'object') {
+        throw new Error('Request body must be a JSON object');
+      }
+      
+      console.log('📨 Body keys:', Object.keys(body));
+      
       if (body.alert_message) {
         // Parse Pine Script alert message (text format)
         console.log('📨 Parsing Pine Script alert message...');
@@ -538,7 +619,8 @@ export async function POST(request) {
       console.error('❌ Error parsing signal data:', parseError);
       return new Response(JSON.stringify({ 
         error: 'Failed to parse signal data',
-        details: parseError.message
+        details: parseError.message,
+        receivedBody: body
       }), { 
         status: 400,
         headers: headers
