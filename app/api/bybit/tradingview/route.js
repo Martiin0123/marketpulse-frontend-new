@@ -776,13 +776,13 @@ export async function POST(request) {
         orderResult = await response.json();
         console.log('📥 Direct signal response:', JSON.stringify(orderResult, null, 2));
 
-        // Handle single action (no position management needed)
+        // Use the actual action from Bybit proxy response
         const actionTaken = orderResult.action || action;
         let pnlPercentage = null;
         
-        // Check if SELL should close an existing BUY position
+        // Check if the proxy response indicates this is closing a position
         let shouldClosePosition = false;
-        if (actionTaken === 'SELL') {
+        if (actionTaken === 'SELL' || actionTaken === 'CLOSE') {
           // Check if there's an active BUY position to close
           const { data: activePosition } = await supabase
             .from('signals')
@@ -797,7 +797,7 @@ export async function POST(request) {
             
           if (activePosition) {
             shouldClosePosition = true;
-            console.log('🔄 SELL signal will close existing BUY position');
+            console.log('🔄 Proxy response indicates position close:', actionTaken);
           }
         }
         
@@ -874,8 +874,8 @@ export async function POST(request) {
           if (discordWebhookUrl) {
             const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
             
-            // Use CLOSE action when closing positions, original action otherwise
-            const displayAction = (actionTaken === 'CLOSE' || shouldClosePosition) ? 'CLOSE' : actionTaken;
+            // Use the actual action from proxy response, but show CLOSE when closing positions
+            const displayAction = shouldClosePosition ? 'CLOSE' : actionTaken;
             
             await sendSuccessDiscordNotification({
               symbol: symbol.toUpperCase(),
@@ -884,7 +884,7 @@ export async function POST(request) {
               timestamp: validTimestamp,
               strategy_metadata: strategy_metadata,
               pnl_percentage: pnlPercentage,
-              exitReason: (actionTaken === 'CLOSE' || shouldClosePosition) ? 'direct_signal' : null
+              exitReason: shouldClosePosition ? 'direct_signal' : null
             }, orderResult.order || orderResult, discordWebhookUrl);
             
             // Send to free webhook if it's every 5th trade
@@ -896,7 +896,7 @@ export async function POST(request) {
                 timestamp: validTimestamp,
                 strategy_metadata: strategy_metadata,
                 pnl_percentage: pnlPercentage,
-                exitReason: (actionTaken === 'CLOSE' || shouldClosePosition) ? 'direct_signal' : null
+                exitReason: shouldClosePosition ? 'direct_signal' : null
               }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
             }
 
@@ -1255,12 +1255,13 @@ export async function POST(request) {
 
         // Send success Discord notification
         if (discordWebhookUrl) {
-          // Use actual Bybit execution price
+          // Use actual Bybit execution price and action from proxy response
           const executionPrice = orderResult.currentPrice || orderResult.avgPrice || orderResult.price || orderResult.order?.avgPrice || 0;
+          const proxyAction = orderResult.action || (isBuy ? 'BUY' : 'SELL');
           
           await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
-            action: isBuy ? 'BUY' : 'SELL',
+            action: proxyAction,
             price: parseFloat(executionPrice),
             timestamp: validTimestamp,
             quantity: orderResult.qty || orderResult.calculatedQuantity,
@@ -1290,10 +1291,11 @@ export async function POST(request) {
 
         if (discordWebhookUrl) {
           const executionPrice = orderResult.currentPrice || orderResult.avgPrice || orderResult.price || orderResult.order?.avgPrice || 0;
+          const proxyAction = orderResult.action || (isBuy ? 'BUY' : 'SELL');
           
           await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
-            action: isBuy ? 'BUY' : 'SELL',
+            action: proxyAction,
             price: parseFloat(executionPrice),
             timestamp: validTimestamp,
             quantity: orderResult.qty || orderResult.calculatedQuantity,
