@@ -28,6 +28,7 @@ import {
   Trophy,
   Target
 } from 'lucide-react';
+import Button from '@/components/ui/Button';
 
 // Define referral types manually since they're not in the generated types yet
 type ReferralCode = {
@@ -307,12 +308,14 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
                     <div className="bg-gray-700 rounded-lg px-4 py-3 flex-1 font-mono text-lg text-white">
                       {referralCode.code}
                     </div>
-                    <button
+                    <Button
                       onClick={() => copyToClipboard(referralCode.code)}
-                      className="p-3 bg-purple-500 hover:bg-purple-600 rounded-lg transition-colors"
+                      variant="outline"
+                      size="sm"
+                      className="p-3"
                     >
                       <Copy className="w-5 h-5 text-white" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -325,12 +328,14 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
                     <div className="bg-gray-700 rounded-lg px-4 py-3 flex-1 text-white break-all">
                       {referralUrl}
                     </div>
-                    <button
+                    <Button
                       onClick={() => copyToClipboard(referralUrl)}
-                      className="p-3 bg-purple-500 hover:bg-purple-600 rounded-lg transition-colors"
+                      variant="outline"
+                      size="sm"
+                      className="p-3"
                     >
                       <Copy className="w-5 h-5 text-white" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -340,27 +345,30 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
                     Share via
                   </h3>
                   <div className="grid grid-cols-1 gap-3">
-                    <button
+                    <Button
                       onClick={shareViaEmail}
-                      className="flex items-center justify-center space-x-3 p-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+                      variant="ghost"
+                      className="flex items-center justify-center space-x-3 p-3"
                     >
                       <Mail className="w-5 h-5 text-gray-300" />
                       <span className="text-white">Email</span>
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={shareViaTwitter}
-                      className="flex items-center justify-center space-x-3 p-3 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                      variant="primary"
+                      className="flex items-center justify-center space-x-3 p-3"
                     >
                       <Twitter className="w-5 h-5 text-white" />
                       <span className="text-white">Twitter</span>
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={shareViaFacebook}
-                      className="flex items-center justify-center space-x-3 p-3 bg-blue-800 hover:bg-blue-900 rounded-lg transition-colors"
+                      variant="primary"
+                      className="flex items-center justify-center space-x-3 p-3 bg-blue-800 hover:bg-blue-900"
                     >
                       <Facebook className="w-5 h-5 text-white" />
                       <span className="text-white">Facebook</span>
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </>
@@ -378,13 +386,14 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
                     Create your unique referral code to start earning rewards
                   </p>
                 </div>
-                <button
+                <Button
                   onClick={createReferralCode}
                   disabled={loading}
-                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all duration-200"
+                  variant="primary"
+                  size="lg"
                 >
                   {loading ? 'Creating...' : 'Create Referral Code'}
-                </button>
+                </Button>
               </div>
             )}
           </div>

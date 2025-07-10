@@ -294,13 +294,13 @@ export default function CopyTradingDashboard() {
               </div>
             </div>
             <div className="flex gap-4">
-              <Button type="submit" className="bg-green-600 hover:bg-green-700">
+              <Button type="submit" variant="primary">
                 Create Relationship
               </Button>
               <Button
                 type="button"
+                variant="ghost"
                 onClick={() => setShowCreateForm(false)}
-                className="bg-gray-600 hover:bg-gray-700"
               >
                 Cancel
               </Button>
@@ -367,7 +367,8 @@ export default function CopyTradingDashboard() {
                   setFormData({ ...formData, leaderId: leader.leader_id });
                   setShowCreateForm(true);
                 }}
-                className="w-full mt-3 bg-blue-600 hover:bg-blue-700"
+                variant="primary"
+                className="w-full mt-3"
               >
                 Copy This Leader
               </Button>
@@ -438,7 +439,8 @@ export default function CopyTradingDashboard() {
                     onClick={() =>
                       updateRelationship(relationship.id, { status: 'paused' })
                     }
-                    className="bg-yellow-600 hover:bg-yellow-700"
+                    variant="outline"
+                    size="sm"
                   >
                     Pause
                   </Button>
@@ -446,13 +448,16 @@ export default function CopyTradingDashboard() {
                     onClick={() =>
                       updateRelationship(relationship.id, { status: 'active' })
                     }
-                    className="bg-green-600 hover:bg-green-700"
+                    variant="primary"
+                    size="sm"
                   >
                     Resume
                   </Button>
                   <Button
                     onClick={() => deleteRelationship(relationship.id)}
-                    className="bg-red-600 hover:bg-red-700"
+                    variant="outline"
+                    size="sm"
+                    className="text-red-400 border-red-400 hover:bg-red-500/10"
                   >
                     Delete
                   </Button>

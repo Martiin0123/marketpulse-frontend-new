@@ -32,7 +32,12 @@ interface Props {
 }
 
 export default function SignalsTab({ signals: initialSignals }: Props) {
-  const [signals, setSignals] = useState<Signal[]>(initialSignals);
+  // Sort initial signals by date (latest first)
+  const sortedInitialSignals = [...initialSignals].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+  const [signals, setSignals] = useState<Signal[]>(sortedInitialSignals);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<
     'all' | 'buy' | 'sell' | 'close'
@@ -52,7 +57,7 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
       try {
         // Avoid duplicate subscriptions
         if (isSubscribed) return;
-        
+
         channel = supabase
           .channel('signals-changes-signalstab')
           .on(
@@ -67,9 +72,11 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
                 setSignals((current) => {
                   const newSignal = payload.new as Signal;
                   // Prevent duplicate signals
-                  const existingSignal = current.find(s => s.id === newSignal.id);
+                  const existingSignal = current.find(
+                    (s) => s.id === newSignal.id
+                  );
                   if (existingSignal) return current;
-                  
+
                   const newSignals = [...current, newSignal];
                   return newSignals.sort(
                     (a, b) =>
@@ -80,7 +87,9 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
               } else if (payload.eventType === 'UPDATE') {
                 setSignals((current) =>
                   current.map((signal) =>
-                    signal.id === payload.new.id ? (payload.new as Signal) : signal
+                    signal.id === payload.new.id
+                      ? (payload.new as Signal)
+                      : signal
                   )
                 );
               }
@@ -123,7 +132,7 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
     return matchesSearch && matchesType && matchesStatus && matchesExchange;
   });
 
-  // Calculate statistics - only count completed trades (BUY signals that are closed)
+  // Calculate statistics - only count completed trades (closed signals with P&L)
   const totalSignals = signals.length;
   const buySignals = signals.filter((signal) => signal.type === 'buy');
   const sellSignals = signals.filter((signal) => signal.type === 'sell');
@@ -133,10 +142,7 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
     (signal) => signal.status === 'active' || signal.status === 'executed'
   );
   const completedTrades = signals.filter(
-    (signal) =>
-      signal.type === 'buy' &&
-      signal.status === 'closed' &&
-      signal.pnl_percentage !== null
+    (signal) => signal.status === 'closed' && signal.pnl_percentage !== null
   );
   const winningTrades = completedTrades.filter(
     (signal) => (signal.pnl_percentage || 0) > 0

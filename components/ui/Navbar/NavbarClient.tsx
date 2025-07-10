@@ -173,7 +173,8 @@ export default function NavbarClient() {
               <Link href="/dashboard">
                 <Button
                   variant="slim"
-                  className={`flex items-center space-x-2 h-9 px-4 py-2 ${
+                  size="sm"
+                  className={`flex items-center space-x-2 ${
                     isActive('/dashboard')
                       ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
                       : ''
@@ -265,12 +266,16 @@ export default function NavbarClient() {
           /* Auth Buttons for non-authenticated users */
           <div className="flex items-center space-x-3">
             <Link href="/signin">
-              <Button variant="slim" className="text-sm h-9 px-2">
+              <Button variant="slim" size="sm">
                 Sign in
               </Button>
             </Link>
             <Link href="/signin">
-              <Button className="text-sm flex items-center space-x-2 h-9 px-2">
+              <Button
+                variant="primary"
+                size="sm"
+                className="flex items-center space-x-2"
+              >
                 <Zap className="w-4 h-4" />
                 <span>Get Started</span>
               </Button>

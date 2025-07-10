@@ -106,7 +106,7 @@ export default async function PerformanceReports() {
     (signal) => signal.status === 'closed' && signal.pnl_percentage !== null
   );
 
-  const totalTrades = signals.filter((signal) => signal.type === 'buy').length;
+  const totalTrades = signals.length;
   const profitableTrades = completedTrades.filter(
     (signal) => (signal.pnl_percentage || 0) > 0
   ).length;

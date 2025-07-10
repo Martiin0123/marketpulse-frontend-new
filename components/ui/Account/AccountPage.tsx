@@ -26,6 +26,7 @@ import { handleRequest } from '@/utils/auth-helpers/client';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import CustomerPortalForm from '@/components/ui/AccountForms/CustomerPortalForm';
+import Button from '@/components/ui/Button';
 
 type Subscription = Tables<'subscriptions'>;
 type Price = Database['public']['Tables']['prices']['Row'];
@@ -116,7 +117,7 @@ export default function AccountPage({
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       alert('New passwords do not match');
       return;
@@ -152,7 +153,10 @@ export default function AccountPage({
     }
   };
 
-  const handleNotificationToggle = async (type: 'email' | 'trading', value: boolean) => {
+  const handleNotificationToggle = async (
+    type: 'email' | 'trading',
+    value: boolean
+  ) => {
     try {
       // Update user metadata with notification preferences
       const { error } = await supabase.auth.updateUser({
@@ -268,23 +272,27 @@ export default function AccountPage({
                       maxLength={64}
                     />
                     <div className="flex space-x-2">
-                      <button
+                      <Button
                         type="submit"
+                        variant="primary"
+                        size="sm"
                         disabled={isLoading}
-                        className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center"
+                        className="flex-1"
                       >
                         <Check className="w-4 h-4" />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => {
                           setIsEditingName(false);
                           setFullName(userDetails?.full_name || '');
                         }}
-                        className="flex-1 bg-slate-600 hover:bg-slate-700 text-white px-3 py-2 rounded-lg transition-colors flex items-center justify-center"
+                        className="flex-1"
                       >
                         <X className="w-4 h-4" />
-                      </button>
+                      </Button>
                     </div>
                   </form>
                 ) : (
@@ -313,26 +321,34 @@ export default function AccountPage({
 
               {/* Account Stats */}
               <div className="border-t border-slate-700 pt-6">
-                <h3 className="text-sm font-medium text-slate-300 mb-4">Account Details</h3>
+                <h3 className="text-sm font-medium text-slate-300 mb-4">
+                  Account Details
+                </h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-slate-400">Member since</span>
                     <span className="text-sm text-white">
-                      {new Date(user?.created_at || '').toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })}
+                      {new Date(user?.created_at || '').toLocaleDateString(
+                        'en-US',
+                        {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        }
+                      )}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-slate-400">Last sign in</span>
                     <span className="text-sm text-white">
                       {user?.last_sign_in_at
-                        ? new Date(user.last_sign_in_at).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric'
-                          })
+                        ? new Date(user.last_sign_in_at).toLocaleDateString(
+                            'en-US',
+                            {
+                              month: 'short',
+                              day: 'numeric'
+                            }
+                          )
                         : 'Never'}
                     </span>
                   </div>
@@ -350,8 +366,12 @@ export default function AccountPage({
                   <UserIcon className="w-5 h-5 text-blue-400" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Personal Information</h3>
-                  <p className="text-sm text-slate-400">Update your personal details</p>
+                  <h3 className="text-lg font-semibold text-white">
+                    Personal Information
+                  </h3>
+                  <p className="text-sm text-slate-400">
+                    Update your personal details
+                  </p>
                 </div>
               </div>
 
@@ -392,8 +412,12 @@ export default function AccountPage({
                   <CreditCard className="w-5 h-5 text-emerald-400" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Subscription & Billing</h3>
-                  <p className="text-sm text-slate-400">Manage your subscription and billing details</p>
+                  <h3 className="text-lg font-semibold text-white">
+                    Subscription & Billing
+                  </h3>
+                  <p className="text-sm text-slate-400">
+                    Manage your subscription and billing details
+                  </p>
                 </div>
               </div>
 
@@ -426,7 +450,9 @@ export default function AccountPage({
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-white">Security</h3>
-                  <p className="text-sm text-slate-400">Manage your account security settings</p>
+                  <p className="text-sm text-slate-400">
+                    Manage your account security settings
+                  </p>
                 </div>
               </div>
 
@@ -440,16 +466,20 @@ export default function AccountPage({
                         Secure your account with a strong password
                       </p>
                     </div>
-                    <button 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => setIsChangingPassword(!isChangingPassword)}
-                      className="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg transition-colors text-sm font-medium"
                     >
                       {isChangingPassword ? 'Cancel' : 'Change Password'}
-                    </button>
+                    </Button>
                   </div>
-                  
+
                   {isChangingPassword && (
-                    <form onSubmit={handlePasswordChange} className="space-y-4 mt-4 pt-4 border-t border-slate-600">
+                    <form
+                      onSubmit={handlePasswordChange}
+                      className="space-y-4 mt-4 pt-4 border-t border-slate-600"
+                    >
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="text-sm font-medium text-slate-300 block mb-2">
@@ -458,7 +488,12 @@ export default function AccountPage({
                           <input
                             type="password"
                             value={passwordData.newPassword}
-                            onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                            onChange={(e) =>
+                              setPasswordData({
+                                ...passwordData,
+                                newPassword: e.target.value
+                              })
+                            }
                             className="bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full"
                             placeholder="Enter new password"
                             required
@@ -471,7 +506,12 @@ export default function AccountPage({
                           <input
                             type="password"
                             value={passwordData.confirmPassword}
-                            onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                            onChange={(e) =>
+                              setPasswordData({
+                                ...passwordData,
+                                confirmPassword: e.target.value
+                              })
+                            }
                             className="bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full"
                             placeholder="Confirm new password"
                             required
@@ -479,20 +519,22 @@ export default function AccountPage({
                         </div>
                       </div>
                       <div className="flex justify-end space-x-3">
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => setIsChangingPassword(false)}
-                          className="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg transition-colors text-sm font-medium"
                         >
                           Cancel
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="submit"
+                          variant="primary"
+                          size="sm"
                           disabled={isLoading}
-                          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
                         >
                           {isLoading ? 'Updating...' : 'Update Password'}
-                        </button>
+                        </Button>
                       </div>
                     </form>
                   )}
@@ -500,14 +542,16 @@ export default function AccountPage({
 
                 <div className="flex items-center justify-between p-4 bg-slate-700/30 rounded-lg border border-slate-600">
                   <div>
-                    <h4 className="text-white font-medium">Two-Factor Authentication</h4>
+                    <h4 className="text-white font-medium">
+                      Two-Factor Authentication
+                    </h4>
                     <p className="text-slate-400 text-sm">
                       Add an extra layer of security to your account
                     </p>
                   </div>
-                  <button className="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg transition-colors text-sm font-medium">
+                  <Button variant="outline" size="sm">
                     Enable 2FA
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -519,15 +563,21 @@ export default function AccountPage({
                   <Bell className="w-5 h-5 text-purple-400" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Notifications</h3>
-                  <p className="text-sm text-slate-400">Control how you receive notifications</p>
+                  <h3 className="text-lg font-semibold text-white">
+                    Notifications
+                  </h3>
+                  <p className="text-sm text-slate-400">
+                    Control how you receive notifications
+                  </p>
                 </div>
               </div>
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-4 bg-slate-700/30 rounded-lg border border-slate-600">
                   <div>
-                    <h4 className="text-white font-medium">Email Notifications</h4>
+                    <h4 className="text-white font-medium">
+                      Email Notifications
+                    </h4>
                     <p className="text-slate-400 text-sm">
                       Receive updates about your account and trades
                     </p>
@@ -537,7 +587,9 @@ export default function AccountPage({
                       type="checkbox"
                       className="sr-only peer"
                       checked={emailNotifications}
-                      onChange={(e) => handleNotificationToggle('email', e.target.checked)}
+                      onChange={(e) =>
+                        handleNotificationToggle('email', e.target.checked)
+                      }
                     />
                     <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
                   </label>
@@ -555,7 +607,9 @@ export default function AccountPage({
                       type="checkbox"
                       className="sr-only peer"
                       checked={tradingAlerts}
-                      onChange={(e) => handleNotificationToggle('trading', e.target.checked)}
+                      onChange={(e) =>
+                        handleNotificationToggle('trading', e.target.checked)
+                      }
                     />
                     <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
                   </label>

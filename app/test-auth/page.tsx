@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import Button from '@/components/ui/Button';
 
 export default function TestAuthPage() {
   const [status, setStatus] = useState('Testing...');
@@ -108,19 +109,13 @@ export default function TestAuthPage() {
         <div>
           <h2 className="text-lg font-semibold mb-2">Tests:</h2>
           <div className="space-y-4">
-            <button
-              onClick={testSupabaseConnection}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
+            <Button onClick={testSupabaseConnection}>
               Test Supabase Connection
-            </button>
+            </Button>
 
-            <button
-              onClick={testURLHelper}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 ml-4"
-            >
+            <Button onClick={testURLHelper} className="ml-4">
               Test URL Helper
-            </button>
+            </Button>
           </div>
         </div>
 

@@ -10,13 +10,39 @@ import {
   Shield
 } from 'lucide-react';
 
-export default function Stats() {
+interface StatsData {
+  totalSignals: number;
+  totalPnl: number;
+  profitableTrades: number;
+  completedTrades: number;
+}
+
+interface Props {
+  statsData?: StatsData;
+}
+
+export default function Stats({ statsData }: Props) {
   const [counts, setCounts] = useState({
     traders: 0,
     profits: 0,
     signals: 0,
     rating: 0
   });
+
+  // Use real data if available, otherwise fall back to hardcoded values
+  const realData = statsData
+    ? {
+        traders: 500, // Keep hardcoded for now
+        profits: statsData.totalPnl, // Show actual PnL percentage
+        signals: statsData.totalSignals || 1500,
+        rating: 4.9 // Keep hardcoded for now
+      }
+    : {
+        traders: 500,
+        profits: 15.2, // Default PnL percentage
+        signals: 1500,
+        rating: 4.9
+      };
 
   const stats = [
     {
@@ -29,17 +55,21 @@ export default function Stats() {
     {
       icon: <DollarSign className="w-8 h-8 text-emerald-400" />,
       value: counts.profits,
-      prefix: '$',
-      suffix: 'M+',
-      label: 'Profits Generated',
-      description: 'Total profits from our signals'
+      prefix: counts.profits >= 0 ? '+' : '',
+      suffix: '%',
+      label: "This Month's Performance",
+      description: statsData
+        ? `Based on ${statsData.completedTrades} completed trades`
+        : 'Total performance from our signals'
     },
     {
       icon: <TrendingUp className="w-8 h-8 text-cyan-400" />,
       value: counts.signals,
       suffix: '+',
       label: 'Signals Delivered',
-      description: 'Successful trading signals'
+      description: statsData
+        ? `${statsData.profitableTrades} profitable trades`
+        : 'Successful trading signals'
     },
     {
       icon: <Award className="w-8 h-8 text-yellow-400" />,
@@ -52,13 +82,6 @@ export default function Stats() {
 
   useEffect(() => {
     const animateCounts = () => {
-      const targets = {
-        traders: 500,
-        profits: 2.5,
-        signals: 1500,
-        rating: 4.9
-      };
-
       const duration = 2000;
       const steps = 60;
       const stepDuration = duration / steps;
@@ -69,10 +92,10 @@ export default function Stats() {
         const progress = currentStep / steps;
 
         setCounts({
-          traders: Math.floor(targets.traders * progress),
-          profits: Number((targets.profits * progress).toFixed(1)),
-          signals: Math.floor(targets.signals * progress),
-          rating: Number((targets.rating * progress).toFixed(1))
+          traders: Math.floor(realData.traders * progress),
+          profits: Number((realData.profits * progress).toFixed(1)),
+          signals: Math.floor(realData.signals * progress),
+          rating: Number((realData.rating * progress).toFixed(1))
         });
 
         if (currentStep >= steps) {
@@ -86,7 +109,7 @@ export default function Stats() {
     // Start animation when component mounts
     const timer = setTimeout(animateCounts, 500);
     return () => clearTimeout(timer);
-  }, []);
+  }, [realData]);
 
   return (
     <section className="py-20 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">

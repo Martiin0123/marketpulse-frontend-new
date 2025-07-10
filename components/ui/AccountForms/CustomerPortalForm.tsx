@@ -43,10 +43,10 @@ export default function CustomerPortalForm({ subscription }: Props) {
   const handleStripePortalRequest = async () => {
     setIsSubmitting(true);
     setError(null);
-    
+
     try {
       const redirectUrl = await createStripePortal(currentPath);
-      
+
       // Check if redirectUrl is an error redirect
       if (redirectUrl.includes('error=')) {
         const urlParams = new URLSearchParams(redirectUrl.split('?')[1]);
@@ -55,12 +55,14 @@ export default function CustomerPortalForm({ subscription }: Props) {
         setIsSubmitting(false);
         return;
       }
-      
+
       setIsSubmitting(false);
       return router.push(redirectUrl);
     } catch (err) {
       console.error('Portal creation error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to create billing portal');
+      setError(
+        err instanceof Error ? err.message : 'Failed to create billing portal'
+      );
       setIsSubmitting(false);
     }
   };
@@ -87,7 +89,10 @@ export default function CustomerPortalForm({ subscription }: Props) {
                   `${subscription?.prices?.products?.name || 'Active'}`
                 )
               ) : (
-                <Link href="/pricing" className="text-blue-400 hover:text-blue-300 transition-colors">
+                <Link
+                  href="/pricing"
+                  className="text-blue-400 hover:text-blue-300 transition-colors"
+                >
                   Choose Plan
                 </Link>
               )}
@@ -115,13 +120,14 @@ export default function CustomerPortalForm({ subscription }: Props) {
             Manage your subscription, payment methods, and billing history
           </p>
         </div>
-        <button
+        <Button
           onClick={handleStripePortalRequest}
           disabled={isSubmitting}
-          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          variant="primary"
+          size="sm"
         >
           {isSubmitting ? 'Opening...' : 'Manage Billing'}
-        </button>
+        </Button>
       </div>
     </div>
   );

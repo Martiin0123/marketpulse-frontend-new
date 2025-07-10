@@ -29,6 +29,7 @@ import PerformanceGuaranteeWidget from '../PerformanceGuarantee/PerformanceGuara
 import VIPWhitelistWidget from './VIPWhitelistWidget';
 import { useAuth } from '@/utils/auth-context';
 import { AuthLoadingState } from '@/components/ui/LoadingStates/Skeleton';
+import Button from '@/components/ui/Button';
 
 type Signal = Tables<'signals'>;
 type Subscription = Tables<'subscriptions'>;
@@ -157,10 +158,9 @@ export default function Dashboard({
     };
   }, [user?.id]); // Only depend on user ID
 
-  // Calculate signal statistics - only count completed trades (BUY signals that are closed or executed with P&L)
+  // Calculate signal statistics - only count completed trades (closed signals with P&L)
   const completedTrades = signals.filter(
     (signal) =>
-      signal.type === 'buy' &&
       (signal.status === 'closed' || signal.status === 'executed') &&
       signal.pnl_percentage !== null
   );
@@ -241,7 +241,7 @@ export default function Dashboard({
                     <CheckCircle className="w-4 h-4 mr-2" />
                     Connected to Discord
                   </div>
-                  <button
+                  <Button
                     onClick={async () => {
                       try {
                         const response = await fetch(
@@ -250,18 +250,13 @@ export default function Dashboard({
                             method: 'POST'
                           }
                         );
-                        const data = await response.json();
-                        if (data.success) {
+                        if (response.ok) {
                           setNotification({
                             type: 'success',
-                            message: `Discord role assigned successfully! (${data.debug?.plan || 'unknown'} plan)`
+                            message: 'Discord role assigned successfully!'
                           });
                         } else {
-                          setNotification({
-                            type: 'error',
-                            message:
-                              data.error || 'Failed to assign Discord role'
-                          });
+                          throw new Error('Failed to assign role');
                         }
                       } catch (error) {
                         setNotification({
@@ -270,31 +265,37 @@ export default function Dashboard({
                         });
                       }
                     }}
-                    className="inline-flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors duration-200"
+                    variant="primary"
+                    size="sm"
+                    className="inline-flex items-center"
                   >
                     <Target className="w-3 h-3 mr-1" />
                     Assign Role
-                  </button>
+                  </Button>
                 </div>
               ) : (
-                <a
-                  href="/api/auth/discord"
-                  className="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 group"
+                <Button
+                  onClick={() => (window.location.href = '/api/auth/discord')}
+                  variant="secondary"
+                  size="sm"
+                  className="inline-flex items-center"
                 >
-                  <MessageCircle className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-200" />
+                  <MessageCircle className="w-4 h-4 mr-2" />
                   Connect Discord Account
-                </a>
+                </Button>
               )}
 
-              <a
-                href="https://discord.gg/N7taGVuz"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-lg transition-colors duration-200 group"
+              <Button
+                onClick={() =>
+                  window.open('https://discord.gg/N7taGVuz', '_blank')
+                }
+                variant="secondary"
+                size="sm"
+                className="inline-flex items-center"
               >
-                <MessageCircle className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-200" />
+                <MessageCircle className="w-4 h-4 mr-2" />
                 Join Discord Community
-              </a>
+              </Button>
               {/* VIP Whitelist Button */}
               <VIPWhitelistWidget
                 user={user}

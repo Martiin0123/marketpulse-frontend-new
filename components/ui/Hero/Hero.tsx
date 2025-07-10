@@ -71,10 +71,7 @@ export default function Hero({ user, monthlyPnL, positions }: HeroProps) {
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
               {user ? (
                 <Link href="/dashboard">
-                  <Button
-                    variant="slim"
-                    className="group bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-8 py-4 text-lg font-semibold"
-                  >
+                  <Button variant="primary" size="lg" className="group">
                     Go to Dashboard
                     <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                   </Button>
@@ -82,10 +79,7 @@ export default function Hero({ user, monthlyPnL, positions }: HeroProps) {
               ) : (
                 <>
                   <Link href="/pricing">
-                    <Button
-                      variant="slim"
-                      className="group bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-8 py-4 text-lg font-semibold"
-                    >
+                    <Button variant="primary" size="lg" className="group">
                       <Target className="w-5 h-5 mr-2" />
                       Start Trading Now
                       <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
@@ -96,10 +90,7 @@ export default function Hero({ user, monthlyPnL, positions }: HeroProps) {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <Button
-                      variant="slim"
-                      className="group bg-transparent border-2 border-blue-500 hover:border-blue-400 text-blue-400 hover:text-white px-8 py-4 text-lg font-semibold"
-                    >
+                    <Button variant="outline" size="lg" className="group">
                       <Star className="w-5 h-5 mr-2" />
                       Join Free Discord
                     </Button>

@@ -87,10 +87,7 @@ export default function CTA({ user }: CTAProps) {
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
               {user ? (
                 <Link href="/dashboard">
-                  <Button
-                    variant="slim"
-                    className="group bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white px-8 py-4 text-lg font-semibold"
-                  >
+                  <Button variant="secondary" size="lg" className="group">
                     <Target className="w-5 h-5 mr-2" />
                     Access Your Dashboard
                     <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
@@ -99,20 +96,14 @@ export default function CTA({ user }: CTAProps) {
               ) : (
                 <>
                   <Link href="/pricing">
-                    <Button
-                      variant="slim"
-                      className="group bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white px-8 py-4 text-lg font-semibold"
-                    >
+                    <Button variant="secondary" size="lg" className="group">
                       <TrendingUp className="w-5 h-5 mr-2" />
                       Start Trading Now
                       <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                     </Button>
                   </Link>
                   <Link href="/signin">
-                    <Button
-                      variant="slim"
-                      className="group bg-transparent border-2 border-slate-600 hover:border-slate-500 text-white px-8 py-4 text-lg font-semibold"
-                    >
+                    <Button variant="ghost" size="lg">
                       Sign In
                     </Button>
                   </Link>

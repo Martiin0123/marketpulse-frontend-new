@@ -443,7 +443,8 @@ export default function Pricing({ user, products, subscription }: Props) {
                         {/* CTA Button */}
                         {isCurrentPlan ? (
                           <Button
-                            variant="slim"
+                            variant="primary"
+                            size="lg"
                             onClick={handleViewDashboard}
                             className="w-full group-hover:scale-105 transition-transform duration-300"
                           >
@@ -452,7 +453,8 @@ export default function Pricing({ user, products, subscription }: Props) {
                         ) : index === 2 ? (
                           // Special handling for 3rd option (VIP tier)
                           <Button
-                            variant="slim"
+                            variant="primary"
+                            size="lg"
                             type="button"
                             loading={priceIdLoading === price.id}
                             onClick={() => handleStripeCheckout(price)}
@@ -462,7 +464,8 @@ export default function Pricing({ user, products, subscription }: Props) {
                           </Button>
                         ) : (
                           <Button
-                            variant="slim"
+                            variant="primary"
+                            size="lg"
                             type="button"
                             loading={priceIdLoading === price.id}
                             onClick={() => handleStripeCheckout(price)}

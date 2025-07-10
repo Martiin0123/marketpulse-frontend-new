@@ -243,9 +243,9 @@ export default function BalanceChart({
         : null;
     };
 
-    // Filter and sort signals by entry time - include all BUY signals (both active and closed)
+    // Filter and sort signals by entry time - include ALL signals (buy, sell, short, close)
     const relevantSignals = signals
-      .filter((signal) => signal.type === 'buy')
+      .filter((signal) => signal.pnl_percentage !== null) // Only include signals with PnL data
       .sort((a, b) => getEntryTimestamp(a) - getEntryTimestamp(b));
 
     // Build comprehensive balance progression
@@ -392,7 +392,7 @@ export default function BalanceChart({
 
     const series = [
       {
-        name: 'Strategy Performance',
+        name: 'Balance Progression (All Signals)',
         data: balanceData.map((d) => ({ x: d.timestamp, y: d.balance }))
       }
     ];
@@ -428,12 +428,12 @@ export default function BalanceChart({
       <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-white">
-            Strategy Performance
+            Balance Progression (All Signals)
           </h3>
           <div className="flex items-center space-x-4 text-sm text-slate-400">
             <div className="flex items-center space-x-1">
               <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-              <span>Performance</span>
+              <span>Balance</span>
             </div>
           </div>
         </div>
@@ -461,29 +461,33 @@ export default function BalanceChart({
       {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
-          <p className="text-sm font-medium text-slate-400">Total Return</p>
+          <p className="text-sm font-medium text-slate-400">Balance Return</p>
           <p
             className={`text-2xl font-bold ${stats.totalReturnPercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
           >
             {stats.totalReturnPercent >= 0 ? '+' : ''}
             {stats.totalReturnPercent.toFixed(2)}%
           </p>
+          <p className="text-xs text-slate-500">All signals</p>
         </div>
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
-          <p className="text-sm font-medium text-slate-400">Win Rate</p>
+          <p className="text-sm font-medium text-slate-400">Balance Win Rate</p>
           <p className="text-2xl font-bold text-white">
             {stats.winRate.toFixed(1)}%
           </p>
+          <p className="text-xs text-slate-500">All signals</p>
         </div>
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
-          <p className="text-sm font-medium text-slate-400">Total Trades</p>
+          <p className="text-sm font-medium text-slate-400">Balance Trades</p>
           <p className="text-2xl font-bold text-white">{stats.totalTrades}</p>
+          <p className="text-xs text-slate-500">All signals</p>
         </div>
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
           <p className="text-sm font-medium text-slate-400">Max Drawdown</p>
           <p className="text-2xl font-bold text-red-400">
             {stats.maxDrawdown.toFixed(2)}%
           </p>
+          <p className="text-xs text-slate-500">Balance progression</p>
         </div>
       </div>
     </div>
@@ -492,7 +496,9 @@ export default function BalanceChart({
   return showContainer ? (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Performance Analysis</h2>
+        <h2 className="text-2xl font-bold text-white">
+          Balance Progression Analysis
+        </h2>
       </div>
       {content}
     </div>

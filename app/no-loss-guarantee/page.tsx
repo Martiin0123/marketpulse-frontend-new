@@ -11,6 +11,8 @@ import {
   Award,
   TrendingUp
 } from 'lucide-react';
+import Link from 'next/link';
+import Button from '@/components/ui/Button';
 
 export default async function PerformanceGuarantee() {
   const supabase = createClient();
@@ -276,18 +278,16 @@ export default async function PerformanceGuarantee() {
               decisions
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a
-                href="/signin/signup"
-                className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-slate-100 transition-colors"
-              >
-                Get Started
-              </a>
-              <a
-                href="/pricing"
-                className="border border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors"
-              >
-                View Pricing
-              </a>
+              <Link href="/signin/signup">
+                <Button variant="primary" size="lg">
+                  Get Started
+                </Button>
+              </Link>
+              <Link href="/pricing">
+                <Button variant="outline" size="lg">
+                  View Pricing
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
