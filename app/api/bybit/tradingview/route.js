@@ -1003,6 +1003,29 @@ export async function POST(request) {
                     pnl_percentage: pnlPercentage,
                     exitReason: 'signal_reversal'
                   }, orderResult.order || orderResult, discordWebhookUrl);
+                  
+                  // Also send close signal to free webhook if it's every 5th trade
+                  if (discordFreeWebhookUrl) {
+                    const { count: totalSignalsBefore } = await supabase
+                      .from('signals')
+                      .select('*', { count: 'exact', head: true });
+                    
+                    const totalSignalsAfter = totalSignalsBefore + 1;
+                    const isEveryFifthTrade = totalSignalsAfter % 5 === 0;
+                    
+                    if (isEveryFifthTrade) {
+                      console.log(`🎯 Sending SELL_CLOSED to free webhook (trade #${totalSignalsAfter})`);
+                      await sendSuccessDiscordNotification({
+                        symbol: symbol.toUpperCase(),
+                        action: 'SELL_CLOSED',
+                        price: parseFloat(executionPrice),
+                        timestamp: validTimestamp,
+                        strategy_metadata: strategy_metadata,
+                        pnl_percentage: pnlPercentage,
+                        exitReason: 'signal_reversal'
+                      }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
+                    }
+                  }
                 } else {
                   console.log('⚠️ No original signal found for SELL_CLOSED notification');
                 }
@@ -1035,6 +1058,29 @@ export async function POST(request) {
                     pnl_percentage: pnlPercentage,
                     exitReason: 'signal_reversal'
                   }, orderResult.order || orderResult, discordWebhookUrl);
+                  
+                  // Also send close signal to free webhook if it's every 5th trade
+                  if (discordFreeWebhookUrl) {
+                    const { count: totalSignalsBefore } = await supabase
+                      .from('signals')
+                      .select('*', { count: 'exact', head: true });
+                    
+                    const totalSignalsAfter = totalSignalsBefore + 1;
+                    const isEveryFifthTrade = totalSignalsAfter % 5 === 0;
+                    
+                    if (isEveryFifthTrade) {
+                      console.log(`🎯 Sending BUY_CLOSED to free webhook (trade #${totalSignalsAfter})`);
+                      await sendSuccessDiscordNotification({
+                        symbol: symbol.toUpperCase(),
+                        action: 'BUY_CLOSED',
+                        price: parseFloat(executionPrice),
+                        timestamp: validTimestamp,
+                        strategy_metadata: strategy_metadata,
+                        pnl_percentage: pnlPercentage,
+                        exitReason: 'signal_reversal'
+                      }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
+                    }
+                  }
                 } else {
                   console.log('⚠️ No original signal found for BUY_CLOSED notification');
                 }
