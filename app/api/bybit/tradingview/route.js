@@ -1004,17 +1004,17 @@ export async function POST(request) {
                     exitReason: 'signal_reversal'
                   }, orderResult.order || orderResult, discordWebhookUrl);
                   
-                  // Also send close signal to free webhook if it's every 5th trade
+                  // Also send close signal to free webhook if the previous trade was the 5th trade
                   if (discordFreeWebhookUrl) {
                     const { count: totalSignalsBefore } = await supabase
                       .from('signals')
                       .select('*', { count: 'exact', head: true });
                     
                     const totalSignalsAfter = totalSignalsBefore + 1;
-                    const isEveryFifthTrade = totalSignalsAfter % 5 === 0;
+                    const wasPreviousTradeFifth = totalSignalsAfter % 5 === 1; // If current is 6, previous was 5
                     
-                    if (isEveryFifthTrade) {
-                      console.log(`🎯 Sending SELL_CLOSED to free webhook (trade #${totalSignalsAfter})`);
+                    if (wasPreviousTradeFifth) {
+                      console.log(`🎯 Sending SELL_CLOSED to free webhook (previous trade was #5, current is #${totalSignalsAfter})`);
                       await sendSuccessDiscordNotification({
                         symbol: symbol.toUpperCase(),
                         action: 'SELL_CLOSED',
@@ -1059,17 +1059,17 @@ export async function POST(request) {
                     exitReason: 'signal_reversal'
                   }, orderResult.order || orderResult, discordWebhookUrl);
                   
-                  // Also send close signal to free webhook if it's every 5th trade
+                  // Also send close signal to free webhook if the previous trade was the 5th trade
                   if (discordFreeWebhookUrl) {
                     const { count: totalSignalsBefore } = await supabase
                       .from('signals')
                       .select('*', { count: 'exact', head: true });
                     
                     const totalSignalsAfter = totalSignalsBefore + 1;
-                    const isEveryFifthTrade = totalSignalsAfter % 5 === 0;
+                    const wasPreviousTradeFifth = totalSignalsAfter % 5 === 1; // If current is 6, previous was 5
                     
-                    if (isEveryFifthTrade) {
-                      console.log(`🎯 Sending BUY_CLOSED to free webhook (trade #${totalSignalsAfter})`);
+                    if (wasPreviousTradeFifth) {
+                      console.log(`🎯 Sending BUY_CLOSED to free webhook (previous trade was #5, current is #${totalSignalsAfter})`);
                       await sendSuccessDiscordNotification({
                         symbol: symbol.toUpperCase(),
                         action: 'BUY_CLOSED',
@@ -1126,9 +1126,9 @@ export async function POST(request) {
                 break;
             }
             
-            // Send to free webhook if it's every 5th trade
-            if (discordFreeWebhookUrl) {
-              console.log('🔍 Checking free webhook...');
+            // Send to free webhook if it's every 5th trade (but not for reversals - only the close signal goes to free)
+            if (discordFreeWebhookUrl && (actionTaken === 'opened_buy' || actionTaken === 'opened_sell')) {
+              console.log('🔍 Checking free webhook for new position...');
               
               // Count total signals BEFORE the new signal was inserted
               const { count: totalSignalsBefore } = await supabase
@@ -1143,10 +1143,10 @@ export async function POST(request) {
               console.log(`🔢 Is every 5th trade? ${isEveryFifthTrade} (${totalSignalsAfter} % 5 = ${totalSignalsAfter % 5})`);
               
               if (isEveryFifthTrade) {
-                console.log(`🎯 Sending to free webhook (trade #${totalSignalsAfter})`);
+                console.log(`🎯 Sending ${actionTaken === 'opened_buy' ? 'BUY' : 'SELL'} to free webhook (trade #${totalSignalsAfter})`);
                 await sendSuccessDiscordNotification({
                   symbol: symbol.toUpperCase(),
-                  action: actionTaken === 'opened_buy' ? 'BUY' : actionTaken === 'opened_sell' ? 'SELL' : actionTaken === 'reversed_to_buy' ? 'BUY' : actionTaken === 'reversed_to_sell' ? 'SELL' : 'CLOSE',
+                  action: actionTaken === 'opened_buy' ? 'BUY' : 'SELL',
                   price: parseFloat(executionPrice),
                   timestamp: validTimestamp,
                   strategy_metadata: strategy_metadata,
