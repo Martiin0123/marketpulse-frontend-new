@@ -505,6 +505,16 @@ export async function POST(request) {
           cleanedJson = cleanedJson.replace(/,\s*$/, '') + '}';
         }
         
+        // Fix unquoted string values (like timestamps)
+        cleanedJson = cleanedJson.replace(/:\s*([^",\{\}\[\]]+)(?=\s*[,}])/g, (match, value) => {
+          // Don't quote numbers, booleans, or already quoted strings
+          if (/^\d+$/.test(value) || value === 'true' || value === 'false' || value === 'null') {
+            return match;
+          }
+          // Quote string values
+          return ': "' + value + '"';
+        });
+        
         console.log('📨 Attempting to parse cleaned JSON:', cleanedJson);
         
         try {
@@ -835,23 +845,7 @@ export async function POST(request) {
               });
             }
 
-            // Create close signal record
-            const closeExecutionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
-            await supabase
-              .from('signals')
-              .insert([{
-                symbol: symbol.toUpperCase(),
-                type: 'close',
-                entry_price: Number(closeExecutionPrice),
-                created_at: validTimestamp,
-                strategy_name: 'Primescope Crypto',
-                signal_source: 'ai_algorithm',
-                exchange: 'bybit',
-                exit_reason: 'direct_signal',
-                status: 'closed',
-                rsi_value: strategy_metadata?.rsi_value || null,
-                technical_metadata: strategy_metadata && Object.keys(strategy_metadata).length > 0 ? strategy_metadata : null
-              }]);
+
           } else {
             // Create new position signal (BUY or SELL)
             const openExecutionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
@@ -866,8 +860,8 @@ export async function POST(request) {
                 signal_source: 'ai_algorithm',
                 exchange: 'bybit',
                 status: 'active',
-                rsi_value: strategy_metadata?.rsi_value || null,
-                technical_metadata: strategy_metadata && Object.keys(strategy_metadata).length > 0 ? strategy_metadata : null
+                order_id: orderResult.order?.orderId || orderResult.orderId || null,
+                executed_at: validTimestamp
               }])
               .select()
               .single();
@@ -1052,29 +1046,7 @@ export async function POST(request) {
           }
         }
 
-        // Create close signal with Pine Script metadata
-        const closeExecutionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
-        const { data: signal, error: signalError } = await supabase
-          .from('signals')
-          .insert([{
-            symbol: symbol.toUpperCase(),
-            type: 'close',
-            entry_price: Number(closeExecutionPrice),
-            created_at: validTimestamp,
-            strategy_name: 'Primescope Crypto',
-            signal_source: 'ai_algorithm',
-            exchange: 'bybit',
-            exit_reason: exitReason || 'ma_cross',
-            status: 'closed',
-            rsi_value: strategy_metadata?.rsi_value || null,
-            technical_metadata: strategy_metadata && Object.keys(strategy_metadata).length > 0 ? strategy_metadata : null
-          }])
-          .select()
-          .single();
-        if (signalError) {
-          signalSaved = false;
-          dbErrorHint = '⚠️ Signal was NOT saved to the database due to rate limit or DB error.';
-        }
+
 
         // Send success Discord notification
         if (discordWebhookUrl) {
@@ -1265,8 +1237,8 @@ export async function POST(request) {
             signal_source: 'ai_algorithm',
             exchange: 'bybit',
             status: 'active',
-            rsi_value: strategy_metadata.rsi_value,
-            technical_metadata: strategy_metadata
+            order_id: orderResult.orderId || orderResult.order?.orderId || null,
+            executed_at: validTimestamp
           }])
           .select()
           .single();
@@ -1304,7 +1276,6 @@ export async function POST(request) {
           signal_id: signal?.id || null,
           symbol: bybitSymbol,
           entry_price: Number(executionPrice),
-          rsi_value: strategy_metadata.rsi_value,
           signalSaved,
           dbErrorHint
         }), {
