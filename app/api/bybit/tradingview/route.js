@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
 import { 
-  submitBybitOrderWithDynamicSizing,
   closeBybitPosition, 
   convertSymbolFormat
 } from '@/utils/bybit/client'
@@ -103,13 +102,13 @@ function parseAIAlgorithmAlert(alertMessage) {
   let signalType = null;
   let exitReason = null;
   
-  if (alertMessage.includes('LONG Entry') || alertMessage.includes('BUY') || alertMessage.includes('LONG')) {
+  if (alertMessage.includes('LONG Entry')) {
     action = 'BUY';
     signalType = 'entry';
-  } else if (alertMessage.includes('SHORT Entry') || alertMessage.includes('SELL') || alertMessage.includes('SHORT')) {
+  } else if (alertMessage.includes('SHORT Entry')) {
     action = 'SELL';
     signalType = 'entry';
-  } else if (alertMessage.includes('LONG Exit') || alertMessage.includes('SHORT Exit')) {
+  } else if (alertMessage.includes('LONG Exit')) {
     action = 'CLOSE';
     signalType = 'exit';
     if (alertMessage.includes('MA Cross')) {
@@ -117,6 +116,20 @@ function parseAIAlgorithmAlert(alertMessage) {
     } else if (alertMessage.includes('Stop/Trailing')) {
       exitReason = 'stop_trailing';
     }
+  } else if (alertMessage.includes('SHORT Exit')) {
+    action = 'CLOSE';
+    signalType = 'exit';
+    if (alertMessage.includes('MA Cross')) {
+      exitReason = 'ma_cross';
+    } else if (alertMessage.includes('Stop/Trailing')) {
+      exitReason = 'stop_trailing';
+    }
+  } else if (alertMessage.includes('BUY')) {
+    action = 'BUY';
+    signalType = 'entry';
+  } else if (alertMessage.includes('SELL')) {
+    action = 'SELL';
+    signalType = 'entry';
   }
   
     console.log('📊 Parsed signal data:', {
@@ -1290,147 +1303,7 @@ export async function POST(request) {
       }
     }
 
-    // Handle BUY/SELL action with dynamic position sizing
-    if (action.toUpperCase() === 'BUY' || action.toUpperCase() === 'SELL') {
-      const isBuy = action.toUpperCase() === 'BUY';
 
-      console.log(`📊 Submitting ${isBuy ? 'BUY' : 'SELL'} order via proxy for:`, bybitSymbol);
-
-      // 🧠 Submit order with dynamic position sizing via proxy (handles all validations automatically)
-      try {
-        orderResult = await submitBybitOrderWithDynamicSizing({
-          symbol: bybitSymbol,
-          side: isBuy ? 'Buy' : 'Sell',
-          orderType: 'Market',
-          category: 'linear',
-          timeInForce: 'GoodTillCancel'
-        });
-      } catch (orderError) {
-        console.error('❌ Failed to place order with dynamic sizing:', orderError);
-        
-        if (discordWebhookUrl) {
-          await sendErrorDiscordNotification({
-            symbol: symbol.toUpperCase(),
-            action: isBuy ? 'BUY' : 'SELL',
-            price: 0,
-            dbErrorHint
-          }, orderError, discordWebhookUrl);
-        }
-        
-        return new Response(JSON.stringify({
-          error: 'Failed to place order with dynamic sizing',
-          details: orderError.message
-        }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-
-      console.log(`${isBuy ? '🟢 Buy' : '🔴 Sell'} order submitted:`, {
-        symbol: bybitSymbol,
-        qty: orderResult.qty || orderResult.calculatedQuantity,
-        order_id: orderResult.orderId,
-        status: orderResult.orderStatus,
-        leverage: orderResult.leverage,
-        riskPercent: orderResult.riskPercent
-      });
-
-      // Try to update database (but don't fail if it doesn't work)
-      try {
-        const executionPrice = orderResult.currentPrice || orderResult.avgPrice || orderResult.price || orderResult.order?.avgPrice || 0;
-        const { data: signal, error: signalError } = await supabase
-          .from('signals')
-          .insert([{
-            symbol: symbol.toUpperCase(),
-            type: isBuy ? 'buy' : 'sell',
-            entry_price: Number(executionPrice),
-            created_at: validTimestamp,
-            strategy_name: 'Primescope Crypto',
-            signal_source: 'ai_algorithm',
-            exchange: 'bybit',
-            status: 'active',
-            order_id: orderResult.orderId || orderResult.order?.orderId || null,
-            executed_at: validTimestamp
-          }])
-          .select()
-          .single();
-
-        databaseResult = signal;
-        if (signalError) {
-          signalSaved = false;
-          dbErrorHint = '⚠️ Signal was NOT saved to the database due to rate limit or DB error.';
-          console.error('❌ Database insert error:', signalError);
-        } else {
-          signalSaved = true;
-          console.log('✅ Signal saved to database:', signal?.id);
-        }
-
-        // Send success Discord notification
-        if (discordWebhookUrl) {
-          // Use actual Bybit execution price and action from proxy response
-          const executionPrice = orderResult.currentPrice || orderResult.avgPrice || orderResult.price || orderResult.order?.avgPrice || 0;
-          const proxyAction = orderResult.action || (isBuy ? 'BUY' : 'SELL');
-          
-          await sendSuccessDiscordNotification({
-            symbol: symbol.toUpperCase(),
-            action: proxyAction,
-            price: parseFloat(executionPrice),
-            timestamp: validTimestamp,
-            quantity: orderResult.qty || orderResult.calculatedQuantity,
-            strategy_metadata: strategy_metadata,
-            dbErrorHint,
-            pnl_percentage: null
-          }, orderResult, discordWebhookUrl);
-        }
-
-        return new Response(JSON.stringify({
-          message: `Bybit ${isBuy ? 'buy' : 'sell'} order submitted successfully`,
-          order_id: orderResult.orderId,
-          signal_id: signal?.id || null,
-          symbol: bybitSymbol,
-          entry_price: Number(executionPrice),
-          signalSaved,
-          dbErrorHint
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        });
-
-      } catch (dbError) {
-        console.error('❌ Database error (rate limit?), but order was successful:', dbError);
-        signalSaved = false;
-        dbErrorHint = '⚠️ Signal was NOT saved to the database due to rate limit or DB error.';
-
-        if (discordWebhookUrl) {
-          const executionPrice = orderResult.currentPrice || orderResult.avgPrice || orderResult.price || orderResult.order?.avgPrice || 0;
-          const proxyAction = orderResult.action || (isBuy ? 'BUY' : 'SELL');
-          
-          await sendSuccessDiscordNotification({
-            symbol: symbol.toUpperCase(),
-            action: proxyAction,
-            price: parseFloat(executionPrice),
-            timestamp: validTimestamp,
-            quantity: orderResult.qty || orderResult.calculatedQuantity,
-            strategy_metadata: strategy_metadata,
-            dbErrorHint,
-            pnl_percentage: null
-          }, orderResult, discordWebhookUrl);
-        }
-
-        return new Response(JSON.stringify({
-          message: `Bybit ${isBuy ? 'buy' : 'sell'} order submitted successfully (database update failed)`,
-          order_id: orderResult.orderId,
-          symbol: bybitSymbol,
-          entry_price: Number(executionPrice),
-          error: 'Database update failed due to rate limit',
-          signalSaved,
-          dbErrorHint
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-    }
 
 
 
