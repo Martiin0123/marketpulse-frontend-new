@@ -81,6 +81,14 @@ export default function Stats({ statsData }: Props) {
   ];
 
   useEffect(() => {
+    // Set initial values immediately
+    setCounts({
+      traders: 0,
+      profits: 0,
+      signals: 0,
+      rating: 0
+    });
+
     // Only animate once when component mounts
     const animateCounts = () => {
       const duration = 2000;
@@ -100,6 +108,13 @@ export default function Stats({ statsData }: Props) {
         });
 
         if (currentStep >= steps) {
+          // Ensure final values are exactly correct
+          setCounts({
+            traders: realData.traders,
+            profits: realData.profits,
+            signals: realData.signals,
+            rating: realData.rating
+          });
           clearInterval(interval);
         }
       }, stepDuration);

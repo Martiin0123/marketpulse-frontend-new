@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server';
-import { getSubscription, getSignals } from '@/utils/supabase/queries';
+import { getSubscription } from '@/utils/supabase/queries';
+import { calculateTradingStats } from '@/utils/stats';
 import {
   BarChart3,
   TrendingUp,
@@ -8,88 +9,6 @@ import {
   DollarSign,
   Percent
 } from 'lucide-react';
-
-// Helper function to calculate monthly returns from signals
-function calculateMonthlyReturns(signals: any[]) {
-  const monthlyData: { [key: string]: number } = {};
-
-  // Group signals by month and calculate returns
-  signals.forEach((signal) => {
-    if (signal.status === 'closed' && signal.pnl_percentage !== null) {
-      const date = new Date(signal.exit_timestamp || signal.created_at);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-
-      if (!monthlyData[monthKey]) {
-        monthlyData[monthKey] = 0;
-      }
-      monthlyData[monthKey] += signal.pnl_percentage;
-    }
-  });
-
-  // Convert to array format and sort by date
-  const monthlyReturns = Object.entries(monthlyData)
-    .map(([month, returnValue]) => ({
-      month: new Date(month + '-01').toLocaleDateString('en-US', {
-        month: 'short'
-      }),
-      return: returnValue,
-      date: month
-    }))
-    .sort((a, b) => a.date.localeCompare(b.date));
-
-  return monthlyReturns;
-}
-
-// Helper function to calculate max drawdown
-function calculateMaxDrawdown(signals: any[]) {
-  let peak = 0;
-  let maxDrawdown = 0;
-  let runningBalance = 100;
-
-  const completedSignals = signals
-    .filter(
-      (signal) => signal.status === 'closed' && signal.pnl_percentage !== null
-    )
-    .sort(
-      (a, b) =>
-        new Date(a.exit_timestamp || a.created_at).getTime() -
-        new Date(b.exit_timestamp || b.created_at).getTime()
-    );
-
-  completedSignals.forEach((signal) => {
-    const pnl = signal.pnl_percentage || 0;
-    runningBalance *= 1 + pnl / 100;
-
-    if (runningBalance > peak) {
-      peak = runningBalance;
-    }
-
-    const drawdown = ((peak - runningBalance) / peak) * 100;
-    if (drawdown > maxDrawdown) {
-      maxDrawdown = drawdown;
-    }
-  });
-
-  return maxDrawdown;
-}
-
-// Helper function to calculate Sharpe ratio (simplified)
-function calculateSharpeRatio(signals: any[]) {
-  const completedSignals = signals.filter(
-    (signal) => signal.status === 'closed' && signal.pnl_percentage !== null
-  );
-
-  if (completedSignals.length === 0) return 0;
-
-  const returns = completedSignals.map((signal) => signal.pnl_percentage || 0);
-  const avgReturn = returns.reduce((sum, ret) => sum + ret, 0) / returns.length;
-  const variance =
-    returns.reduce((sum, ret) => sum + Math.pow(ret - avgReturn, 2), 0) /
-    returns.length;
-  const stdDev = Math.sqrt(variance);
-
-  return stdDev > 0 ? avgReturn / stdDev : 0;
-}
 
 export default async function PerformanceReports() {
   const supabase = createClient();
@@ -100,14 +19,10 @@ export default async function PerformanceReports() {
 
   const subscription = user ? await getSubscription(supabase) : null;
 
-  // Fetch all signals for comprehensive analysis (not just last 50)
-  const { data: signals, error } = await supabase
-    .from('signals')
-    .select('*')
-    .order('created_at', { ascending: false });
+  // Calculate trading stats directly
+  const tradingStats = await calculateTradingStats();
 
-  if (error) {
-    console.error('Error fetching signals:', error);
+  if (!tradingStats) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="text-center">
@@ -120,55 +35,24 @@ export default async function PerformanceReports() {
     );
   }
 
-  const signalsData = signals || [];
-
-  // Calculate real performance metrics from signals
-  const completedTrades = signalsData.filter(
-    (signal) => signal.status === 'closed' && signal.pnl_percentage !== null
-  );
-
-  const totalTrades = signalsData.length;
-  const activeTrades = signalsData.filter(
-    (signal) => signal.status === 'active'
-  ).length;
-  const profitableTrades = completedTrades.filter(
-    (signal) => (signal.pnl_percentage || 0) > 0
-  ).length;
-  const winRate =
-    completedTrades.length > 0
-      ? (profitableTrades / completedTrades.length) * 100
-      : 0;
-
-  const totalReturn = completedTrades.reduce(
-    (sum, signal) => sum + (signal.pnl_percentage || 0),
-    0
-  );
-  const averageTradeReturn =
-    completedTrades.length > 0 ? totalReturn / completedTrades.length : 0;
-
-  const monthlyReturns = calculateMonthlyReturns(signalsData);
-  const maxDrawdown = calculateMaxDrawdown(signalsData);
-  const sharpeRatio = calculateSharpeRatio(signalsData);
-
-  // Calculate average monthly return
-  const averageMonthlyReturn =
-    monthlyReturns.length > 0
-      ? monthlyReturns.reduce((sum, month) => sum + month.return, 0) /
-        monthlyReturns.length
-      : 0;
-
   const performanceData = {
-    totalReturn,
-    monthlyReturn: averageMonthlyReturn,
-    winRate,
-    totalTrades,
-    activeTrades,
-    profitableTrades,
-    completedTrades: completedTrades.length,
-    averageTradeReturn,
-    maxDrawdown,
-    sharpeRatio,
-    monthlyReturns
+    totalReturn: tradingStats.totalPnl,
+    monthlyReturn:
+      tradingStats.monthlyReturns.length > 0
+        ? tradingStats.monthlyReturns.reduce(
+            (sum: number, month: any) => sum + month.return,
+            0
+          ) / tradingStats.monthlyReturns.length
+        : 0,
+    winRate: tradingStats.winRate,
+    totalTrades: tradingStats.totalSignals,
+    activeTrades: tradingStats.activeSignals,
+    profitableTrades: tradingStats.profitableTrades,
+    completedTrades: tradingStats.closedSignals,
+    averageTradeReturn: tradingStats.averageTradeReturn,
+    maxDrawdown: tradingStats.maxDrawdown,
+    sharpeRatio: tradingStats.sharpeRatio,
+    monthlyReturns: tradingStats.monthlyReturns
   };
 
   return (
@@ -260,33 +144,35 @@ export default async function PerformanceReports() {
             </h3>
             <div className="space-y-4">
               {performanceData.monthlyReturns.length > 0 ? (
-                performanceData.monthlyReturns.map((item, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <Calendar className="w-4 h-4 text-slate-400" />
-                      <span className="text-slate-300">{item.month}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"
-                          style={{
-                            width: `${Math.max(0, Math.min(Math.abs(item.return), 100))}%`
-                          }}
-                        />
+                performanceData.monthlyReturns.map(
+                  (item: any, index: number) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <Calendar className="w-4 h-4 text-slate-400" />
+                        <span className="text-slate-300">{item.month}</span>
                       </div>
-                      <span
-                        className={`text-sm font-medium ${item.return >= 0 ? 'text-green-400' : 'text-red-400'}`}
-                      >
-                        {item.return >= 0 ? '+' : ''}
-                        {item.return.toFixed(2)}%
-                      </span>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"
+                            style={{
+                              width: `${Math.max(0, Math.min(Math.abs(item.return), 100))}%`
+                            }}
+                          />
+                        </div>
+                        <span
+                          className={`text-sm font-medium ${item.return >= 0 ? 'text-green-400' : 'text-red-400'}`}
+                        >
+                          {item.return >= 0 ? '+' : ''}
+                          {item.return.toFixed(2)}%
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  )
+                )
               ) : (
                 <div className="text-center py-8">
                   <Calendar className="w-12 h-12 text-slate-500 mx-auto mb-4" />

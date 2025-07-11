@@ -392,7 +392,7 @@ export default function BalanceChart({
 
     const series = [
       {
-        name: 'Balance Progression (Every Trade)',
+        name: 'Balance Progression per Trade',
         data: balanceData.map((d) => ({ x: d.timestamp, y: d.balance }))
       }
     ];
@@ -428,7 +428,7 @@ export default function BalanceChart({
       <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-white">
-            Balance Progression (Every Trade)
+            Balance Progression per Trade
           </h3>
           <div className="flex items-center space-x-4 text-sm text-slate-400">
             <div className="flex items-center space-x-1">
@@ -497,7 +497,7 @@ export default function BalanceChart({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-white">
-          Balance Progression Analysis (Every Trade)
+          Balance Progression per Trade
         </h2>
       </div>
       {content}

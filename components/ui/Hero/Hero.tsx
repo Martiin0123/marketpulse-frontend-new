@@ -7,7 +7,10 @@ import {
   Target,
   Star,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  BarChart3,
+  Users,
+  Award
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { Tables } from '@/types_db';
@@ -100,43 +103,92 @@ export default function Hero({ user, monthlyPnL, positions }: HeroProps) {
             </div>
           </div>
 
-          {/* Right Column - Minimalistic Performance Card */}
+          {/* Right Column - Professional Performance Card */}
           <div className="relative">
-            <div className="bg-slate-800/30 backdrop-blur-sm rounded-2xl border border-slate-700/50 p-8">
-              <div className="text-center">
-                <h3 className="text-2xl font-bold text-white mb-6">
+            <div className="bg-gradient-to-br from-slate-800/40 to-slate-900/40 backdrop-blur-xl rounded-3xl border border-slate-700/50 p-8 shadow-2xl">
+              {/* Header */}
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center px-4 py-2 bg-emerald-500/10 backdrop-blur-sm rounded-full border border-emerald-500/30 mb-4">
+                  <BarChart3 className="w-4 h-4 text-emerald-500 mr-2" />
+                  <span className="text-emerald-200 text-sm font-medium">
+                    Live Performance
+                  </span>
+                </div>
+                <h3 className="text-2xl font-bold text-white">
                   This Month's Performance
                 </h3>
+              </div>
 
-                {/* Main P&L Display */}
-                <div className="mb-8">
-                  <div
-                    className={`text-4xl font-bold ${pnlColor} flex items-center justify-center mb-2`}
-                  >
+              {/* Main P&L Display */}
+              <div className="mb-8">
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-3">
                     {monthlyPnL?.totalPnL && monthlyPnL.totalPnL > 0 ? (
-                      <TrendingUp className="w-8 h-8 mr-3" />
+                      <TrendingUp className="w-8 h-8 text-emerald-500 mr-3" />
                     ) : (
-                      <TrendingDown className="w-8 h-8 mr-3" />
+                      <TrendingDown className="w-8 h-8 text-red-500 mr-3" />
                     )}
-                    {formattedPnL}
+                    <div
+                      className={`text-5xl font-bold ${pnlColor} tracking-tight`}
+                    >
+                      {formattedPnL}
+                    </div>
                   </div>
-                  <div className="text-slate-400">Total Return</div>
+                  <div className="text-slate-400 text-lg font-medium">
+                    Total Return
+                  </div>
                 </div>
+              </div>
 
-                {/* Simple Stats */}
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-emerald-400 mb-1">
+              {/* Performance Metrics Grid */}
+              <div className="grid grid-cols-2 gap-6 mb-6">
+                <div className="bg-slate-700/30 rounded-xl p-4 text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <Award className="w-5 h-5 text-emerald-400 mr-2" />
+                    <div className="text-2xl font-bold text-emerald-400">
                       {winRate}%
                     </div>
-                    <div className="text-sm text-slate-400">Win Rate</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-400 mb-1">
+                  <div className="text-sm text-slate-400 font-medium">
+                    Win Rate
+                  </div>
+                </div>
+                <div className="bg-slate-700/30 rounded-xl p-4 text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <Users className="w-5 h-5 text-blue-400 mr-2" />
+                    <div className="text-2xl font-bold text-blue-400">
                       {monthlyPnL?.totalPositions || 0}
                     </div>
-                    <div className="text-sm text-slate-400">Signals</div>
                   </div>
+                  <div className="text-sm text-slate-400 font-medium">
+                    Signals
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Info */}
+              <div className="bg-slate-700/20 rounded-xl p-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-400">Profitable Trades</span>
+                  <span className="text-emerald-400 font-semibold">
+                    {monthlyPnL?.profitablePositions || 0}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm mt-2">
+                  <span className="text-slate-400">Total Trades</span>
+                  <span className="text-white font-semibold">
+                    {monthlyPnL?.totalPositions || 0}
+                  </span>
+                </div>
+              </div>
+
+              {/* Trust Indicator */}
+              <div className="mt-6 text-center">
+                <div className="inline-flex items-center px-3 py-1 bg-blue-500/10 rounded-full border border-blue-500/30">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2 animate-pulse"></div>
+                  <span className="text-blue-200 text-xs font-medium">
+                    Real-time Data
+                  </span>
                 </div>
               </div>
             </div>

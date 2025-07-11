@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server';
 import { getSignals } from '@/utils/supabase/queries';
 import Dashboard from '@/components/ui/Dashboard/Dashboard';
 import { getUser } from '@/utils/supabase/queries';
+import { calculateTradingStats } from '@/utils/stats';
 
 // Force dynamic rendering since this page uses auth
 export const dynamic = 'force-dynamic';
@@ -25,15 +26,25 @@ export default async function DashboardPage() {
       signals = [];
     }
 
-    // Calculate basic stats from signals
-    const totalSignals = signals.length;
-    const activeSignals = signals.filter(s => s.status === 'active').length;
-    const closedSignals = signals.filter(s => s.status === 'closed').length;
-    const completedSignals = signals.filter(s => s.status === 'closed' && s.pnl_percentage !== null);
-    const totalPnl = completedSignals.reduce((sum, s) => sum + (s.pnl_percentage || 0), 0);
-    const winRate = completedSignals.length > 0 ? 
-      (completedSignals.filter(s => (s.pnl_percentage || 0) > 0).length / completedSignals.length) * 100 : 0;
-    const averagePnl = completedSignals.length > 0 ? totalPnl / completedSignals.length : 0;
+    // Use centralized stats calculation
+    let tradingStats = null;
+    try {
+      tradingStats = await calculateTradingStats();
+    } catch (statsError) {
+      console.error('Failed to calculate trading stats:', statsError);
+      // Fallback to basic calculations if centralized stats fail
+      const completedSignals = signals.filter(s => s.status === 'closed' && s.pnl_percentage !== null);
+      const totalPnl = completedSignals.reduce((sum, s) => sum + (s.pnl_percentage || 0), 0);
+      tradingStats = {
+        totalSignals: signals.length,
+        activeSignals: signals.filter(s => s.status === 'active').length,
+        closedSignals: signals.filter(s => s.status === 'closed').length,
+        totalPnl,
+        winRate: completedSignals.length > 0 ? 
+          (completedSignals.filter(s => (s.pnl_percentage || 0) > 0).length / completedSignals.length) * 100 : 0,
+        averagePnl: completedSignals.length > 0 ? totalPnl / completedSignals.length : 0
+      };
+    }
 
     return (
       <Dashboard
@@ -41,12 +52,12 @@ export default async function DashboardPage() {
         subscription={null as any} // Will be provided by auth context
         signals={signals}
         stats={{
-          totalSignals,
-          activeSignals,
-          closedSignals,
-          totalPnl,
-          winRate,
-          averagePnl
+          totalSignals: tradingStats.totalSignals,
+          activeSignals: tradingStats.activeSignals,
+          closedSignals: tradingStats.closedSignals,
+          totalPnl: tradingStats.totalPnl,
+          winRate: tradingStats.winRate,
+          averagePnl: tradingStats.averageTradeReturn
         }}
       />
     );
