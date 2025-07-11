@@ -9,22 +9,24 @@ import Logo from '@/components/icons/Logo';
 import Link from 'next/link';
 
 interface OauthSignInProps {
-  allowEmail: boolean;
-  redirectMethod: string;
+  allowEmail?: boolean;
+  redirectMethod?: string;
   disableButton?: boolean;
+  nextUrl?: string;
 }
 
 export default function OauthSignIn({
-  allowEmail,
-  redirectMethod,
-  disableButton
+  allowEmail = false,
+  redirectMethod = 'server',
+  disableButton = false,
+  nextUrl
 }: OauthSignInProps) {
   const router = redirectMethod === 'client' ? useRouter() : null;
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     setIsSubmitting(true);
-    await signInWithOAuth(e);
+    await signInWithOAuth(e, nextUrl);
     setIsSubmitting(false);
   };
 
@@ -44,6 +46,7 @@ export default function OauthSignIn({
         className="space-y-6"
         onSubmit={(e) => handleSubmit(e)}
       >
+        <input type="hidden" name="provider" value="github" />
         <Button
           variant="slim"
           type="submit"

@@ -2,14 +2,23 @@ import { redirect } from 'next/navigation';
 import { getUser } from '@/utils/supabase/queries';
 import { createClient } from '@/utils/supabase/server';
 import PasswordSignIn from '@/components/ui/AuthForms/PasswordSignIn';
-import OauthSignIn from '@/components/ui/AuthForms/OauthSignIn';
-import Separator from '@/components/ui/AuthForms/Separator';
 
-export default async function SignIn() {
+interface SignInProps {
+  searchParams: { [key: string]: string | string[] | undefined };
+}
+
+export default async function SignIn({ searchParams }: SignInProps) {
   const supabase = createClient();
   const user = await getUser(supabase);
 
+  // Get the next URL from search params
+  const nextUrl = searchParams.next as string;
+
   if (user) {
+    // If user is already logged in, redirect to the next URL or dashboard
+    if (nextUrl && nextUrl.startsWith('/') && !nextUrl.startsWith('//')) {
+      return redirect(nextUrl);
+    }
     return redirect('/dashboard');
   }
 
@@ -31,10 +40,8 @@ export default async function SignIn() {
           </p>
         </div>
         
-        <div className="mt-8 space-y-6">
+        <div className="mt-8">
           <PasswordSignIn />
-          <Separator />
-          <OauthSignIn />
         </div>
       </div>
     </div>

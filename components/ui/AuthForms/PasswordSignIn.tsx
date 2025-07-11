@@ -11,15 +11,15 @@ import Logo from '@/components/icons/Logo';
 
 // Define prop type with allowEmail boolean
 interface PasswordSignInProps {
-  allowEmail: boolean;
-  redirectMethod: string;
+  allowEmail?: boolean;
+  redirectMethod?: string;
   disableButton?: boolean;
 }
 
 export default function PasswordSignIn({
-  allowEmail,
-  redirectMethod,
-  disableButton
+  allowEmail = false,
+  redirectMethod = 'server',
+  disableButton = false
 }: PasswordSignInProps) {
   const router = redirectMethod === 'client' ? useRouter() : null;
   const [isSubmitting, setIsSubmitting] = useState(false);

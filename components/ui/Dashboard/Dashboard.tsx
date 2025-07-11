@@ -204,22 +204,22 @@ export default function Dashboard({
       {/* Notification */}
       {notification && (
         <div
-          className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg transition-all duration-300 ${
+          className={`fixed top-4 right-4 z-50 p-6 rounded-xl shadow-xl backdrop-blur-md transition-all duration-300 border ring-1 ${
             notification.type === 'success'
-              ? 'bg-emerald-600 text-white'
-              : 'bg-red-600 text-white'
+              ? 'bg-emerald-900/90 border-emerald-500/50 ring-emerald-500/20 text-white'
+              : 'bg-red-900/90 border-red-500/50 ring-red-500/20 text-white'
           }`}
         >
           <div className="flex items-center">
             {notification.type === 'success' ? (
-              <CheckCircle className="w-5 h-5 mr-2" />
+              <CheckCircle className="w-5 h-5 mr-3 text-emerald-400" />
             ) : (
-              <XCircle className="w-5 h-5 mr-2" />
+              <XCircle className="w-5 h-5 mr-3 text-red-400" />
             )}
-            <span className="text-sm font-medium">{notification.message}</span>
+            <span className="text-sm font-medium flex-1">{notification.message}</span>
             <button
               onClick={() => setNotification(null)}
-              className="ml-4 text-white/80 hover:text-white"
+              className="ml-4 text-white/60 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-all"
             >
               <XCircle className="w-4 h-4" />
             </button>

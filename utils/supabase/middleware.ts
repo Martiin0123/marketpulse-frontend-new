@@ -4,9 +4,9 @@ import { User } from '@supabase/supabase-js';
 
 const PROTECTED_ROUTES = ['/dashboard', '/signals', '/account', '/referrals', '/performance-reports'];
 
-// Extremely aggressive cache to reduce auth requests in production
+// Reasonable cache to reduce auth requests while maintaining session accuracy
 const authCache = new Map<string, { user: User | null; timestamp: number }>();
-const CACHE_DURATION = process.env.NODE_ENV === 'production' ? 15 * 60 * 1000 : 5 * 60 * 1000; // 15 min in prod, 5 min in dev
+const CACHE_DURATION = process.env.NODE_ENV === 'production' ? 2 * 60 * 1000 : 1 * 60 * 1000; // 2 min in prod, 1 min in dev
 
 // Circuit breaker for Supabase auth failures
 let authCircuitBreaker = {
@@ -17,10 +17,10 @@ let authCircuitBreaker = {
 const CIRCUIT_BREAKER_THRESHOLD = 3;
 const CIRCUIT_BREAKER_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
-// Extremely conservative rate limiting for auth requests
+// Reasonable rate limiting for auth requests
 const rateLimitMap = new Map<string, { count: number; timestamp: number }>();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const MAX_REQUESTS_PER_WINDOW = process.env.NODE_ENV === 'production' ? 1 : 2; // 1 request per minute in production
+const MAX_REQUESTS_PER_WINDOW = process.env.NODE_ENV === 'production' ? 5 : 10; // 5 requests per minute in production
 
 // Helper function to clean up expired cache entries on-demand
 const cleanupExpiredEntries = () => {

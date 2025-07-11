@@ -1,5 +1,3 @@
-import { createClient } from '@/utils/supabase/server';
-import { getSubscription } from '@/utils/supabase/queries';
 import { calculateTradingStats } from '@/utils/stats';
 import {
   BarChart3,
@@ -11,14 +9,6 @@ import {
 } from 'lucide-react';
 
 export default async function PerformanceReports() {
-  const supabase = createClient();
-
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  const subscription = user ? await getSubscription(supabase) : null;
-
   // Calculate trading stats directly
   const tradingStats = await calculateTradingStats();
 

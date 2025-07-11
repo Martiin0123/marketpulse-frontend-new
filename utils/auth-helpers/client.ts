@@ -26,7 +26,7 @@ export async function handleRequest(
   }
 }
 
-export async function signInWithOAuth(e: React.FormEvent<HTMLFormElement>) {
+export async function signInWithOAuth(e: React.FormEvent<HTMLFormElement>, nextUrl?: string) {
   // Prevent default form submission refresh
   e.preventDefault();
   const formData = new FormData(e.currentTarget);
@@ -34,7 +34,13 @@ export async function signInWithOAuth(e: React.FormEvent<HTMLFormElement>) {
 
   // Create client-side supabase client and call signInWithOAuth
   const supabase = createClient();
-  const redirectURL = getURL('/auth/callback');
+  let redirectURL = getURL('/auth/callback');
+  
+  // If nextUrl is provided, add it as a query parameter
+  if (nextUrl) {
+    redirectURL += `?next=${encodeURIComponent(nextUrl)}`;
+  }
+  
   await supabase.auth.signInWithOAuth({
     provider: provider,
     options: {

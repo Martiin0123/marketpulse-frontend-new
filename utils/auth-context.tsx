@@ -67,20 +67,20 @@ export function AuthProvider({
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
-      console.log('Auth state changed:', event);
+      console.log('Auth state changed:', event, session?.expires_at);
 
       try {
         const currentUser = session?.user || null;
         setUser(currentUser);
         setError(null);
 
-        // Fetch subscription if user exists and this is a sign-in event
+        // Fetch subscription if user exists and this is a sign-in or refresh event
         if (
           currentUser &&
-          (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')
+          (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')
         ) {
           await fetchSubscription(currentUser.id);
-        } else if (!currentUser) {
+        } else if (!currentUser || event === 'SIGNED_OUT') {
           setSubscription(null);
         }
       } catch (err) {

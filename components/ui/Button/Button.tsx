@@ -4,7 +4,7 @@ import cn from 'classnames';
 import React, { forwardRef, useRef, ButtonHTMLAttributes } from 'react';
 import { mergeRefs } from 'react-merge-refs';
 
-import LoadingDots from '@/components/ui/LoadingDots';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'slim' | 'flat';
@@ -96,12 +96,10 @@ const Button = forwardRef<HTMLButtonElement, Props>((props, buttonRef) => {
       }}
       {...rest}
     >
-      {children}
       {loading && (
-        <i className="flex pl-2 m-0">
-          <LoadingDots />
-        </i>
+        <LoadingSpinner size={size === 'sm' ? 'sm' : size === 'lg' || size === 'xl' ? 'lg' : 'md'} className="mr-2" />
       )}
+      {children}
     </Component>
   );
 });
