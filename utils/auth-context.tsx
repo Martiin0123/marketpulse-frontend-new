@@ -19,6 +19,7 @@ interface AuthContextType {
   subscription: Subscription | null;
   loading: boolean;
   error: string | null;
+  session: any | null;
   signOut: () => Promise<void>;
   refreshData: () => Promise<void>;
 }
@@ -40,6 +41,7 @@ export function AuthProvider({
   const [subscription, setSubscription] = useState<Subscription | null>(
     initialSubscription
   );
+  const [session, setSession] = useState<any | null>(null);
   const [loading, setLoading] = useState(!initialUser);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -72,12 +74,20 @@ export function AuthProvider({
       try {
         const currentUser = session?.user || null;
         setUser(currentUser);
+        setSession(session);
+        console.log('🔍 Auth context - Setting session:', {
+          hasSession: !!session,
+          hasUser: !!currentUser,
+          accessTokenLength: session?.access_token?.length
+        });
         setError(null);
 
         // Fetch subscription if user exists and this is a sign-in or refresh event
         if (
           currentUser &&
-          (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')
+          (event === 'SIGNED_IN' ||
+            event === 'TOKEN_REFRESHED' ||
+            event === 'INITIAL_SESSION')
         ) {
           await fetchSubscription(currentUser.id);
         } else if (!currentUser || event === 'SIGNED_OUT') {
@@ -103,6 +113,13 @@ export function AuthProvider({
           error
         } = await supabase.auth.getSession();
 
+        console.log('🔍 Auth context - Initial session check:', {
+          hasSession: !!session,
+          hasUser: !!session?.user,
+          accessTokenLength: session?.access_token?.length,
+          error: error?.message
+        });
+
         if (error) {
           console.error('Initial session error:', error);
           setError(error.message);
@@ -110,6 +127,7 @@ export function AuthProvider({
 
         if (mounted && session?.user) {
           setUser(session.user);
+          setSession(session);
           await fetchSubscription(session.user.id);
         }
       } catch (err) {
@@ -232,30 +250,45 @@ export function AuthProvider({
         const keysToRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          if (key && (key.startsWith('sb-') || key.includes('supabase') || key.includes('auth'))) {
+          if (
+            key &&
+            (key.startsWith('sb-') ||
+              key.includes('supabase') ||
+              key.includes('auth'))
+          ) {
             keysToRemove.push(key);
           }
         }
-        keysToRemove.forEach(key => localStorage.removeItem(key));
-        
+        keysToRemove.forEach((key) => localStorage.removeItem(key));
+
         // Clear sessionStorage
         sessionStorage.clear();
-        
+
         // Clear specific Supabase cookies that might persist
-        const cookiesToClear = ['sb-access-token', 'sb-refresh-token', 'supabase-auth-token', 'supabase.auth.token'];
-        cookiesToClear.forEach(cookieName => {
+        const cookiesToClear = [
+          'sb-access-token',
+          'sb-refresh-token',
+          'supabase-auth-token',
+          'supabase.auth.token'
+        ];
+        cookiesToClear.forEach((cookieName) => {
           document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname}`;
           document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/`;
         });
-        
+
         // Clear all cookies as fallback
-        document.cookie.split(";").forEach(function(c) { 
-          document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+        document.cookie.split(';').forEach(function (c) {
+          document.cookie = c
+            .replace(/^ +/, '')
+            .replace(
+              /=.*/,
+              '=;expires=' + new Date().toUTCString() + ';path=/'
+            );
         });
       }
 
       // Add a small delay to ensure cleanup completes
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Force full page reload to clear any cached state
       window.location.replace('/');
@@ -266,8 +299,13 @@ export function AuthProvider({
         localStorage.clear();
         sessionStorage.clear();
         // Still try to clear cookies on error
-        document.cookie.split(";").forEach(function(c) { 
-          document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+        document.cookie.split(';').forEach(function (c) {
+          document.cookie = c
+            .replace(/^ +/, '')
+            .replace(
+              /=.*/,
+              '=;expires=' + new Date().toUTCString() + ';path=/'
+            );
         });
         window.location.replace('/');
       }
@@ -287,6 +325,7 @@ export function AuthProvider({
   const value: AuthContextType = {
     user,
     subscription,
+    session,
     loading,
     error,
     signOut,

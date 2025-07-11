@@ -203,17 +203,16 @@ export const getUserReferralCode = async (supabase: SupabaseClient) => {
     return null;
   }
 
-  const { data: referralCode, error } = await supabase
+  const { data: referralCodes, error } = await supabase
     .from('referral_codes')
     .select('*')
-    .eq('user_id', user.user.id)
-    .single();
+    .eq('user_id', user.user.id);
 
-  if (error && error.code !== 'PGRST116') {
+  if (error) {
     return null;
   }
 
-  return referralCode;
+  return referralCodes && referralCodes.length > 0 ? referralCodes[0] : null;
 };
 
 export const getReferrals = async (supabase: SupabaseClient) => {
@@ -461,20 +460,20 @@ export const ensureUserReferralCodeClient = async (supabase: SupabaseClient) => 
   console.log('🔍 User found:', user.id);
 
   // Check if user already has a referral code
-  const { data: referralCode, error } = await supabase
+  const { data: referralCodes, error } = await supabase
     .from('referral_codes')
     .select('*')
-    .eq('user_id', user.id)
-    .single();
+    .eq('user_id', user.id);
 
-  console.log('🔍 Existing referral code check:', { referralCode, error });
+  console.log('🔍 Existing referral code check:', { referralCodes, error });
 
-  if (error && error.code !== 'PGRST116') {
+  if (error) {
     console.error('❌ Error checking existing referral code:', error);
     return null;
   }
 
-  if (referralCode) {
+  if (referralCodes && referralCodes.length > 0) {
+    const referralCode = referralCodes[0];
     console.log('✅ Existing referral code found:', referralCode);
     return referralCode;
   }

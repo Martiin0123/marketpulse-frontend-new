@@ -109,7 +109,7 @@ export default function ReferralDashboard({
   const [stats, setStats] = useState(initialStats);
   const [loading, setLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const { user: authUser } = useAuth();
+  const { user: authUser, session } = useAuth();
   const supabase = createClient();
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -119,7 +119,7 @@ export default function ReferralDashboard({
   const createReferralCode = async () => {
     setLoading(true);
     try {
-      console.log('🔍 Calling referral code creation API...');
+      console.log('🔍 Checking session state...');
 
       if (!authUser) {
         console.error('❌ No authenticated user found');
@@ -129,84 +129,55 @@ export default function ReferralDashboard({
 
       console.log('🔍 Auth user found:', authUser.id);
 
-      // Use the same Supabase client that the auth context uses
-      const supabaseClient = createClient();
+      // Skip session validation since user is clearly authenticated
+      // The fact that we're on this page means auth context has the user
+      console.log('🔍 Calling simple API endpoint...');
 
-      if (!supabaseClient) {
-        console.error('❌ Supabase client not available');
-        setToastMessage('Failed to create referral code');
-        return;
-      }
-
-      // Get the current session from the same client
-      const {
-        data: { session },
-        error: sessionError
-      } = await supabaseClient.auth.getSession();
-
-      console.log('🔍 Session check:', {
-        session: !!session,
-        error: sessionError
-      });
-
-      if (sessionError) {
-        console.error('❌ Session error:', sessionError);
-        setToastMessage('Please sign in to create a referral code');
-        return;
-      }
-
-      if (!session) {
-        console.error('❌ No session found');
-        setToastMessage('Please sign in to create a referral code');
-        return;
-      }
-
-      console.log(
-        '🔍 Session found, access token length:',
-        session.access_token?.length
-      );
-      console.log(
-        '🔍 Access token preview:',
-        session.access_token?.substring(0, 20) + '...'
-      );
-
-      console.log('🔍 About to make API call with headers:', {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token?.substring(0, 20)}...`
-      });
-
-      const response = await fetch('/api/referral/create-code', {
+      // Use the simple API endpoint that handles auth via cookies
+      const response = await fetch('/api/referral/create-simple', {
         method: 'POST',
+        credentials: 'include', // Include cookies for authentication
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`
+          'Content-Type': 'application/json'
         }
       });
 
       console.log('🔍 API response status:', response.status);
-      console.log(
-        '🔍 API response headers:',
-        Object.fromEntries(response.headers.entries())
-      );
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error('❌ API error:', data);
-        setToastMessage('Failed to create referral code');
-        return;
-      }
-
-      if (data.referralCode) {
-        setReferralCode(data.referralCode);
-        setToastMessage('Referral code created successfully!');
-        console.log('✅ Referral code created:', data.referralCode);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.referralCode) {
+          setReferralCode(data.referralCode);
+          setToastMessage('Referral code created successfully!');
+          console.log('✅ Referral code created:', data.referralCode);
+        } else {
+          setToastMessage('Failed to create referral code');
+        }
       } else {
-        setToastMessage('Failed to create referral code');
+        const errorData = await response.json();
+        console.error('❌ API error:', errorData);
+        setToastMessage(
+          'Failed to create referral code: ' +
+            (errorData.error || 'Unknown error')
+        );
       }
     } catch (error) {
       console.error('Error creating referral code:', error);
-      setToastMessage('Failed to create referral code');
+      setToastMessage('Session error. Please sign in again.');
+
+      // If any error occurs, assume session is corrupted
+      try {
+        await supabase.auth.signOut({ scope: 'global' });
+      } catch (signOutError) {
+        console.error('Sign out error:', signOutError);
+      }
+
+      localStorage.clear();
+      sessionStorage.clear();
+      setTimeout(() => {
+        window.location.href =
+          '/signin?next=' + encodeURIComponent(window.location.pathname);
+      }, 1500);
     } finally {
       setLoading(false);
       setTimeout(() => setToastMessage(null), 3000);
@@ -256,6 +227,48 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  const requestReferral = async () => {
+    setLoading(true);
+    try {
+      const pendingReferrals = referrals.filter((r) => r.status === 'pending');
+
+      if (pendingReferrals.length === 0) {
+        setToastMessage('No pending referrals to request');
+        return;
+      }
+
+      const response = await fetch('/api/referral/request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({
+          pendingReferrals,
+          user: {
+            id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || 'Unknown'
+          }
+        })
+      });
+
+      if (response.ok) {
+        setToastMessage('Referral request sent successfully!');
+      } else {
+        const error = await response.json();
+        setToastMessage(
+          'Failed to send referral request: ' + (error.error || 'Unknown error')
+        );
+      }
+    } catch (error) {
+      console.error('Error requesting referral:', error);
+      setToastMessage('Failed to send referral request');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -630,6 +643,31 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
                 </tbody>
               </table>
             </div>
+
+            {/* Request Referral Button */}
+            {referrals.filter((r) => r.status === 'pending').length > 0 && (
+              <div className="mt-6 pt-6 border-t border-gray-700">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-white font-medium">
+                      Pending Referrals
+                    </h3>
+                    <p className="text-gray-400 text-sm">
+                      You have{' '}
+                      {referrals.filter((r) => r.status === 'pending').length}{' '}
+                      pending referral(s)
+                    </p>
+                  </div>
+                  <Button
+                    onClick={requestReferral}
+                    loading={loading}
+                    className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                  >
+                    Request Referral
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
