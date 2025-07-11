@@ -168,7 +168,12 @@ export default function Dashboard({
     (signal) => signal.status === 'active' || signal.status === 'executed'
   );
   const totalSignals = signals.length;
-  const recentSignals = signals.slice(0, 10);
+  const recentSignals = signals
+    .sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+    .slice(0, 10);
 
   // Calculate win rate from completed trades only
   const winningTrades = completedTrades.filter(

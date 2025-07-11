@@ -261,10 +261,10 @@ export default function BalanceChart({
       return new Date(ts).toLocaleDateString();
     };
 
-    // Process all closed signals chronologically
+    // Process all signals chronologically (including active ones)
     const allSignals = [...relevantSignals].sort((a, b) => {
-      const aTime = getExitTimestamp(a) || getEntryTimestamp(a);
-      const bTime = getExitTimestamp(b) || getEntryTimestamp(b);
+      const aTime = getEntryTimestamp(a);
+      const bTime = getEntryTimestamp(b);
       return aTime - bTime;
     });
 
@@ -281,12 +281,12 @@ export default function BalanceChart({
       });
     }
 
-    // Process each signal
+    // Process each signal - create a datapoint for every single signal
     allSignals.forEach((signal) => {
       const entryTime = getEntryTimestamp(signal);
       const exitTime = getExitTimestamp(signal);
 
-      // Add entry point for all signals
+      // Add entry point for ALL signals (including active ones)
       balanceData.push({
         date: getDateFromTimestamp(entryTime, entryTime),
         balance: runningBalance,
@@ -392,7 +392,7 @@ export default function BalanceChart({
 
     const series = [
       {
-        name: 'Balance Progression (All Signals)',
+        name: 'Balance Progression (Every Trade)',
         data: balanceData.map((d) => ({ x: d.timestamp, y: d.balance }))
       }
     ];
@@ -428,7 +428,7 @@ export default function BalanceChart({
       <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-white">
-            Balance Progression (All Signals)
+            Balance Progression (Every Trade)
           </h3>
           <div className="flex items-center space-x-4 text-sm text-slate-400">
             <div className="flex items-center space-x-1">
@@ -468,19 +468,19 @@ export default function BalanceChart({
             {stats.totalReturnPercent >= 0 ? '+' : ''}
             {stats.totalReturnPercent.toFixed(2)}%
           </p>
-          <p className="text-xs text-slate-500">All signals</p>
+          <p className="text-xs text-slate-500">Every trade</p>
         </div>
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
           <p className="text-sm font-medium text-slate-400">Balance Win Rate</p>
           <p className="text-2xl font-bold text-white">
             {stats.winRate.toFixed(1)}%
           </p>
-          <p className="text-xs text-slate-500">All signals</p>
+          <p className="text-xs text-slate-500">Every trade</p>
         </div>
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
           <p className="text-sm font-medium text-slate-400">Balance Trades</p>
           <p className="text-2xl font-bold text-white">{stats.totalTrades}</p>
-          <p className="text-xs text-slate-500">All signals</p>
+          <p className="text-xs text-slate-500">Every trade</p>
         </div>
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
           <p className="text-sm font-medium text-slate-400">Max Drawdown</p>
@@ -497,7 +497,7 @@ export default function BalanceChart({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-white">
-          Balance Progression Analysis
+          Balance Progression Analysis (Every Trade)
         </h2>
       </div>
       {content}

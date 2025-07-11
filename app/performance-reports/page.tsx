@@ -99,14 +99,38 @@ export default async function PerformanceReports() {
   } = await supabase.auth.getUser();
 
   const subscription = user ? await getSubscription(supabase) : null;
-  const signals = await getSignals(supabase);
+
+  // Fetch all signals for comprehensive analysis (not just last 50)
+  const { data: signals, error } = await supabase
+    .from('signals')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching signals:', error);
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-white mb-4">
+            Error Loading Reports
+          </h1>
+          <p className="text-slate-400">Unable to load performance data.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const signalsData = signals || [];
 
   // Calculate real performance metrics from signals
-  const completedTrades = signals.filter(
+  const completedTrades = signalsData.filter(
     (signal) => signal.status === 'closed' && signal.pnl_percentage !== null
   );
 
-  const totalTrades = signals.length;
+  const totalTrades = signalsData.length;
+  const activeTrades = signalsData.filter(
+    (signal) => signal.status === 'active'
+  ).length;
   const profitableTrades = completedTrades.filter(
     (signal) => (signal.pnl_percentage || 0) > 0
   ).length;
@@ -122,9 +146,9 @@ export default async function PerformanceReports() {
   const averageTradeReturn =
     completedTrades.length > 0 ? totalReturn / completedTrades.length : 0;
 
-  const monthlyReturns = calculateMonthlyReturns(signals);
-  const maxDrawdown = calculateMaxDrawdown(signals);
-  const sharpeRatio = calculateSharpeRatio(signals);
+  const monthlyReturns = calculateMonthlyReturns(signalsData);
+  const maxDrawdown = calculateMaxDrawdown(signalsData);
+  const sharpeRatio = calculateSharpeRatio(signalsData);
 
   // Calculate average monthly return
   const averageMonthlyReturn =
@@ -138,7 +162,9 @@ export default async function PerformanceReports() {
     monthlyReturn: averageMonthlyReturn,
     winRate,
     totalTrades,
+    activeTrades,
     profitableTrades,
+    completedTrades: completedTrades.length,
     averageTradeReturn,
     maxDrawdown,
     sharpeRatio,
@@ -204,8 +230,8 @@ export default async function PerformanceReports() {
                 {performanceData.totalTrades}
               </span>
             </div>
-            <h3 className="text-slate-300 font-medium">Total Trades</h3>
-            <p className="text-slate-400 text-sm">Signals generated</p>
+            <h3 className="text-slate-300 font-medium">Total Signals</h3>
+            <p className="text-slate-400 text-sm">All signals generated</p>
           </div>
 
           <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6">
@@ -248,7 +274,7 @@ export default async function PerformanceReports() {
                         <div
                           className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"
                           style={{
-                            width: `${Math.max(0, Math.min(item.return, 100))}%`
+                            width: `${Math.max(0, Math.min(Math.abs(item.return), 100))}%`
                           }}
                         />
                       </div>
@@ -314,12 +340,51 @@ export default async function PerformanceReports() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <Target className="w-5 h-5 text-slate-400" />
-                  <span className="text-slate-300">Profitable Trades</span>
+                  <span className="text-slate-300">Completed Trades</span>
                 </div>
                 <span className="text-lg font-semibold text-emerald-400">
-                  {performanceData.profitableTrades}/{completedTrades.length}
+                  {performanceData.completedTrades}/
+                  {performanceData.totalTrades}
                 </span>
               </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <BarChart3 className="w-5 h-5 text-slate-400" />
+                  <span className="text-slate-300">Active Signals</span>
+                </div>
+                <span className="text-lg font-semibold text-yellow-400">
+                  {performanceData.activeTrades}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Trade Statistics */}
+        <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6 mb-12">
+          <h3 className="text-xl font-semibold text-white mb-6">
+            Trade Statistics
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-emerald-400 mb-2">
+                {performanceData.profitableTrades}
+              </div>
+              <div className="text-slate-400 text-sm">Winning Trades</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-red-400 mb-2">
+                {performanceData.completedTrades -
+                  performanceData.profitableTrades}
+              </div>
+              <div className="text-slate-400 text-sm">Losing Trades</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-blue-400 mb-2">
+                {performanceData.completedTrades}
+              </div>
+              <div className="text-slate-400 text-sm">Total Completed</div>
             </div>
           </div>
         </div>
@@ -336,7 +401,7 @@ export default async function PerformanceReports() {
             </p>
             <p>
               • These performance metrics are based on actual trading signals
-              and historical data.
+              and historical data from closed trades only.
             </p>
             <p>
               • Individual results may vary based on market conditions, timing,

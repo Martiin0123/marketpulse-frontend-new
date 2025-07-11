@@ -32,8 +32,8 @@ export default function Stats({ statsData }: Props) {
   // Use real data if available, otherwise fall back to hardcoded values
   const realData = statsData
     ? {
-        traders: 500, // Keep hardcoded for now
-        profits: statsData.totalPnl, // Show actual PnL percentage
+        traders: 10, // Keep hardcoded for now
+        profits: statsData.totalPnl, // Show actual total PnL percentage
         signals: statsData.totalSignals || 1500,
         rating: 4.9 // Keep hardcoded for now
       }
@@ -57,7 +57,7 @@ export default function Stats({ statsData }: Props) {
       value: counts.profits,
       prefix: counts.profits >= 0 ? '+' : '',
       suffix: '%',
-      label: "This Month's Performance",
+      label: 'Total Performance',
       description: statsData
         ? `Based on ${statsData.completedTrades} completed trades`
         : 'Total performance from our signals'
@@ -66,7 +66,7 @@ export default function Stats({ statsData }: Props) {
       icon: <TrendingUp className="w-8 h-8 text-cyan-400" />,
       value: counts.signals,
       suffix: '+',
-      label: 'Signals Delivered',
+      label: 'Total Signals Sent',
       description: statsData
         ? `${statsData.profitableTrades} profitable trades`
         : 'Successful trading signals'
@@ -81,6 +81,7 @@ export default function Stats({ statsData }: Props) {
   ];
 
   useEffect(() => {
+    // Only animate once when component mounts
     const animateCounts = () => {
       const duration = 2000;
       const steps = 60;
@@ -109,7 +110,7 @@ export default function Stats({ statsData }: Props) {
     // Start animation when component mounts
     const timer = setTimeout(animateCounts, 500);
     return () => clearTimeout(timer);
-  }, [realData]);
+  }, []); // Remove realData dependency to prevent re-animation
 
   return (
     <section className="py-20 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">

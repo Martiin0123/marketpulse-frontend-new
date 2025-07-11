@@ -329,7 +329,7 @@ export default function Pricing({ user, products, subscription }: Props) {
                       {/* Current Plan Badge */}
                       {isCurrentPlan && (
                         <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
-                          <div className="bg-gradient-to-r from-emerald-500 to-green-500 px-6 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
+                          <div className="bg-gradient-to-r from-emerald-500 to-green-500 px-8 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
                             <Check className="w-4 h-4 mr-2" />
                             Current Plan
                           </div>
