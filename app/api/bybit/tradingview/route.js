@@ -678,6 +678,7 @@ export async function POST(request) {
 
     const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
     const discordFreeWebhookUrl = process.env.DISCORD_WEBHOOK_URL_FREE;
+    const discordErrorWebhookUrl = process.env.DISCORD_WEBHOOK_URL_ERROR;
     
     // Trade counter for Discord webhook management - using signal ID
     let isEveryFifthTrade = false;
@@ -1118,12 +1119,12 @@ export async function POST(request) {
       } catch (directError) {
         console.error('❌ Direct signal failed:', directError);
         
-        if (discordWebhookUrl) {
+        if (discordErrorWebhookUrl) {
           await sendErrorDiscordNotification({
             symbol: symbol.toUpperCase(),
             action: action,
             price: 0
-          }, directError, discordWebhookUrl);
+          }, directError, discordErrorWebhookUrl);
         }
         
         return new Response(JSON.stringify({
@@ -1146,13 +1147,13 @@ export async function POST(request) {
       } catch (closeError) {
         console.error('❌ Failed to close position:', closeError);
         
-        if (discordWebhookUrl) {
+        if (discordErrorWebhookUrl) {
           await sendErrorDiscordNotification({
             symbol: symbol.toUpperCase(),
             action: 'CLOSE',
             price: 0,
             dbErrorHint
-          }, closeError, discordWebhookUrl);
+          }, closeError, discordErrorWebhookUrl);
         }
         
         return new Response(JSON.stringify({ 
