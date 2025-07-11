@@ -121,10 +121,29 @@ export default function ReferralDashboard({
     try {
       console.log('🔍 Calling referral code creation API...');
 
+      if (!supabase) {
+        console.error('❌ Supabase client not available');
+        setToastMessage('Failed to create referral code');
+        return;
+      }
+
+      // Get the current session
+      const {
+        data: { session },
+        error: sessionError
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        console.error('❌ No session found:', sessionError);
+        setToastMessage('Please sign in to create a referral code');
+        return;
+      }
+
       const response = await fetch('/api/referral/create-code', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`
         }
       });
 
