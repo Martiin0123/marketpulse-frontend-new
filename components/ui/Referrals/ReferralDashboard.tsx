@@ -129,17 +129,20 @@ export default function ReferralDashboard({
 
       console.log('🔍 Auth user found:', authUser.id);
 
-      if (!supabase) {
+      // Use the same Supabase client that the auth context uses
+      const supabaseClient = createClient();
+
+      if (!supabaseClient) {
         console.error('❌ Supabase client not available');
         setToastMessage('Failed to create referral code');
         return;
       }
 
-      // Get the current session from the existing supabase client
+      // Get the current session from the same client
       const {
         data: { session },
         error: sessionError
-      } = await supabase.auth.getSession();
+      } = await supabaseClient.auth.getSession();
 
       console.log('🔍 Session check:', {
         session: !!session,
@@ -162,6 +165,15 @@ export default function ReferralDashboard({
         '🔍 Session found, access token length:',
         session.access_token?.length
       );
+      console.log(
+        '🔍 Access token preview:',
+        session.access_token?.substring(0, 20) + '...'
+      );
+
+      console.log('🔍 About to make API call with headers:', {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token?.substring(0, 20)}...`
+      });
 
       const response = await fetch('/api/referral/create-code', {
         method: 'POST',
@@ -172,6 +184,10 @@ export default function ReferralDashboard({
       });
 
       console.log('🔍 API response status:', response.status);
+      console.log(
+        '🔍 API response headers:',
+        Object.fromEntries(response.headers.entries())
+      );
 
       const data = await response.json();
 
