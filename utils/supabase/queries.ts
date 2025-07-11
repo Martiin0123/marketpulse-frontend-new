@@ -444,11 +444,21 @@ export const ensureUserReferralCode = async (supabase: SupabaseClient) => {
 
 // Client-side version without cache
 export const ensureUserReferralCodeClient = async (supabase: SupabaseClient) => {
-  const { data: { user } } = await supabase.auth.getUser();
+  console.log('🔍 Starting ensureUserReferralCodeClient');
   
-  if (!user) {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  
+  if (userError) {
+    console.error('❌ Error getting user:', userError);
     return null;
   }
+  
+  if (!user) {
+    console.error('❌ No user found');
+    return null;
+  }
+
+  console.log('🔍 User found:', user.id);
 
   // Check if user already has a referral code
   const { data: referralCode, error } = await supabase
@@ -457,13 +467,19 @@ export const ensureUserReferralCodeClient = async (supabase: SupabaseClient) => 
     .eq('user_id', user.id)
     .single();
 
+  console.log('🔍 Existing referral code check:', { referralCode, error });
+
   if (error && error.code !== 'PGRST116') {
+    console.error('❌ Error checking existing referral code:', error);
     return null;
   }
 
   if (referralCode) {
+    console.log('✅ Existing referral code found:', referralCode);
     return referralCode;
   }
+
+  console.log('🔍 No existing referral code, creating new one...');
 
   // Call the database function to create referral code
   // Since we don't have a public.users table, we'll pass null for user_name
@@ -472,7 +488,10 @@ export const ensureUserReferralCodeClient = async (supabase: SupabaseClient) => 
     user_name: null
   });
 
+  console.log('🔍 RPC call result:', { data, createError });
+
   if (createError) {
+    console.error('❌ Error creating referral code via RPC:', createError);
     return null;
   }
 
@@ -483,10 +502,14 @@ export const ensureUserReferralCodeClient = async (supabase: SupabaseClient) => 
     .eq('user_id', user.id)
     .single();
 
+  console.log('🔍 Fetching new referral code:', { newReferralCode, fetchError });
+
   if (fetchError) {
+    console.error('❌ Error fetching new referral code:', fetchError);
     return null;
   }
 
+  console.log('✅ Successfully created referral code:', newReferralCode);
   return newReferralCode;
 };
 

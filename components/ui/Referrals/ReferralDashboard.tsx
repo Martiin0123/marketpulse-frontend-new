@@ -119,10 +119,27 @@ export default function ReferralDashboard({
   const createReferralCode = async () => {
     setLoading(true);
     try {
-      const newCode = await ensureUserReferralCodeClient(supabase);
-      if (newCode) {
-        setReferralCode(newCode);
+      console.log('🔍 Calling referral code creation API...');
+
+      const response = await fetch('/api/referral/create-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('❌ API error:', data);
+        setToastMessage('Failed to create referral code');
+        return;
+      }
+
+      if (data.referralCode) {
+        setReferralCode(data.referralCode);
         setToastMessage('Referral code created successfully!');
+        console.log('✅ Referral code created:', data.referralCode);
       } else {
         setToastMessage('Failed to create referral code');
       }
