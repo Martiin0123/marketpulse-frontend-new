@@ -10,6 +10,9 @@ import {
 } from '@/utils/supabase/queries';
 import ReferralDashboard from '@/components/ui/Referrals/ReferralDashboard';
 
+// Force dynamic rendering since this page uses auth
+export const dynamic = 'force-dynamic';
+
 export default async function ReferralsPage() {
   const supabase = createClient();
   const [user, subscription] = await Promise.all([

@@ -2,7 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { unstable_cache as cache } from 'next/cache';
 import { Tables } from '@/types_db';
 
-export const getUser = cache(async (supabase: SupabaseClient) => {
+export const getUser = async (supabase: SupabaseClient) => {
   const { data: user } = await supabase.auth.getUser();
   
   if (!user.user?.id) {
@@ -11,9 +11,9 @@ export const getUser = cache(async (supabase: SupabaseClient) => {
 
   // Using auth.users directly - no need for custom users table
   return user.user;
-});
+};
 
-export const getSubscription = cache(async (supabase: SupabaseClient) => {
+export const getSubscription = async (supabase: SupabaseClient) => {
   const { data: user } = await supabase.auth.getUser();
   
   if (!user.user?.id) {
@@ -79,7 +79,7 @@ export const getSubscription = cache(async (supabase: SupabaseClient) => {
   }
 
   return subscription;
-});
+};
 
 export const getProducts = cache(async (supabase: SupabaseClient) => {
   const { data: products, error } = await supabase
@@ -125,7 +125,7 @@ export type UserDetails = {
   payment_method: any;
 };
 
-export const getUserDetails = cache(async (supabase: SupabaseClient): Promise<UserDetails | null> => {
+export const getUserDetails = async (supabase: SupabaseClient): Promise<UserDetails | null> => {
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user?.id) {
@@ -140,7 +140,7 @@ export const getUserDetails = cache(async (supabase: SupabaseClient): Promise<Us
     billing_address: user.user_metadata?.billing_address || null,
     payment_method: user.user_metadata?.payment_method || null
   };
-});
+};
 
 export const getSignals = cache(async (supabase: SupabaseClient) => {
   const { data: signals, error } = await supabase
@@ -196,7 +196,7 @@ export const getClosedPositionsCurrentMonth = cache(async (supabase: SupabaseCli
 });
 
 // Referral-related queries
-export const getUserReferralCode = cache(async (supabase: SupabaseClient) => {
+export const getUserReferralCode = async (supabase: SupabaseClient) => {
   const { data: user } = await supabase.auth.getUser();
   
   if (!user.user?.id) {
@@ -214,9 +214,9 @@ export const getUserReferralCode = cache(async (supabase: SupabaseClient) => {
   }
 
   return referralCode;
-});
+};
 
-export const getReferrals = cache(async (supabase: SupabaseClient) => {
+export const getReferrals = async (supabase: SupabaseClient) => {
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
@@ -247,10 +247,10 @@ export const getReferrals = cache(async (supabase: SupabaseClient) => {
       // You can get user details from auth.users if needed
     }
   }));
-});
+};
 
 // New function to get referral statistics
-export const getReferralStats = cache(async (supabase: SupabaseClient) => {
+export const getReferralStats = async (supabase: SupabaseClient) => {
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
@@ -298,9 +298,9 @@ export const getReferralStats = cache(async (supabase: SupabaseClient) => {
     pendingReferrals,
     activeReferrals
   };
-});
+};
 
-export const getReferralRewards = cache(async (supabase: SupabaseClient) => {
+export const getReferralRewards = async (supabase: SupabaseClient) => {
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
@@ -351,7 +351,7 @@ export const getReferralRewards = cache(async (supabase: SupabaseClient) => {
       } : null
     };
   });
-});
+};
 
 export const validateReferralCode = async (supabase: SupabaseClient, code: string) => {
   try {
@@ -491,7 +491,7 @@ export const ensureUserReferralCodeClient = async (supabase: SupabaseClient) => 
 };
 
 // New function to calculate pro-rated monthly performance for No Loss Guarantee
-export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClient, targetMonth?: string) => {
+export const getProRatedMonthlyPerformance = async (supabase: SupabaseClient, targetMonth?: string) => {
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
@@ -648,7 +648,7 @@ export const getProRatedMonthlyPerformance = cache(async (supabase: SupabaseClie
     isPeriodEnded,
     signals
   };
-});
+};
 
 export const getClosedBybitSignalsCurrentMonth = cache(async (supabase: SupabaseClient) => {
   // Get the start and end of the current month

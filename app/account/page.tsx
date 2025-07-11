@@ -7,6 +7,9 @@ import {
 } from '@/utils/supabase/queries';
 import AccountPage from '@/components/ui/Account/AccountPage';
 
+// Force dynamic rendering since this page uses auth
+export const dynamic = 'force-dynamic';
+
 export default async function Account() {
   const supabase = createClient();
   const [user, userDetails, subscription] = await Promise.all([

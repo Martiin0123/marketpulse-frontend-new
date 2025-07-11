@@ -8,6 +8,9 @@ import {
   Percent
 } from 'lucide-react';
 
+// Force dynamic rendering since this page uses auth/data
+export const dynamic = 'force-dynamic';
+
 export default async function PerformanceReports() {
   // Calculate trading stats directly
   const tradingStats = await calculateTradingStats();

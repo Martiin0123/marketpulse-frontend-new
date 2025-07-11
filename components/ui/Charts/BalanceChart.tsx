@@ -248,7 +248,7 @@ export default function BalanceChart({
       .filter((signal) => signal.pnl_percentage !== null) // Only include signals with PnL data
       .sort((a, b) => getEntryTimestamp(a) - getEntryTimestamp(b));
 
-    // Build comprehensive balance progression
+    // Build balance progression with one data point per completed trade
     const balanceData: BalanceDataPoint[] = [];
     let runningBalance = 100; // Start at 100%
 
@@ -261,74 +261,65 @@ export default function BalanceChart({
       return new Date(ts).toLocaleDateString();
     };
 
-    // Process all signals chronologically (including active ones)
-    const allSignals = [...relevantSignals].sort((a, b) => {
-      const aTime = getEntryTimestamp(a);
-      const bTime = getEntryTimestamp(b);
-      return aTime - bTime;
-    });
+    // Filter only completed trades and sort chronologically
+    const completedTrades = relevantSignals
+      .filter(
+        (signal) =>
+          (signal.status === 'closed' || signal.status === 'executed') &&
+          signal.pnl_percentage !== null
+      )
+      .sort((a, b) => {
+        const aTime = getExitTimestamp(a) || getEntryTimestamp(a);
+        const bTime = getExitTimestamp(b) || getEntryTimestamp(b);
+        return aTime - bTime;
+      });
 
-    // Add initial balance point if we have signals
-    if (allSignals.length > 0) {
-      const firstSignal = allSignals[0];
-      const firstTimestamp = getEntryTimestamp(firstSignal);
+    // Add initial balance point (100%)
+    if (completedTrades.length > 0) {
       balanceData.push({
-        date: getDateFromTimestamp(firstTimestamp, firstTimestamp),
+        date: 'Initial',
         balance: runningBalance,
-        timestamp: firstTimestamp,
+        timestamp:
+          Date.now() - (completedTrades.length + 1) * 24 * 60 * 60 * 1000, // Place before first trade
         type: 'entry',
-        signal: firstSignal
+        signal: {} as Signal
       });
     }
 
-    // Process each signal - create a datapoint for every single signal
-    allSignals.forEach((signal) => {
-      const entryTime = getEntryTimestamp(signal);
-      const exitTime = getExitTimestamp(signal);
+    // Process each completed trade - one data point per trade
+    completedTrades.forEach((signal, index) => {
+      const exitTime = getExitTimestamp(signal) || getEntryTimestamp(signal);
+      const pnlPercentage = signal.pnl_percentage || 0;
 
-      // Add entry point for ALL signals (including active ones)
+      // Calculate new balance after this trade
+      const newBalance = runningBalance * (1 + pnlPercentage / 100);
+
+      // Add data point for this trade
       balanceData.push({
-        date: getDateFromTimestamp(entryTime, entryTime),
-        balance: runningBalance,
-        timestamp: entryTime,
-        type: 'entry',
+        date: getDateFromTimestamp(exitTime, exitTime),
+        balance: newBalance,
+        timestamp: exitTime,
+        type: 'exit',
         signal
       });
 
-      // If signal is closed or executed, add exit point with P&L
-      if (
-        (signal.status === 'closed' || signal.status === 'executed') &&
-        exitTime &&
-        signal.pnl_percentage !== null
-      ) {
-        const pnlPercentage = signal.pnl_percentage || 0;
-        const newBalance = runningBalance * (1 + pnlPercentage / 100);
-
-        balanceData.push({
-          date: getDateFromTimestamp(exitTime, entryTime),
-          balance: newBalance,
-          timestamp: exitTime,
-          type: 'exit',
-          signal
-        });
-
-        runningBalance = newBalance;
-      }
+      // Update running balance for next trade
+      runningBalance = newBalance;
     });
 
     // Calculate statistics
-    const completedTrades = relevantSignals.filter(
+    const allCompletedTrades = relevantSignals.filter(
       (signal) =>
         (signal.status === 'closed' || signal.status === 'executed') &&
         signal.pnl_percentage !== null
     );
     const totalTrades = relevantSignals.length;
-    const winningTrades = completedTrades.filter(
+    const winningTrades = allCompletedTrades.filter(
       (signal) => (signal.pnl_percentage || 0) > 0
     ).length;
     const winRate =
-      completedTrades.length > 0
-        ? (winningTrades / completedTrades.length) * 100
+      allCompletedTrades.length > 0
+        ? (winningTrades / allCompletedTrades.length) * 100
         : 0;
     const totalReturn = runningBalance - 100;
     const totalReturnPercent = totalReturn;
@@ -392,7 +383,7 @@ export default function BalanceChart({
 
     const series = [
       {
-        name: 'Balance Progression per Trade',
+        name: 'Cumulative Balance',
         data: balanceData.map((d) => ({ x: d.timestamp, y: d.balance }))
       }
     ];
@@ -428,7 +419,7 @@ export default function BalanceChart({
       <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-white">
-            Balance Progression per Trade
+            Cumulative Balance (Starting at 100%)
           </h3>
           <div className="flex items-center space-x-4 text-sm text-slate-400">
             <div className="flex items-center space-x-1">
@@ -448,9 +439,11 @@ export default function BalanceChart({
           ) : (
             <div className="flex items-center justify-center h-full">
               <div className="text-center text-slate-400">
-                <div className="text-lg font-medium mb-2">No Trading Data</div>
+                <div className="text-lg font-medium mb-2">
+                  No Completed Trades
+                </div>
                 <div className="text-sm">
-                  Start receiving signals to see performance metrics
+                  Complete some trades to see cumulative balance progression
                 </div>
               </div>
             </div>
@@ -461,26 +454,26 @@ export default function BalanceChart({
       {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
-          <p className="text-sm font-medium text-slate-400">Balance Return</p>
+          <p className="text-sm font-medium text-slate-400">Total Return</p>
           <p
             className={`text-2xl font-bold ${stats.totalReturnPercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
           >
             {stats.totalReturnPercent >= 0 ? '+' : ''}
             {stats.totalReturnPercent.toFixed(2)}%
           </p>
-          <p className="text-xs text-slate-500">Every trade</p>
+          <p className="text-xs text-slate-500">Cumulative</p>
         </div>
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
-          <p className="text-sm font-medium text-slate-400">Balance Win Rate</p>
+          <p className="text-sm font-medium text-slate-400">Win Rate</p>
           <p className="text-2xl font-bold text-white">
             {stats.winRate.toFixed(1)}%
           </p>
-          <p className="text-xs text-slate-500">Every trade</p>
+          <p className="text-xs text-slate-500">Completed trades</p>
         </div>
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
-          <p className="text-sm font-medium text-slate-400">Balance Trades</p>
+          <p className="text-sm font-medium text-slate-400">Completed Trades</p>
           <p className="text-2xl font-bold text-white">{stats.totalTrades}</p>
-          <p className="text-xs text-slate-500">Every trade</p>
+          <p className="text-xs text-slate-500">Total signals</p>
         </div>
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
           <p className="text-sm font-medium text-slate-400">Max Drawdown</p>
