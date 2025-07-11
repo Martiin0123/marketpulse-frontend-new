@@ -223,19 +223,54 @@ export function AuthProvider({
       setSubscription(null);
       setError(null);
 
-      // Clear storage
-      localStorage.removeItem('supabase.auth.token');
-      sessionStorage.clear();
+      // Use the official sign out with scope 'global' to sign out everywhere
+      await supabase.auth.signOut({ scope: 'global' });
 
-      // Sign out from Supabase
-      await supabase!.auth.signOut();
+      // Clear all possible auth storage keys
+      if (typeof window !== 'undefined') {
+        // Clear all localStorage items that might contain auth data
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith('sb-') || key.includes('supabase') || key.includes('auth'))) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+        
+        // Clear sessionStorage
+        sessionStorage.clear();
+        
+        // Clear specific Supabase cookies that might persist
+        const cookiesToClear = ['sb-access-token', 'sb-refresh-token', 'supabase-auth-token', 'supabase.auth.token'];
+        cookiesToClear.forEach(cookieName => {
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname}`;
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/`;
+        });
+        
+        // Clear all cookies as fallback
+        document.cookie.split(";").forEach(function(c) { 
+          document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+        });
+      }
 
-      // Force redirect to home
-      window.location.href = '/';
+      // Add a small delay to ensure cleanup completes
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Force full page reload to clear any cached state
+      window.location.replace('/');
     } catch (err) {
       console.error('Sign out error:', err);
       // Even if sign out fails, clear everything and redirect
-      window.location.href = '/';
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+        sessionStorage.clear();
+        // Still try to clear cookies on error
+        document.cookie.split(";").forEach(function(c) { 
+          document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+        });
+        window.location.replace('/');
+      }
     }
   };
 

@@ -52,13 +52,28 @@ export const signUpWithEmail = async (email: string, password: string) => {
 export const signOutUser = async () => {
   const supabase = createClient();
   
-  // Clear all storage first
-  if (typeof window !== 'undefined') {
-    localStorage.clear();
-    sessionStorage.clear();
-  }
-  
-  // Then sign out
+  // Sign out from Supabase first
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+  
+  // Clear all storage
+  if (typeof window !== 'undefined') {
+    // Clear all localStorage items that might contain auth data
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('sb-') || key.includes('supabase') || key.includes('auth'))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
+    // Clear sessionStorage
+    sessionStorage.clear();
+    
+    // Clear cookies
+    document.cookie.split(";").forEach(function(c) { 
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+    });
+  }
 };
