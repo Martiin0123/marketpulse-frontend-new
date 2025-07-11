@@ -1,7 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { buffer } from 'micro';
 import Stripe from 'stripe';
-import { createClient } from '@/utils/supabase/server';
+import { createClient } from '@supabase/supabase-js';
+import {
+  upsertProductRecord,
+  upsertPriceRecord,
+  manageSubscriptionStatusChange,
+  deleteProductRecord,
+  deletePriceRecord
+} from '@/utils/supabase/admin';
 
 export const config = {
   api: {
@@ -14,6 +21,22 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 });
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+
+// Create admin Supabase client for webhook
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+// Events for product/price management
+const productPriceEvents = new Set([
+  'product.created',
+  'product.updated',
+  'product.deleted',
+  'price.created',
+  'price.updated',
+  'price.deleted'
+]);
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -46,48 +69,108 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    const supabase = createClient();
-
     console.log('🔔 Processing webhook event:', event.type);
     
+    // Handle product/price management events
+    if (productPriceEvents.has(event.type)) {
+      console.log('🔔 Handling product/price event:', event.type);
+      try {
+        switch (event.type) {
+          case 'product.created':
+          case 'product.updated':
+            await upsertProductRecord(event.data.object as Stripe.Product);
+            break;
+          case 'price.created':
+          case 'price.updated':
+            await upsertPriceRecord(event.data.object as Stripe.Price);
+            break;
+          case 'price.deleted':
+            await deletePriceRecord(event.data.object as Stripe.Price);
+            break;
+          case 'product.deleted':
+            await deleteProductRecord(event.data.object as Stripe.Product);
+            break;
+          default:
+            console.log(`🔔 Unhandled product/price event type: ${event.type}`);
+        }
+        console.log('✅ Product/price event processed successfully');
+      } catch (error) {
+        console.error('❌ Error processing product/price event:', error);
+        return res.status(400).json({ error: 'Product/price event processing failed' });
+      }
+    }
+    
+    // Handle subscription and payment events
     switch (event.type) {
       case 'checkout.session.completed':
         console.log('🔔 Handling checkout.session.completed');
-        await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session, supabase);
+        await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session, supabaseAdmin);
         break;
 
       case 'customer.subscription.created':
         console.log('🔔 Handling customer.subscription.created');
-        await handleSubscriptionCreated(event.data.object as Stripe.Subscription, supabase);
-        break;
-
-      case 'invoice.payment_succeeded':
-        console.log('🔔 Handling invoice.payment_succeeded');
-        await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice, supabase);
-        break;
-
-      case 'invoice.payment_failed':
-        console.log('🔔 Handling invoice.payment_failed');
-        await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice, supabase);
+        await handleSubscriptionCreated(event.data.object as Stripe.Subscription, supabaseAdmin);
+        // Also handle with admin utilities for customer sync
+        try {
+          await manageSubscriptionStatusChange(
+            event.data.object.id,
+            event.data.object.customer as string,
+            true
+          );
+        } catch (error) {
+          console.error('❌ Error in admin subscription handling:', error);
+        }
         break;
 
       case 'customer.subscription.updated':
         console.log('🔔 Handling customer.subscription.updated');
-        await handleSubscriptionUpdated(event.data.object as Stripe.Subscription, supabase);
+        await handleSubscriptionUpdated(event.data.object as Stripe.Subscription, supabaseAdmin);
+        // Also handle with admin utilities for customer sync
+        try {
+          await manageSubscriptionStatusChange(
+            event.data.object.id,
+            event.data.object.customer as string,
+            false
+          );
+        } catch (error) {
+          console.error('❌ Error in admin subscription handling:', error);
+        }
         break;
 
       case 'customer.subscription.deleted':
         console.log('🔔 Handling customer.subscription.deleted');
-        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription, supabase);
+        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription, supabaseAdmin);
+        // Also handle with admin utilities for customer sync
+        try {
+          await manageSubscriptionStatusChange(
+            event.data.object.id,
+            event.data.object.customer as string,
+            false
+          );
+        } catch (error) {
+          console.error('❌ Error in admin subscription handling:', error);
+        }
+        break;
+
+      case 'invoice.payment_succeeded':
+        console.log('🔔 Handling invoice.payment_succeeded');
+        await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice, supabaseAdmin);
+        break;
+
+      case 'invoice.payment_failed':
+        console.log('🔔 Handling invoice.payment_failed');
+        await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice, supabaseAdmin);
         break;
 
       case 'charge.refunded':
         console.log('🔔 Handling charge.refunded');
-        await handleChargeRefunded(event.data.object as Stripe.Charge, supabase);
+        await handleChargeRefunded(event.data.object as Stripe.Charge, supabaseAdmin);
         break;
 
       default:
-        console.log(`🔔 Unhandled event type: ${event.type}`);
+        if (!productPriceEvents.has(event.type)) {
+          console.log(`🔔 Unhandled event type: ${event.type}`);
+        }
     }
 
     res.status(200).json({ received: true });
@@ -130,7 +213,7 @@ async function handleSubscriptionCreated(
       return;
     }
     
-    // Find user by email
+    // Find user by email using admin client
     const { data: user } = await supabase.auth.admin.listUsers();
     const userRecord = user.users.find((u: any) => u.email === userEmail);
     
