@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
+import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getURL, getErrorRedirect, getStatusRedirect } from 'utils/helpers';
@@ -194,13 +195,25 @@ export async function signUp(formData: FormData) {
 
   const supabase = createClient();
   
+  // Create service role client for referral operations
+  const serviceSupabase = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    }
+  );
+  
   // Validate referral code if provided
   let validReferralCode = false;
   let referrerId = null;
   if (referralCode) {
     console.log('🔍 Validating referral code:', referralCode);
     try {
-      const { data: referralData, error: referralError } = await supabase
+      const { data: referralData, error: referralError } = await serviceSupabase
         .from('referral_codes')
         .select('user_id, is_active')
         .eq('code', referralCode)
@@ -215,6 +228,18 @@ export async function signUp(formData: FormData) {
         console.log('✅ Valid referral code found, referrer ID:', referrerId);
       } else {
         console.error('❌ Invalid referral code during signup:', referralError);
+        // Check if referral code exists but is inactive
+        const { data: inactiveCode } = await serviceSupabase
+          .from('referral_codes')
+          .select('is_active')
+          .eq('code', referralCode)
+          .single();
+        
+        if (inactiveCode) {
+          console.log('🔍 Referral code exists but is inactive');
+        } else {
+          console.log('🔍 Referral code does not exist in database');
+        }
       }
     } catch (error) {
       console.error('❌ Error validating referral code:', error);
@@ -250,30 +275,39 @@ export async function signUp(formData: FormData) {
       console.log('🔍 Referral code:', referralCode);
       
       try {
-        const { error: referralError } = await supabase
+        console.log('🔍 Attempting to insert referral record...');
+        const { data: referralData, error: referralError } = await serviceSupabase
           .from('referrals')
           .insert({
             referrer_id: referrerId,
             referee_id: authData.user.id,
             referral_code: referralCode,
             status: 'pending' // Start with pending status
-          });
+          })
+          .select();
 
         if (referralError) {
           console.error('❌ Error creating referral record:', referralError);
+          console.error('❌ Error details:', {
+            code: referralError.code,
+            message: referralError.message,
+            details: referralError.details,
+            hint: referralError.hint
+          });
         } else {
-          console.log('✅ Referral record created successfully');
+          console.log('✅ Referral record created successfully:', referralData);
           
           // Get current clicks count and increment
-          const { data: currentData } = await supabase
+          const { data: currentData } = await serviceSupabase
             .from('referral_codes')
             .select('clicks')
             .eq('code', referralCode)
             .single();
 
           const newClicks = (currentData?.clicks || 0) + 1;
+          console.log('🔍 Updating click count from', currentData?.clicks || 0, 'to', newClicks);
           
-          const { error: updateError } = await supabase
+          const { error: updateError } = await serviceSupabase
             .from('referral_codes')
             .update({ clicks: newClicks })
             .eq('code', referralCode);
@@ -289,6 +323,8 @@ export async function signUp(formData: FormData) {
       }
     } else {
       console.log('🔍 No valid referral code provided or referrer not found');
+      console.log('🔍 validReferralCode:', validReferralCode);
+      console.log('🔍 referrerId:', referrerId);
     }
 
     redirectPath = getStatusRedirect(

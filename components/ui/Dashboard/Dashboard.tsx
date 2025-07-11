@@ -216,7 +216,9 @@ export default function Dashboard({
             ) : (
               <XCircle className="w-5 h-5 mr-3 text-red-400" />
             )}
-            <span className="text-sm font-medium flex-1">{notification.message}</span>
+            <span className="text-sm font-medium flex-1">
+              {notification.message}
+            </span>
             <button
               onClick={() => setNotification(null)}
               className="ml-4 text-white/60 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-all"
@@ -553,6 +555,12 @@ export default function Dashboard({
         {activeTab === 'signals' && <SignalsTab signals={signals} />}
 
         {activeTab === 'strategy-analysis' && (
+          <div className="space-y-6">
+            <PerformanceGuaranteeWidget />
+          </div>
+        )}
+
+        {activeTab === 'performance-guarantee' && (
           <div className="space-y-6">
             <PerformanceGuaranteeWidget />
           </div>
