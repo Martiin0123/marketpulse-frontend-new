@@ -1,73 +1,99 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { headers } from 'next/headers';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { buffer } from 'micro';
 import Stripe from 'stripe';
 import { createClient } from '@/utils/supabase/server';
 
+export const config = {
+  api: {
+    bodyParser: false, // required to get raw body
+  },
+};
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16'
+  apiVersion: '2023-10-16',
 });
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
-export async function POST(request: NextRequest) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).send('Method Not Allowed');
+  }
+
+  console.log('🔔 Stripe webhook received:', {
+    method: req.method,
+    url: req.url,
+    headers: req.headers
+  });
+
   try {
-    const body = await request.text();
-    const signature = headers().get('stripe-signature')!;
+    const buf = await buffer(req);
+    const sig = req.headers['stripe-signature']!;
+
+    console.log('🔔 Webhook body length:', buf.length);
+    console.log('🔔 Webhook signature present:', !!sig);
+    console.log('🔔 Webhook secret configured:', !!webhookSecret);
 
     let event: Stripe.Event;
 
     try {
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-    } catch (err) {
-      console.error('Webhook signature verification failed:', err);
-      return NextResponse.json(
-        { error: 'Invalid signature' },
-        { status: 400 }
-      );
+      event = stripe.webhooks.constructEvent(buf, sig, webhookSecret);
+      console.log('🔔 Webhook signature verified successfully');
+      console.log('🔔 Event type:', event.type);
+      console.log('🔔 Event ID:', event.id);
+    } catch (err: any) {
+      console.error('❌ Webhook signature verification failed:', err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
     const supabase = createClient();
 
+    console.log('🔔 Processing webhook event:', event.type);
+    
     switch (event.type) {
       case 'checkout.session.completed':
+        console.log('🔔 Handling checkout.session.completed');
         await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session, supabase);
         break;
 
       case 'customer.subscription.created':
+        console.log('🔔 Handling customer.subscription.created');
         await handleSubscriptionCreated(event.data.object as Stripe.Subscription, supabase);
         break;
 
       case 'invoice.payment_succeeded':
+        console.log('🔔 Handling invoice.payment_succeeded');
         await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice, supabase);
         break;
 
       case 'invoice.payment_failed':
+        console.log('🔔 Handling invoice.payment_failed');
         await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice, supabase);
         break;
 
       case 'customer.subscription.updated':
+        console.log('🔔 Handling customer.subscription.updated');
         await handleSubscriptionUpdated(event.data.object as Stripe.Subscription, supabase);
         break;
 
       case 'customer.subscription.deleted':
+        console.log('🔔 Handling customer.subscription.deleted');
         await handleSubscriptionDeleted(event.data.object as Stripe.Subscription, supabase);
         break;
 
       case 'charge.refunded':
+        console.log('🔔 Handling charge.refunded');
         await handleChargeRefunded(event.data.object as Stripe.Charge, supabase);
         break;
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        console.log(`🔔 Unhandled event type: ${event.type}`);
     }
 
-    return NextResponse.json({ received: true });
+    res.status(200).json({ received: true });
   } catch (error) {
     console.error('Webhook error:', error);
-    return NextResponse.json(
-      { error: 'Webhook handler failed' },
-      { status: 500 }
-    );
+    res.status(500).json({ error: 'Webhook handler failed' });
   }
 }
 
