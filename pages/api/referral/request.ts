@@ -30,10 +30,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: 'Unauthorized - Invalid token' });
     }
 
-    const { pendingReferrals, user: requestUser } = req.body;
+    const { pendingReferrals, referralId, referral, user: requestUser } = req.body;
 
-    if (!pendingReferrals || !Array.isArray(pendingReferrals)) {
-      return res.status(400).json({ error: 'Invalid pending referrals data' });
+    // Check if this is an individual referral request or bulk request
+    let referralsToProcess = [];
+    let isIndividualRequest = false;
+    
+    if (referralId && referral) {
+      // Individual referral request
+      referralsToProcess = [referral];
+      isIndividualRequest = true;
+    } else if (pendingReferrals && Array.isArray(pendingReferrals)) {
+      // Bulk request (existing functionality)
+      referralsToProcess = pendingReferrals;
+    } else {
+      return res.status(400).json({ error: 'Invalid request data' });
     }
 
     // Send Discord webhook
@@ -46,8 +57,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Create Discord message
     const embed = {
-      title: '🔔 Referral Request',
-      description: `A user has requested assistance with pending referrals`,
+      title: isIndividualRequest ? '🔔 Individual Referral Request' : '🔔 Bulk Referral Request',
+      description: `A user has requested assistance with ${isIndividualRequest ? 'a' : 'pending'} referral${isIndividualRequest ? '' : 's'}`,
       color: 0xFFD700, // Gold color
       fields: [
         {
@@ -61,8 +72,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           inline: true
         },
         {
-          name: '📊 Pending Referrals',
-          value: `${pendingReferrals.length} referral(s)`,
+          name: '📊 Referrals',
+          value: `${referralsToProcess.length} referral(s)`,
           inline: true
         }
       ],
@@ -73,8 +84,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
 
     // Add referral details
-    if (pendingReferrals.length > 0) {
-      const referralDetails = pendingReferrals.map((referral: any, index: number) => {
+    if (referralsToProcess.length > 0) {
+      const referralDetails = referralsToProcess.map((referral: any, index: number) => {
         return {
           name: `Referral ${index + 1}`,
           value: `Code: ${referral.referral_code}\nCreated: ${new Date(referral.created_at).toLocaleDateString()}`,
@@ -106,7 +117,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     console.log('✅ Discord webhook sent successfully');
-    return res.status(200).json({ success: true, message: 'Referral request sent successfully' });
+
+    // Update referral status to "requested" if this is an individual request
+    if (isIndividualRequest && referralId) {
+      try {
+        const { error: updateError } = await supabaseAdmin
+          .from('referrals')
+          .update({ status: 'requested' })
+          .eq('id', referralId);
+
+        if (updateError) {
+          console.error('❌ Error updating referral status:', updateError);
+          // Don't fail the request, just log the error
+        } else {
+          console.log('✅ Referral status updated to "requested"');
+        }
+      } catch (updateError) {
+        console.error('❌ Error updating referral status:', updateError);
+        // Don't fail the request, just log the error
+      }
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Referral request sent successfully',
+      updatedStatus: isIndividualRequest ? 'requested' : null
+    });
 
   } catch (error) {
     console.error('❌ Unexpected error:', error);

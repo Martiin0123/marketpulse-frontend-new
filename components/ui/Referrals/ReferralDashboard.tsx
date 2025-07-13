@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { User } from '@supabase/supabase-js';
 import { useAuth } from '@/utils/auth-context';
-import { createClient } from '@/utils/supabase/client';
 import {
   getUserReferralCode,
   getReferrals,
@@ -26,7 +25,9 @@ import {
   CheckCircle,
   Clock,
   Trophy,
-  Target
+  Target,
+  AlertCircle,
+  X
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 
@@ -47,7 +48,7 @@ type Referral = {
   referrer_id: string;
   referee_id: string;
   referral_code: string;
-  status: 'pending' | 'active' | 'rewarded' | 'expired';
+  status: 'pending' | 'active' | 'rewarded' | 'expired' | 'requested' | 'paid';
   reward_amount: number;
   reward_currency: string;
   converted_at?: string;
@@ -88,9 +89,12 @@ interface Props {
   initialStats: {
     totalEarnings: number;
     pendingAmount: number;
+    requestedAmount: number;
     totalClicks: number;
     pendingReferrals: number;
+    requestedReferrals: number;
     activeReferrals: number;
+    totalReferrals: number;
   };
 }
 
@@ -106,16 +110,48 @@ export default function ReferralDashboard({
   );
   const [referrals, setReferrals] = useState<Referral[]>(initialReferrals);
   const [rewards, setRewards] = useState<ReferralReward[]>(initialRewards);
-  const [stats, setStats] = useState(initialStats);
+  const [stats, setStats] = useState({
+    totalEarnings: initialStats?.totalEarnings || 0,
+    pendingAmount: initialStats?.pendingAmount || 0,
+    requestedAmount: initialStats?.requestedAmount || 0,
+    totalClicks: initialStats?.totalClicks || 0,
+    pendingReferrals: initialStats?.pendingReferrals || 0,
+    requestedReferrals: initialStats?.requestedReferrals || 0,
+    activeReferrals: initialStats?.activeReferrals || 0,
+    totalReferrals: initialStats?.totalReferrals || 0
+  });
   const [loading, setLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const { user: authUser, session } = useAuth();
-  const supabase = createClient();
+  const { user: authUser, session, signOut } = useAuth();
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
   const referralUrl = referralCode
     ? `${baseUrl}/signin/signup?ref=${referralCode.code}`
     : '';
+
+  // Calculate stats dynamically from referrals data
+  useEffect(() => {
+    const calculatedStats = {
+      totalEarnings: referrals
+        .filter((r) => r.status === 'paid' || r.status === 'active')
+        .reduce((sum, r) => sum + r.reward_amount, 0),
+      pendingAmount: referrals
+        .filter((r) => r.status === 'pending')
+        .reduce((sum, r) => sum + r.reward_amount, 0),
+      requestedAmount: referrals
+        .filter((r) => r.status === 'requested')
+        .reduce((sum, r) => sum + r.reward_amount, 0),
+      totalClicks: referralCode?.clicks || 0,
+      pendingReferrals: referrals.filter((r) => r.status === 'pending').length,
+      requestedReferrals: referrals.filter((r) => r.status === 'requested')
+        .length,
+      activeReferrals: referrals.filter(
+        (r) => r.status === 'active' || r.status === 'paid'
+      ).length,
+      totalReferrals: referrals.length
+    };
+    setStats(calculatedStats);
+  }, [referrals, referralCode]);
   const createReferralCode = async () => {
     setLoading(true);
     try {
@@ -167,7 +203,7 @@ export default function ReferralDashboard({
 
       // If any error occurs, assume session is corrupted
       try {
-        await supabase.auth.signOut({ scope: 'global' });
+        await signOut();
       } catch (signOutError) {
         console.error('Sign out error:', signOutError);
       }
@@ -229,24 +265,32 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
     });
   };
 
-  const requestReferral = async () => {
-    setLoading(true);
-    try {
-      const pendingReferrals = referrals.filter((r) => r.status === 'pending');
+  const requestIndividualReferral = async (referral: Referral) => {
+    console.log('🔍 Requesting individual referral:', {
+      referralId: referral.id,
+      hasSession: !!session,
+      authUser: authUser?.id
+    });
 
-      if (pendingReferrals.length === 0) {
-        setToastMessage('No pending referrals to request');
+    try {
+      if (!authUser) {
+        console.error('❌ No authenticated user found');
+        setToastMessage('Please sign in to request referral assistance');
         return;
       }
 
-      const response = await fetch('/api/referral/request', {
+      console.log('🔍 Auth user found:', authUser.id);
+
+      // Use the same approach as createReferralCode - rely on server-side auth via cookies
+      const response = await fetch('/api/referral/request-simple', {
         method: 'POST',
+        credentials: 'include', // Include cookies for authentication
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session?.access_token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          pendingReferrals,
+          referralId: referral.id,
+          referral,
           user: {
             id: user.id,
             email: user.email,
@@ -255,24 +299,30 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
         })
       });
 
-      if (response.ok) {
-        setToastMessage('Referral request sent successfully!');
-      } else {
-        const error = await response.json();
-        setToastMessage(
-          'Failed to send referral request: ' + (error.error || 'Unknown error')
-        );
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to request referral');
       }
+
+      const result = await response.json();
+      setToastMessage(result.message || 'Referral request sent successfully!');
+
+      // Update the referral status locally
+      setReferrals((prevReferrals) =>
+        prevReferrals.map((r) =>
+          r.id === referral.id ? { ...r, status: 'requested' as const } : r
+        )
+      );
     } catch (error) {
-      console.error('Error requesting referral:', error);
-      setToastMessage('Failed to send referral request');
-    } finally {
-      setLoading(false);
+      console.error('Error requesting individual referral:', error);
+      setToastMessage(
+        error instanceof Error ? error.message : 'Failed to request referral'
+      );
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
       {/* Toast Message */}
       {toastMessage && (
         <div className="fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50">
@@ -283,7 +333,7 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
+          <h1 className="text-4xl font-bold text-white mb-2">
             Referral Program
           </h1>
           <p className="text-gray-400 text-lg">
@@ -294,7 +344,7 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
 
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
             <div className="flex items-center">
               <div className="p-2 bg-green-500/20 rounded-lg">
                 <DollarSign className="w-6 h-6 text-green-400" />
@@ -304,67 +354,69 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
                   Total Earnings
                 </p>
                 <p className="text-2xl font-bold text-white">
-                  €{stats.totalEarnings.toFixed(2)}
+                  €{(stats.totalEarnings || 0).toFixed(2)}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-purple-500/20 rounded-lg">
-                <Clock className="w-6 h-6 text-purple-400" />
+              <div className="p-2 bg-orange-500/20 rounded-lg">
+                <AlertCircle className="w-6 h-6 text-orange-400" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-400">
+                  Requested Amount
+                </p>
+                <p className="text-2xl font-bold text-white">
+                  €{(stats.requestedAmount || 0).toFixed(2)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-yellow-500/20 rounded-lg">
+                <Clock className="w-6 h-6 text-yellow-400" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-400">
                   Pending Amount
                 </p>
                 <p className="text-2xl font-bold text-white">
-                  €{stats.pendingAmount.toFixed(2)}
+                  €{(stats.pendingAmount || 0).toFixed(2)}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
             <div className="flex items-center">
               <div className="p-2 bg-blue-500/20 rounded-lg">
                 <Users className="w-6 h-6 text-blue-400" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-400">
-                  Active Referrals
+                  Total Referrals
                 </p>
                 <p className="text-2xl font-bold text-white">
-                  {stats.activeReferrals}
+                  {stats.totalReferrals || 0}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-yellow-500/20 rounded-lg">
-                <Clock className="w-6 h-6 text-yellow-400" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-400">Pending</p>
-                <p className="text-2xl font-bold text-white">
-                  {stats.pendingReferrals}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-orange-500/20 rounded-lg">
-                <Target className="w-6 h-6 text-orange-400" />
+              <div className="p-2 bg-slate-500/20 rounded-lg">
+                <Target className="w-6 h-6 text-slate-400" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-400">Clicks</p>
                 <p className="text-2xl font-bold text-white">
-                  {stats.totalClicks}
+                  {stats.totalClicks || 0}
                 </p>
               </div>
             </div>
@@ -373,10 +425,10 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Referral Link Section */}
-          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
             <div className="flex items-center space-x-3 mb-6">
-              <div className="p-2 bg-purple-500/20 rounded-lg">
-                <Share2 className="w-6 h-6 text-purple-400" />
+              <div className="p-2 bg-blue-500/20 rounded-lg">
+                <Share2 className="w-6 h-6 text-blue-400" />
               </div>
               <div>
                 <h2 className="text-xl font-semibold text-white">
@@ -490,7 +542,7 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
           </div>
 
           {/* Referral Program Info */}
-          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
             <div className="flex items-center space-x-3 mb-6">
               <div className="p-2 bg-green-500/20 rounded-lg">
                 <Gift className="w-6 h-6 text-green-400" />
@@ -505,7 +557,7 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
 
             <div className="space-y-4">
               <div className="flex items-start space-x-3">
-                <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
                   1
                 </div>
                 <div>
@@ -517,7 +569,7 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
               </div>
 
               <div className="flex items-start space-x-3">
-                <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
                   2
                 </div>
                 <div>
@@ -529,7 +581,7 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
               </div>
 
               <div className="flex items-start space-x-3">
-                <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
                   3
                 </div>
                 <div>
@@ -558,7 +610,7 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
 
         {/* Referrals List */}
         {referrals.length > 0 && (
-          <div className="mt-8 bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
+          <div className="mt-8 bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
             <div className="flex items-center space-x-3 mb-6">
               <div className="p-2 bg-blue-500/20 rounded-lg">
                 <Users className="w-6 h-6 text-blue-400" />
@@ -574,7 +626,7 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-gray-700">
+                  <tr className="border-b border-slate-700">
                     <th className="text-left text-gray-400 font-medium py-3 px-4">
                       User
                     </th>
@@ -585,7 +637,10 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
                       Date
                     </th>
                     <th className="text-left text-gray-400 font-medium py-3 px-4">
-                      Reward
+                      Amount
+                    </th>
+                    <th className="text-left text-gray-400 font-medium py-3 px-4">
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -593,7 +648,7 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
                   {referrals.map((referral) => (
                     <tr
                       key={referral.id}
-                      className="border-b border-gray-700/50"
+                      className="border-b border-slate-700/50"
                     >
                       <td className="py-4 px-4">
                         <div>
@@ -610,15 +665,25 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
                           className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
                             referral.status === 'active'
                               ? 'bg-green-500/20 text-green-400'
-                              : referral.status === 'pending'
-                                ? 'bg-yellow-500/20 text-yellow-400'
-                                : 'bg-gray-500/20 text-gray-400'
+                              : referral.status === 'paid'
+                                ? 'bg-green-500/20 text-green-400'
+                                : referral.status === 'pending'
+                                  ? 'bg-yellow-500/20 text-yellow-400'
+                                  : referral.status === 'requested'
+                                    ? 'bg-orange-500/20 text-orange-400'
+                                    : 'bg-gray-500/20 text-gray-400'
                           }`}
                         >
                           {referral.status === 'active' && (
                             <CheckCircle className="w-3 h-3" />
                           )}
+                          {referral.status === 'paid' && (
+                            <CheckCircle className="w-3 h-3" />
+                          )}
                           {referral.status === 'pending' && (
+                            <Clock className="w-3 h-3" />
+                          )}
+                          {referral.status === 'requested' && (
                             <Clock className="w-3 h-3" />
                           )}
                           <span className="capitalize">{referral.status}</span>
@@ -628,99 +693,33 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
                         {formatDate(referral.created_at)}
                       </td>
                       <td className="py-4 px-4">
-                        <span
-                          className={`font-medium ${
-                            referral.status === 'active'
-                              ? 'text-green-400'
-                              : 'text-gray-400'
-                          }`}
-                        >
-                          {referral.status === 'active' ? '€19.00' : 'Pending'}
+                        <span className="inline-flex items-center justify-center w-8 h-8 bg-green-500/20 rounded-full text-sm font-bold text-green-400 mr-2">
+                          €
                         </span>
+                        <span className="font-medium text-green-400">
+                          {(referral.reward_amount || 0).toFixed(2)}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4">
+                        {referral.status === 'pending' && (
+                          <Button
+                            onClick={() => requestIndividualReferral(referral)}
+                            size="sm"
+                            className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                          >
+                            Request
+                          </Button>
+                        )}
+                        {referral.status === 'requested' && (
+                          <span className="text-yellow-400 text-sm font-medium">
+                            Requested
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
-
-            {/* Request Referral Button */}
-            {referrals.filter((r) => r.status === 'pending').length > 0 && (
-              <div className="mt-6 pt-6 border-t border-gray-700">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-white font-medium">
-                      Pending Referrals
-                    </h3>
-                    <p className="text-gray-400 text-sm">
-                      You have{' '}
-                      {referrals.filter((r) => r.status === 'pending').length}{' '}
-                      pending referral(s)
-                    </p>
-                  </div>
-                  <Button
-                    onClick={requestReferral}
-                    loading={loading}
-                    className="bg-yellow-600 hover:bg-yellow-700 text-white"
-                  >
-                    Request Referral
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Rewards History */}
-        {rewards.length > 0 && (
-          <div className="mt-8 bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="p-2 bg-green-500/20 rounded-lg">
-                <Trophy className="w-6 h-6 text-green-400" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-white">
-                  Rewards History
-                </h2>
-                <p className="text-gray-400">Your earning history</p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {rewards.map((reward) => (
-                <div
-                  key={reward.id}
-                  className="flex items-center justify-between p-4 bg-gray-700/30 rounded-lg"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-green-500/20 rounded-lg">
-                      <DollarSign className="w-4 h-4 text-green-400" />
-                    </div>
-                    <div>
-                      <div className="text-white font-medium">
-                        Referral Reward - {reward.referral?.referee?.full_name}
-                      </div>
-                      <div className="text-gray-400 text-sm">
-                        {formatDate(reward.created_at)}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-green-400 font-bold">
-                      +${Number(reward.amount).toFixed(2)}
-                    </div>
-                    <div
-                      className={`text-xs ${
-                        reward.status === 'paid'
-                          ? 'text-green-400'
-                          : 'text-yellow-400'
-                      }`}
-                    >
-                      {reward.status}
-                    </div>
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
         )}

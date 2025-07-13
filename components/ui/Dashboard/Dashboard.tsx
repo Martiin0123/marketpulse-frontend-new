@@ -3,7 +3,7 @@
 import { User } from '@supabase/supabase-js';
 import { Tables } from '@/types_db';
 import { useState, useEffect } from 'react';
-import { createClient } from '@/utils/supabase/client';
+
 import {
   Activity,
   TrendingUp,
@@ -17,7 +17,8 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  AlertTriangle
+  AlertTriangle,
+  X
 } from 'lucide-react';
 import { Database } from '@/types_db';
 import BalanceChart from '@/components/ui/Charts/BalanceChart';
@@ -65,7 +66,6 @@ export default function Dashboard({
     type: 'success' | 'error';
     message: string;
   } | null>(null);
-  const supabase = createClient();
 
   // Use auth context data if available, otherwise fall back to props
   const user = authUser || initialUser;
@@ -95,68 +95,67 @@ export default function Dashboard({
     }
   }, []); // Empty dependency array - only run once
 
-  // Real-time updates for signals - only set up once when component mounts
-  useEffect(() => {
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    let isSubscribed = false;
+  // Real-time updates for signals - temporarily disabled to prevent rate limiting
+  // useEffect(() => {
+  //   let channel: ReturnType<typeof supabase.channel> | null = null;
+  //   let isSubscribed = false;
 
-    const setupChannel = async () => {
-      try {
-        // Avoid duplicate subscriptions
-        if (isSubscribed) return;
+  //   const setupChannel = async () => {
+  //     try {
+  //       // Avoid duplicate subscriptions
+  //       if (isSubscribed) return;
 
-        channel = supabase
-          .channel('signals-changes-dashboard')
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'signals'
-            },
-            (payload) => {
-              if (payload.eventType === 'INSERT') {
-                setSignals((current) => {
-                  // Prevent duplicate signals
-                  const existingSignal = current.find(
-                    (s) => s.id === payload.new.id
-                  );
-                  if (existingSignal) return current;
-                  return [payload.new as Signal, ...current];
-                });
-              } else if (payload.eventType === 'UPDATE') {
-                setSignals((current) =>
-                  current.map((signal) =>
-                    signal.id === payload.new.id
-                      ? (payload.new as Signal)
-                      : signal
-                  )
-                );
-              }
-            }
-          )
-          .subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
-              isSubscribed = true;
-            }
-          });
-      } catch (error) {
-        console.error('Failed to setup real-time channel:', error);
-      }
-    };
+  //       channel = supabase
+  //         .channel('signals-changes-dashboard')
+  //         .on(
+  //           'postgres_changes',
+  //           {
+  //             event: '*',
+  //             schema: 'public',
+  //             table: 'signals'
+  //           },
+  //           (payload) => {
+  //             if (payload.eventType === 'INSERT') {
+  //               setSignals((current) => {
+  //                 // Prevent duplicate signals
+  //                 const existingSignal = current.find(
+  //                   (s) => s.id === payload.new.id
+  //                 );
+  //                 if (existingSignal) return current;
+  //                 return [payload.new as Signal, ...current];
+  //               });
+  //             } else if (payload.eventType === 'UPDATE') {
+  //               setSignals((current) =>
+  //                 current.map((signal) =>
+  //                   signal.id === payload.new.id
+  //                     ? (payload.new as Signal)
+  //                     : signal
+  //                 )
+  //               );
+  //             }
+  //           }
+  //         )
+  //         .subscribe((status) => {
+  //           if (status === 'SUBSCRIBED') {
+  //             isSubscribed = true;
+  //           }
+  //         });
+  //     } catch (error) {
+  //       console.error('Failed to setup real-time channel:', error);
+  //     }
+  //   };
 
-    // Only setup if we have a user and no active subscription
-    if (user && !isSubscribed) {
-      setupChannel();
-    }
+  //   // Only setup if we have a user and no active subscription
+  //   if (user && !isSubscribed) {
+  //     setupChannel();
+  //   }
 
-    return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
-        isSubscribed = false;
-      }
-    };
-  }, [user?.id]); // Only depend on user ID
+  //   return () => {
+  //     if (channel) {
+  //       supabase.removeChannel(channel);
+  //       isSubscribed = false;
+  //   };
+  // }, [user?.id]); // Only depend on user ID
 
   // Calculate signal statistics - only count completed trades (closed signals with P&L)
   const completedTrades = signals.filter(
@@ -250,6 +249,48 @@ export default function Dashboard({
                   </div>
                   <Button
                     onClick={async () => {
+                      if (
+                        confirm(
+                          'Are you sure you want to remove your Discord connection? This will remove your Discord role and you will no longer receive notifications.'
+                        )
+                      ) {
+                        try {
+                          const response = await fetch(
+                            '/api/discord/remove-connection',
+                            {
+                              method: 'POST'
+                            }
+                          );
+                          if (response.ok) {
+                            setNotification({
+                              type: 'success',
+                              message:
+                                'Discord connection removed successfully!'
+                            });
+                            // Refresh the page to update the UI
+                            window.location.reload();
+                          } else {
+                            throw new Error(
+                              'Failed to remove Discord connection'
+                            );
+                          }
+                        } catch (error) {
+                          setNotification({
+                            type: 'error',
+                            message: 'Failed to remove Discord connection'
+                          });
+                        }
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="inline-flex items-center text-red-400 border-red-400 hover:bg-red-400/10"
+                  >
+                    <X className="w-3 h-3 mr-1" />
+                    Remove Discord Connection
+                  </Button>
+                  <Button
+                    onClick={async () => {
                       try {
                         const response = await fetch(
                           '/api/discord/assign-role',
@@ -278,7 +319,7 @@ export default function Dashboard({
                   >
                     <Target className="w-3 h-3 mr-1" />
                     Assign Role
-                  </Button>
+                  </Button>{' '}
                 </div>
               ) : (
                 <Button
