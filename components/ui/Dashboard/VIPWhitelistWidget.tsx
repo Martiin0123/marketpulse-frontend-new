@@ -209,7 +209,7 @@ export default function VIPWhitelistWidget({
         className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-sm font-medium rounded-lg transition-all duration-200 group"
       >
         <Crown className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-200" />
-        Submit Whitelist
+        Whitelist Access
       </button>
 
       {/* Modal */}

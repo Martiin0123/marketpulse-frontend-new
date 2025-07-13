@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
   try {
@@ -53,8 +54,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'VIP subscription required' }, { status: 403 });
     }
 
+    // Create admin client for bypassing RLS
+    const supabaseAdmin = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
     // Get existing whitelist request
-    const { data: existingRequest, error: requestError } = await supabase
+    const { data: existingRequest, error: requestError } = await supabaseAdmin
       .from('whitelist_requests')
       .select('*')
       .eq('user_id', user.id)
@@ -120,8 +127,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Bybit UID and email required' }, { status: 400 });
     }
 
+    // Create admin client for bypassing RLS
+    const supabaseAdmin = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
     // Check if user already has a pending or approved request
-    const { data: existingRequest, error: existingError } = await supabase
+    const { data: existingRequest, error: existingError } = await supabaseAdmin
       .from('whitelist_requests')
       .select('*')
       .eq('user_id', user.id)
@@ -141,8 +154,8 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Create new whitelist request
-    const { data: newRequest, error: insertError } = await supabase
+    // Create new whitelist request using admin client
+    const { data: newRequest, error: insertError } = await supabaseAdmin
       .from('whitelist_requests')
       .insert({
         user_id: user.id,
