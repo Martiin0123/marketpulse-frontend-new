@@ -83,7 +83,7 @@ export default async function DashboardPage() {
     return (
       <Dashboard
         user={user}
-        subscription={subscription as any}
+        subscription={subscription}
         signals={signals}
         stats={{
           totalSignals: tradingStats.totalSignals || 0,

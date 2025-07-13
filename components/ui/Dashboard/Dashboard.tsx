@@ -46,7 +46,7 @@ interface Stats {
 
 interface Props {
   user: User;
-  subscription: Subscription;
+  subscription: any; // Using any to handle complex subscription structure with prices relationship
   signals: Signal[];
   stats: Stats;
 }
@@ -345,10 +345,7 @@ export default function Dashboard({
                 Join Discord Community
               </Button>
               {/* VIP Whitelist Button */}
-              <VIPWhitelistWidget
-                user={user}
-                subscription={{ ...subscription, prices: null }}
-              />
+              <VIPWhitelistWidget user={user} subscription={subscription} />
             </div>
           </div>
         </div>
