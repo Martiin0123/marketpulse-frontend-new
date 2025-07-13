@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (error) {
+      console.error('Password reset session error:', error);
       return NextResponse.redirect(
         getErrorRedirect(
           `${requestUrl.origin}/signin/forgot_password`,

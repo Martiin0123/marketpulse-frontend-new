@@ -6,20 +6,12 @@ import { UserDetails } from '@/utils/supabase/queries';
 import { useState } from 'react';
 import {
   User as UserIcon,
-  Mail,
   Shield,
   CreditCard,
-  Bell,
-  Settings,
-  Camera,
   Edit3,
   Check,
   X,
-  Star,
-  Calendar,
-  Activity,
-  Users,
-  LogOut
+  Star
 } from 'lucide-react';
 import { updateName } from '@/utils/auth-helpers/server';
 import { handleRequest } from '@/utils/auth-helpers/client';
@@ -52,7 +44,6 @@ export default function AccountPage({
   subscription
 }: Props) {
   const [isEditingName, setIsEditingName] = useState(false);
-  const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [fullName, setFullName] = useState(userDetails?.full_name || '');
   const [isLoading, setIsLoading] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
@@ -61,8 +52,6 @@ export default function AccountPage({
     newPassword: '',
     confirmPassword: ''
   });
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [tradingAlerts, setTradingAlerts] = useState(true);
   const router = useRouter();
   const supabase = createClient();
 
@@ -130,6 +119,10 @@ export default function AccountPage({
 
     setIsLoading(true);
     try {
+      if (!supabase) {
+        throw new Error('Supabase client not available');
+      }
+
       const { error } = await supabase.auth.updateUser({
         password: passwordData.newPassword
       });
@@ -150,32 +143,6 @@ export default function AccountPage({
       alert(error.message || 'Failed to update password');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleNotificationToggle = async (
-    type: 'email' | 'trading',
-    value: boolean
-  ) => {
-    try {
-      // Update user metadata with notification preferences
-      const { error } = await supabase.auth.updateUser({
-        data: {
-          [`${type}_notifications`]: value
-        }
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      if (type === 'email') {
-        setEmailNotifications(value);
-      } else {
-        setTradingAlerts(value);
-      }
-    } catch (error) {
-      console.error('Error updating notification preference:', error);
     }
   };
 
@@ -255,9 +222,6 @@ export default function AccountPage({
                   >
                     {getInitials(userDetails?.full_name)}
                   </div>
-                  <button className="absolute -bottom-1 -right-1 bg-blue-500 hover:bg-blue-600 rounded-full p-2 transition-colors shadow-lg">
-                    <Camera className="w-3 h-3 text-white" />
-                  </button>
                 </div>
 
                 {/* Name Section */}
@@ -538,81 +502,6 @@ export default function AccountPage({
                       </div>
                     </form>
                   )}
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-slate-700/30 rounded-lg border border-slate-600">
-                  <div>
-                    <h4 className="text-white font-medium">
-                      Two-Factor Authentication
-                    </h4>
-                    <p className="text-slate-400 text-sm">
-                      Add an extra layer of security to your account
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Enable 2FA
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Notifications & Preferences */}
-            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
-              <div className="flex items-center space-x-3 mb-6">
-                <div className="p-2 bg-purple-500/20 rounded-lg">
-                  <Bell className="w-5 h-5 text-purple-400" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white">
-                    Notifications
-                  </h3>
-                  <p className="text-sm text-slate-400">
-                    Control how you receive notifications
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-slate-700/30 rounded-lg border border-slate-600">
-                  <div>
-                    <h4 className="text-white font-medium">
-                      Email Notifications
-                    </h4>
-                    <p className="text-slate-400 text-sm">
-                      Receive updates about your account and trades
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      checked={emailNotifications}
-                      onChange={(e) =>
-                        handleNotificationToggle('email', e.target.checked)
-                      }
-                    />
-                    <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-slate-700/30 rounded-lg border border-slate-600">
-                  <div>
-                    <h4 className="text-white font-medium">Trading Alerts</h4>
-                    <p className="text-slate-400 text-sm">
-                      Get notified about important trading signals
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      checked={tradingAlerts}
-                      onChange={(e) =>
-                        handleNotificationToggle('trading', e.target.checked)
-                      }
-                    />
-                    <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
-                  </label>
                 </div>
               </div>
             </div>

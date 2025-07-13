@@ -87,7 +87,7 @@ export default function UpdatePassword() {
               id="confirmPassword"
               placeholder="Confirm your new password"
               type={showConfirmPassword ? 'text' : 'password'}
-              name="confirmPassword"
+              name="passwordConfirm"
               autoCapitalize="none"
               autoComplete="new-password"
               autoCorrect="off"

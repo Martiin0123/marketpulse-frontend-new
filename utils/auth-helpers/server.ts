@@ -348,6 +348,11 @@ export async function updatePassword(formData: FormData) {
   const passwordConfirm = String(formData.get('passwordConfirm')).trim();
   let redirectPath: string;
 
+  console.log('🔍 Password update attempt:');
+  console.log('🔍 - Password length:', password.length);
+  console.log('🔍 - Password confirm length:', passwordConfirm.length);
+  console.log('🔍 - Passwords match:', password === passwordConfirm);
+
   // Check that the password and confirmation match
   if (password !== passwordConfirm) {
     redirectPath = getErrorRedirect(
@@ -355,26 +360,56 @@ export async function updatePassword(formData: FormData) {
       'Your password could not be updated.',
       'Passwords do not match.'
     );
+    return redirectPath;
+  }
+
+  // Check password length
+  if (password.length < 6) {
+    redirectPath = getErrorRedirect(
+      '/signin/update_password',
+      'Your password could not be updated.',
+      'Password must be at least 6 characters long.'
+    );
+    return redirectPath;
   }
 
   const supabase = createClient();
+  
+  // Check if user is authenticated
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  
+  if (userError || !user) {
+    console.error('❌ User not authenticated for password update:', userError);
+    redirectPath = getErrorRedirect(
+      '/signin/update_password',
+      'Authentication required.',
+      'Please sign in to update your password.'
+    );
+    return redirectPath;
+  }
+
+  console.log('🔍 User authenticated, updating password for:', user.email);
+
   const { error, data } = await supabase.auth.updateUser({
     password
   });
 
   if (error) {
+    console.error('❌ Password update error:', error);
     redirectPath = getErrorRedirect(
       '/signin/update_password',
       'Your password could not be updated.',
       error.message
     );
   } else if (data.user) {
+    console.log('✅ Password updated successfully for:', data.user.email);
     redirectPath = getStatusRedirect(
-      '/',
+      '/dashboard',
       'Success!',
       'Your password has been updated.'
     );
   } else {
+    console.error('❌ No user data returned from password update');
     redirectPath = getErrorRedirect(
       '/signin/update_password',
       'Hmm... Something went wrong.',
