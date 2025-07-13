@@ -118,7 +118,7 @@ export default function NavbarClient() {
       href: '/performance-reports',
       label: 'Reports',
       icon: FileText,
-      protected: true
+      protected: false
     }
   ];
 

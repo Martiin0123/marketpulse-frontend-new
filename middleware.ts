@@ -17,16 +17,16 @@ export const config = {
   matcher: [
     /*
      * Match only the routes that need authentication:
-     * - dashboard, account, referrals, performance-reports
+     * - dashboard, account, referrals
      * - signin pages
      * - Exclude static assets and API routes
      */
     '/dashboard/:path*',
     '/account/:path*',
     '/referrals/:path*',
-    '/performance-reports/:path*',
     '/signals/:path*',
     '/signin/:path*'
+    // Removed '/performance-reports' to allow all authenticated users
     // Removed '/pricing' and '/' to reduce middleware calls
   ]
 };
