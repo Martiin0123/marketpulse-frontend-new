@@ -280,7 +280,7 @@ export default function PerformanceGuaranteeWidget() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-6 bg-slate-700/30 rounded-xl border border-slate-600/50">
                   <div className="text-center">
                     <div className="text-3xl font-bold text-white mb-1">
-                      ${perf.totalPnL.toFixed(2)}
+                      % {perf.totalPnL.toFixed(2)}
                     </div>
                     <div className="text-sm text-slate-400">Total P&L</div>
                   </div>
