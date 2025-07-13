@@ -9,19 +9,27 @@ const GUILD_ID = process.env.DISCORD_GUILD_ID!;
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN!;
 
 export async function GET(req: NextRequest) {
+  console.log('Discord callback started');
+  
   const { searchParams } = new URL(req.url);
   const code = searchParams.get('code');
   const error = searchParams.get('error');
   
+  console.log('Discord callback params:', { code: code ? 'present' : 'missing', error });
+  
   if (error) {
+    console.log('Discord OAuth error:', error);
     return NextResponse.redirect('/dashboard?error=discord_oauth_denied');
   }
   
   if (!code) {
+    console.log('No Discord code provided');
     return NextResponse.redirect('/dashboard?error=discord_oauth_failed');
   }
 
   try {
+    console.log('Starting Discord token exchange');
+    
     // Exchange code for access token
     const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
@@ -79,15 +87,20 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    console.log('Discord user info received:', { id: discordUser.id, username: discordUser.username });
+    
     // Store Discord user ID in Supabase
     const supabase = createClient();
     
+    console.log('Getting current user from Supabase');
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
     if (userError || !user) {
       console.error('Failed to get current user:', userError);
       return NextResponse.redirect('/dashboard?error=user_not_found');
     }
+    
+    console.log('Current user found:', { user_id: user.id });
 
     // Update user metadata with Discord ID
     const { error: updateError } = await supabase.auth.updateUser({
@@ -105,6 +118,8 @@ export async function GET(req: NextRequest) {
       discord_username: discordUser.username
     });
 
+    console.log('Checking user subscription level');
+    
     // Check if user has premium/VIP subscription to access dashboard
     const { data: subscriptions, error: subscriptionError } = await supabase
       .from('subscriptions')
@@ -113,13 +128,23 @@ export async function GET(req: NextRequest) {
       .in('status', ['active', 'trialing'])
       .order('created', { ascending: false });
 
+    console.log('Subscription check result:', { 
+      subscriptions: subscriptions?.length || 0, 
+      error: subscriptionError?.message,
+      roles: subscriptions?.map(s => s.role)
+    });
+
     const hasPremiumAccess = subscriptions && subscriptions.length > 0 && 
       ['premium', 'vip'].includes(subscriptions[0].role as string);
 
+    console.log('Premium access check:', { hasPremiumAccess });
+
     // Redirect based on subscription level
     if (hasPremiumAccess) {
+      console.log('Redirecting to dashboard');
       return NextResponse.redirect('/dashboard?discord=connected');
     } else {
+      console.log('Redirecting to pricing page');
       return NextResponse.redirect('/pricing?message=dashboard_access_required&discord=connected');
     }
 
