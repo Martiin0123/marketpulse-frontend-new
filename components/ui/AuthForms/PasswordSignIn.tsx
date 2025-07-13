@@ -33,13 +33,6 @@ export default function PasswordSignIn({
 
   return (
     <div>
-      <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-white mb-2">Welcome Back</h2>
-        <p className="text-slate-400 text-sm">
-          Sign in to your account to continue
-        </p>
-      </div>
-
       <form
         noValidate={true}
         className="space-y-6"
@@ -65,7 +58,7 @@ export default function PasswordSignIn({
               autoCapitalize="none"
               autoComplete="email"
               autoCorrect="off"
-              className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+              className="w-full pl-10 pr-4 py-4 bg-slate-700/30 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200 backdrop-blur-sm"
             />
           </div>
         </div>
@@ -90,7 +83,7 @@ export default function PasswordSignIn({
               autoCapitalize="none"
               autoComplete="current-password"
               autoCorrect="off"
-              className="w-full pl-10 pr-12 py-3 bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+              className="w-full pl-10 pr-12 py-4 bg-slate-700/30 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200 backdrop-blur-sm"
             />
             <button
               type="button"
@@ -109,7 +102,7 @@ export default function PasswordSignIn({
         <Button
           variant="slim"
           type="submit"
-          className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
+          className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold py-4 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
           loading={isSubmitting}
           disabled={disableButton}
         >
@@ -122,7 +115,7 @@ export default function PasswordSignIn({
         <div className="text-center">
           <Link
             href="/auth/reset_password"
-            className="text-sm text-slate-400 hover:text-slate-300 transition-colors"
+            className="text-sm text-slate-400 hover:text-slate-300 transition-colors duration-200 hover:scale-105 inline-block"
           >
             Forgot your password?
           </Link>
@@ -132,20 +125,20 @@ export default function PasswordSignIn({
           <div className="text-center">
             <Link
               href="/signin/email_signin"
-              className="text-sm text-slate-400 hover:text-slate-300 transition-colors"
+              className="text-sm text-slate-400 hover:text-slate-300 transition-colors duration-200 hover:scale-105 inline-block"
             >
               Sign in via magic link
             </Link>
           </div>
         )}
 
-        <div className="text-center pt-4 border-t border-slate-700">
+        <div className="text-center pt-6 border-t border-slate-700/50">
           <span className="text-sm text-slate-400">
             Don't have an account?{' '}
           </span>
           <Link
             href="/signin/signup"
-            className="text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium"
+            className="text-sm text-blue-400 hover:text-blue-300 transition-colors duration-200 font-medium hover:scale-105 inline-block"
           >
             Sign up
           </Link>
