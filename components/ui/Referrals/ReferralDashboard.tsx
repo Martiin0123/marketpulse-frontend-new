@@ -53,6 +53,7 @@ type Referral = {
   reward_currency: string;
   converted_at?: string;
   rewarded_at?: string;
+  eligible_at?: string;
   created_at: string;
   updated_at: string;
   referee?: {
@@ -264,6 +265,58 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
       day: 'numeric'
     });
   };
+
+  const calculateTimeRemaining = (eligibleAt: string) => {
+    const now = new Date();
+    const eligibleDate = new Date(eligibleAt);
+    const diffTime = eligibleDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays <= 0) {
+      return { days: 0, hours: 0, minutes: 0, isEligible: true };
+    }
+
+    const diffHours = Math.floor(
+      (diffTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+    );
+    const diffMinutes = Math.floor((diffTime % (1000 * 60 * 60)) / (1000 * 60));
+
+    return {
+      days: diffDays,
+      hours: diffHours,
+      minutes: diffMinutes,
+      isEligible: false
+    };
+  };
+
+  const [timeRemaining, setTimeRemaining] = useState<{ [key: string]: any }>(
+    {}
+  );
+
+  // Update timers every minute
+  useEffect(() => {
+    const updateTimers = () => {
+      const newTimeRemaining: { [key: string]: any } = {};
+
+      referrals.forEach((referral) => {
+        if (referral.status === 'active' && referral.eligible_at) {
+          newTimeRemaining[referral.id] = calculateTimeRemaining(
+            referral.eligible_at
+          );
+        }
+      });
+
+      setTimeRemaining(newTimeRemaining);
+    };
+
+    // Update immediately
+    updateTimers();
+
+    // Update every minute
+    const interval = setInterval(updateTimers, 60000);
+
+    return () => clearInterval(interval);
+  }, [referrals]);
 
   const requestIndividualReferral = async (referral: Referral) => {
     console.log('🔍 Requesting individual referral:', {
@@ -594,13 +647,26 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
               </div>
 
               <div className="flex items-start space-x-3">
-                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
                   4
+                </div>
+                <div>
+                  <h3 className="text-white font-medium">Wait 60 Days</h3>
+                  <p className="text-gray-400 text-sm">
+                    After 60 days, you can request your €19 commission
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-3">
+                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                  5
                 </div>
                 <div>
                   <h3 className="text-white font-medium">Get Rewarded</h3>
                   <p className="text-gray-400 text-sm">
-                    Receive €19 commission for each successful referral
+                    Request and receive €19 commission for each successful
+                    referral
                   </p>
                 </div>
               </div>
@@ -664,9 +730,9 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
                         <div
                           className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
                             referral.status === 'active'
-                              ? 'bg-green-500/20 text-green-400'
+                              ? 'bg-blue-500/20 text-blue-400'
                               : referral.status === 'paid'
-                                ? 'bg-green-500/20 text-green-400'
+                                ? 'bg-emerald-500/20 text-emerald-400'
                                 : referral.status === 'pending'
                                   ? 'bg-yellow-500/20 text-yellow-400'
                                   : referral.status === 'requested'
@@ -702,13 +768,40 @@ PrimeScope provides real-time trading signals backed by advanced AI and technica
                       </td>
                       <td className="py-4 px-4">
                         {referral.status === 'pending' && (
-                          <Button
-                            onClick={() => requestIndividualReferral(referral)}
-                            size="sm"
-                            className="bg-yellow-600 hover:bg-yellow-700 text-white"
-                          >
-                            Request
-                          </Button>
+                          <div className="text-center">
+                            <div className="text-orange-400 text-sm font-medium mb-1">
+                              Waiting for subscription
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              User needs to subscribe first
+                            </div>
+                          </div>
+                        )}
+                        {referral.status === 'active' && (
+                          <div className="text-center">
+                            {timeRemaining[referral.id]?.isEligible ? (
+                              <Button
+                                onClick={() =>
+                                  requestIndividualReferral(referral)
+                                }
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                              >
+                                Request Payment
+                              </Button>
+                            ) : (
+                              <div>
+                                <div className="text-blue-400 text-sm font-medium mb-1">
+                                  {timeRemaining[referral.id]?.days || 0}d{' '}
+                                  {timeRemaining[referral.id]?.hours || 0}h{' '}
+                                  {timeRemaining[referral.id]?.minutes || 0}m
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                  until eligible
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         )}
                         {referral.status === 'requested' && (
                           <span className="text-yellow-400 text-sm font-medium">

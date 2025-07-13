@@ -239,7 +239,7 @@ BEGIN
     SET 
       status = 'active',
       subscribed_at = now(),
-      eligible_at = now() + interval '30 days',
+      eligible_at = now() + interval '60 days',
       subscription_id = NEW.id
     WHERE referee_id = NEW.user_id 
       AND status = 'pending'
@@ -279,7 +279,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION check_eligible_rewards()
 RETURNS void AS $$
 BEGIN
-  -- Update rewards to eligible status for referrals that have been active for 30 days
+  -- Update rewards to eligible status for referrals that have been active for 60 days
   UPDATE public.referral_rewards 
   SET status = 'eligible', eligible_at = now()
   WHERE status = 'pending' 
@@ -288,7 +288,7 @@ BEGIN
       FROM public.referrals r 
       WHERE r.status = 'active' 
         AND r.eligible_at IS NOT NULL 
-        AND r.eligible_at <= now() - interval '30 days'
+        AND r.eligible_at <= now() - interval '60 days'
     );
 END;
 $$ LANGUAGE plpgsql;
