@@ -105,8 +105,23 @@ export async function GET(req: NextRequest) {
       discord_username: discordUser.username
     });
 
-    // Redirect back to dashboard with success message
-    return NextResponse.redirect('/dashboard?discord=connected');
+    // Check if user has premium/VIP subscription to access dashboard
+    const { data: subscriptions, error: subscriptionError } = await supabase
+      .from('subscriptions')
+      .select('status, role')
+      .eq('user_id', user.id)
+      .in('status', ['active', 'trialing'])
+      .order('created', { ascending: false });
+
+    const hasPremiumAccess = subscriptions && subscriptions.length > 0 && 
+      ['premium', 'vip'].includes(subscriptions[0].role as string);
+
+    // Redirect based on subscription level
+    if (hasPremiumAccess) {
+      return NextResponse.redirect('/dashboard?discord=connected');
+    } else {
+      return NextResponse.redirect('/pricing?message=dashboard_access_required&discord=connected');
+    }
 
   } catch (error) {
     console.error('Discord OAuth callback error:', error);

@@ -97,7 +97,18 @@ export default function Pricing({ user, products, subscription }: Props) {
 
   useEffect(() => {
     const message = searchParams?.get('message');
-    if (message === 'subscription_required') {
+    const discordConnected = searchParams?.get('discord');
+
+    if (
+      message === 'subscription_required' ||
+      message === 'dashboard_access_required'
+    ) {
+      setShowMessage(true);
+      setTimeout(() => setShowMessage(false), 8000);
+    }
+
+    // Show Discord connection success message
+    if (discordConnected === 'connected') {
       setShowMessage(true);
       setTimeout(() => setShowMessage(false), 8000);
     }
@@ -193,7 +204,11 @@ export default function Pricing({ user, products, subscription }: Props) {
           <div className="bg-orange-500/20 backdrop-blur-sm border border-orange-500/50 rounded-xl px-6 py-3 flex items-center space-x-3">
             <AlertTriangle className="w-5 h-5 text-orange-400" />
             <span className="text-orange-200 font-medium">
-              Please subscribe to access trading signals and dashboard features
+              {searchParams?.get('discord') === 'connected'
+                ? 'Discord connected successfully! Upgrade to Premium or VIP to access the dashboard'
+                : searchParams?.get('message') === 'dashboard_access_required'
+                  ? 'Premium or VIP subscription required to access the dashboard'
+                  : 'Please subscribe to access trading signals and dashboard features'}
             </span>
           </div>
         </div>

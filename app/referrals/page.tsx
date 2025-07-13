@@ -26,9 +26,10 @@ export default async function ReferralsPage() {
 
   if (
     !subscription ||
-    !['trialing', 'active'].includes(subscription.status as string)
+    !['trialing', 'active'].includes(subscription.status as string) ||
+    !['premium', 'vip'].includes(subscription.role as string)
   ) {
-    return redirect('/?message=subscription_required');
+    return redirect('/pricing?message=dashboard_access_required');
   }
 
   // Fetch referral data

@@ -1,3 +1,6 @@
+import { redirect } from 'next/navigation';
+import { createClient } from '@/utils/supabase/server';
+import { getUser, getSubscription } from '@/utils/supabase/queries';
 import { calculateTradingStats } from '@/utils/stats';
 import {
   BarChart3,
@@ -12,6 +15,25 @@ import {
 export const dynamic = 'force-dynamic';
 
 export default async function PerformanceReports() {
+  const supabase = createClient();
+  const [user, subscription] = await Promise.all([
+    getUser(supabase),
+    getSubscription(supabase)
+  ]);
+
+  if (!user) {
+    return redirect('/signin');
+  }
+
+  // Check subscription level - only premium or VIP users can access performance reports
+  if (
+    !subscription ||
+    !['active', 'trialing'].includes(subscription.status as string) ||
+    !['premium', 'vip'].includes(subscription.role as string)
+  ) {
+    return redirect('/pricing?message=dashboard_access_required');
+  }
+
   // Calculate trading stats directly
   const tradingStats = await calculateTradingStats();
 

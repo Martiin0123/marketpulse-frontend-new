@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID!;
-const REDIRECT_URI = encodeURIComponent(process.env.DISCORD_REDIRECT_URI || 'https://marketpulse.com/api/auth/discord/callback');
+const REDIRECT_URI = encodeURIComponent(process.env.DISCORD_REDIRECT_URI || 'https://primescope.app/api/auth/discord/callback');
 const SCOPE = 'identify guilds.join';
 
 export async function GET(req: NextRequest) {
