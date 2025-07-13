@@ -21,12 +21,8 @@ export default async function PerformanceReports() {
     getSubscription(supabase)
   ]);
 
-  if (!user) {
-    return redirect('/signin');
-  }
-
-  // Performance reports are accessible to all authenticated users
-  // No subscription check needed
+  // Performance reports are accessible to all users (authenticated or not)
+  // No authentication or subscription check needed
 
   // Calculate trading stats directly
   const tradingStats = await calculateTradingStats();
