@@ -26,9 +26,18 @@ export default async function ReferralsPage() {
 
   if (
     !subscription ||
-    !['trialing', 'active'].includes(subscription.status as string) ||
-    !['premium', 'vip'].includes(subscription.role as string)
+    !['trialing', 'active'].includes(subscription.status as string)
   ) {
+    return redirect('/pricing?message=dashboard_access_required');
+  }
+
+  // Check if user has premium or VIP subscription based on product name
+  const productName =
+    (subscription as any)?.prices?.products?.name?.toLowerCase() || '';
+  const hasPremiumAccess =
+    productName.includes('premium') || productName.includes('vip');
+
+  if (!hasPremiumAccess) {
     return redirect('/pricing?message=dashboard_access_required');
   }
 

@@ -134,8 +134,9 @@ export async function GET(req: NextRequest) {
       roles: subscriptions?.map(s => s.role)
     });
 
+    // Check if user has premium or VIP subscription based on product name
     const hasPremiumAccess = subscriptions && subscriptions.length > 0 && 
-      ['premium', 'vip'].includes(subscriptions[0].role as string);
+      (subscriptions[0].role === 'premium' || subscriptions[0].role === 'vip');
 
     console.log('Premium access check:', { hasPremiumAccess });
 
