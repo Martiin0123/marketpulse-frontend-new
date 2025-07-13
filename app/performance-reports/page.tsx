@@ -25,23 +25,8 @@ export default async function PerformanceReports() {
     return redirect('/signin');
   }
 
-  // Check subscription level - only premium or VIP users can access performance reports
-  if (
-    !subscription ||
-    !['active', 'trialing'].includes(subscription.status as string)
-  ) {
-    return redirect('/pricing?message=dashboard_access_required');
-  }
-
-  // Check if user has premium or VIP subscription based on product name
-  const productName =
-    (subscription as any)?.prices?.products?.name?.toLowerCase() || '';
-  const hasPremiumAccess =
-    productName.includes('premium') || productName.includes('vip');
-
-  if (!hasPremiumAccess) {
-    return redirect('/pricing?message=dashboard_access_required');
-  }
+  // Performance reports are accessible to all authenticated users
+  // No subscription check needed
 
   // Calculate trading stats directly
   const tradingStats = await calculateTradingStats();

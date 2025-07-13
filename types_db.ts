@@ -512,6 +512,52 @@ export type Database = {
           },
         ]
       }
+      whitelist_requests: {
+        Row: {
+          id: string
+          user_id: string
+          bybit_uid: string
+          user_email: string
+          user_name: string | null
+          status: string
+          created_at: string
+          approved_at: string | null
+          rejected_at: string | null
+          notes: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          bybit_uid: string
+          user_email: string
+          user_name?: string | null
+          status?: string
+          created_at?: string
+          approved_at?: string | null
+          rejected_at?: string | null
+          notes?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          bybit_uid?: string
+          user_email?: string
+          user_name?: string | null
+          status?: string
+          created_at?: string
+          approved_at?: string | null
+          rejected_at?: string | null
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whitelist_requests_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           avatar_url: string | null
