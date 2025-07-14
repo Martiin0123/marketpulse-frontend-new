@@ -89,7 +89,7 @@ export default function Hero({ user, monthlyPnL, positions }: HeroProps) {
                     </Button>
                   </Link>
                   <a
-                    href="https://discord.gg/N7taGVuz"
+                    href="https://discord.gg/GDY4ZcXzes"
                     target="_blank"
                     rel="noopener noreferrer"
                   >

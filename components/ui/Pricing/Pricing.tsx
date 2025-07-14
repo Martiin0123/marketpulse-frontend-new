@@ -286,6 +286,61 @@ export default function Pricing({ user, products, subscription }: Props) {
           {/* Pricing Cards */}
           <div className="flex justify-center">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl w-full">
+              {/* Free Plan (Hardcoded) */}
+              <div className="relative bg-slate-800/30 backdrop-blur-sm rounded-3xl border border-slate-700/50 hover:border-slate-600/50 bg-slate-800/20 p-8 transition-all duration-500 hover:scale-105 hover:shadow-2xl group">
+                {/* Plan Header */}
+                <div className="text-center mb-8">
+                  {/* Price */}
+                  <div className="mb-6">
+                    <span className="text-5xl font-bold bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 bg-clip-text text-transparent">
+                      €0
+                    </span>
+                    <span className="text-slate-400 text-lg ml-2">/month</span>
+                  </div>
+
+                  <h3 className="text-2xl font-bold text-white mb-4">Free</h3>
+                  <p className="text-slate-400 text-sm mb-6 leading-relaxed">
+                    Get started with occasional trading signals and join our
+                    Discord community
+                  </p>
+
+                  {/* Feature Indicators */}
+                  <div className="mb-6">
+                    <div className="flex items-center space-x-2 p-3 bg-blue-500/10 rounded-lg border border-blue-500/30 mb-4">
+                      <div>
+                        <p className="text-blue-200 text-sm font-medium">
+                          Free Trading Signals
+                        </p>
+                        <p className="text-slate-400 text-xs">
+                          Occasional signals (limited frequency)
+                        </p>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                      <p className="text-blue-200 text-sm font-medium mb-2">
+                        🎯 Perfect for Beginners
+                      </p>
+                      <p className="text-slate-400 text-xs">
+                        Try our signals risk-free and upgrade when you're ready
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* CTA Button */}
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    onClick={() =>
+                      window.open('https://discord.gg/GDY4ZcXzes', '_blank')
+                    }
+                    className="w-full group-hover:scale-105 transition-transform duration-300"
+                  >
+                    Join Discord Community
+                  </Button>
+                </div>
+              </div>
+
+              {/* Premium/VIP Plans from Stripe */}
               {products
                 .map((product) => {
                   const price = product?.prices?.find(
@@ -310,7 +365,7 @@ export default function Pricing({ user, products, subscription }: Props) {
                   }).format((price?.unit_amount || 0) / 100);
 
                   const isPopular =
-                    index === 1 || product.name?.toLowerCase().includes('pro');
+                    index === 0 || product.name?.toLowerCase().includes('pro');
                   const isCurrentPlan =
                     subscription?.prices?.products?.name === product.name;
 
@@ -325,9 +380,9 @@ export default function Pricing({ user, products, subscription }: Props) {
                           'border-emerald-500/50 shadow-2xl shadow-emerald-500/25 bg-slate-800/40':
                             isCurrentPlan,
                           'border-purple-500/50 shadow-2xl shadow-purple-500/25 bg-slate-800/40':
-                            index === 2,
+                            index === 1,
                           'border-slate-700/50 hover:border-slate-600/50 bg-slate-800/20':
-                            !isPopular && !isCurrentPlan && index !== 2
+                            !isPopular && !isCurrentPlan && index !== 1
                         }
                       )}
                     >
@@ -351,8 +406,8 @@ export default function Pricing({ user, products, subscription }: Props) {
                         </div>
                       )}
 
-                      {/* Limited Badge for 3rd option */}
-                      {index === 2 && (
+                      {/* Limited Badge for VIP option (now index 1) */}
+                      {index === 1 && (
                         <div className="z-1 absolute -top-6 left-1/2 transform -translate-x-1/2">
                           <div className="bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-2 rounded-full text-white text-sm font-bold flex items-center shadow-lg">
                             <AlertTriangle className="w-4 h-4 mr-2" />
@@ -384,30 +439,6 @@ export default function Pricing({ user, products, subscription }: Props) {
                         <div className="mb-6">
                           {index === 0 && (
                             <>
-                              <div className="flex items-center space-x-2 p-3 bg-blue-500/10 rounded-lg border border-blue-500/30 mb-4">
-                                <div>
-                                  <p className="text-blue-200 text-sm font-medium">
-                                    Free Trading Signals
-                                  </p>
-                                  <p className="text-slate-400 text-xs">
-                                    Occasional signals (limited frequency)
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                                <p className="text-blue-200 text-sm font-medium mb-2">
-                                  🎯 Perfect for Beginners
-                                </p>
-                                <p className="text-slate-400 text-xs">
-                                  Try our signals risk-free and upgrade when
-                                  you're ready
-                                </p>
-                              </div>
-                            </>
-                          )}
-
-                          {index === 1 && (
-                            <>
                               <div className="flex items-center space-x-2 p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/30 mb-4">
                                 <div className="flex flex-col justify-center items-center w-full">
                                   <p className="text-emerald-200 text-sm font-medium">
@@ -430,7 +461,7 @@ export default function Pricing({ user, products, subscription }: Props) {
                             </>
                           )}
 
-                          {index === 2 && (
+                          {index === 1 && (
                             <>
                               <div className="flex items-center space-x-2 p-3 bg-purple-500/10 rounded-lg border border-purple-500/30 mb-4">
                                 <div className="flex flex-col justify-center items-center w-full">
@@ -465,8 +496,8 @@ export default function Pricing({ user, products, subscription }: Props) {
                           >
                             View Dashboard
                           </Button>
-                        ) : index === 2 ? (
-                          // Special handling for 3rd option (VIP tier)
+                        ) : index === 1 ? (
+                          // Special handling for VIP tier (now index 1)
                           <Button
                             variant="primary"
                             size="lg"
@@ -488,9 +519,7 @@ export default function Pricing({ user, products, subscription }: Props) {
                           >
                             {subscription
                               ? 'Change Plan'
-                              : index === 0
-                                ? 'Start Free, Upgrade Later'
-                                : 'Start Trading Smarter'}
+                              : 'Start Trading Smarter'}
                           </Button>
                         )}
 

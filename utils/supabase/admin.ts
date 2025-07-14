@@ -110,23 +110,43 @@ const deletePriceRecord = async (price: Stripe.Price) => {
 };
 
 const upsertCustomerToSupabase = async (uuid: string, customerId: string) => {
-  const supabase = getSupabaseAdmin();
-  const { error: upsertError } = await supabase
-    .from('customers')
-    .upsert([{ id: uuid, stripe_customer_id: customerId }]);
+  try {
+    console.log('[ADMIN] Upserting customer to Supabase:', { uuid, customerId });
+    const supabase = getSupabaseAdmin();
+    const { error: upsertError } = await supabase
+      .from('customers')
+      .upsert([{ id: uuid, stripe_customer_id: customerId }]);
 
-  if (upsertError)
-    throw new Error(`Supabase customer record creation failed: ${upsertError.message}`);
+    if (upsertError) {
+      console.error('[ADMIN] Supabase customer upsert error:', upsertError);
+      throw new Error(`Supabase customer record creation failed: ${upsertError.message}`);
+    }
 
-  return customerId;
+    console.log('[ADMIN] Successfully upserted customer to Supabase');
+    return customerId;
+  } catch (error) {
+    console.error('[ADMIN] Upsert customer error:', error);
+    throw error;
+  }
 };
 
 const createCustomerInStripe = async (uuid: string, email: string) => {
-  const customerData = { metadata: { supabaseUUID: uuid }, email: email };
-  const newCustomer = await stripe.customers.create(customerData);
-  if (!newCustomer) throw new Error('Stripe customer creation failed.');
-
-  return newCustomer.id;
+  try {
+    console.log('[ADMIN] Creating Stripe customer with data:', { uuid, email });
+    const customerData = { metadata: { supabaseUUID: uuid }, email: email };
+    const newCustomer = await stripe.customers.create(customerData);
+    
+    if (!newCustomer) {
+      console.error('[ADMIN] Stripe customer creation returned null');
+      throw new Error('Stripe customer creation failed.');
+    }
+    
+    console.log('[ADMIN] Successfully created Stripe customer:', newCustomer.id);
+    return newCustomer.id;
+  } catch (error) {
+    console.error('[ADMIN] Stripe customer creation error:', error);
+    throw new Error(`Stripe customer creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 };
 
 const createOrRetrieveCustomer = async ({
@@ -136,7 +156,10 @@ const createOrRetrieveCustomer = async ({
   email: string;
   uuid: string;
 }) => {
+  console.log('[ADMIN] Starting createOrRetrieveCustomer with:', { email, uuid });
+  
   const supabase = getSupabaseAdmin();
+  
   // Check if the customer already exists in Supabase
   const { data: existingSupabaseCustomer, error: queryError } =
     await supabase
@@ -146,46 +169,78 @@ const createOrRetrieveCustomer = async ({
       .maybeSingle();
 
   if (queryError) {
+    console.error('[ADMIN] Supabase customer lookup error:', queryError);
     throw new Error(`Supabase customer lookup failed: ${queryError.message}`);
   }
+
+  console.log('[ADMIN] Existing Supabase customer:', existingSupabaseCustomer);
 
   // Retrieve the Stripe customer ID using the Supabase customer ID, with email fallback
   let stripeCustomerId: string | undefined;
   if (existingSupabaseCustomer?.stripe_customer_id) {
-    const existingStripeCustomer = await stripe.customers.retrieve(
-      existingSupabaseCustomer.stripe_customer_id
-    );
-    stripeCustomerId = existingStripeCustomer.id;
+    try {
+      console.log('[ADMIN] Retrieving existing Stripe customer:', existingSupabaseCustomer.stripe_customer_id);
+      const existingStripeCustomer = await stripe.customers.retrieve(
+        existingSupabaseCustomer.stripe_customer_id
+      );
+      stripeCustomerId = existingStripeCustomer.id;
+      console.log('[ADMIN] Retrieved existing Stripe customer:', stripeCustomerId);
+    } catch (stripeError) {
+      console.error('[ADMIN] Stripe customer retrieval error:', stripeError);
+      // If the Stripe customer doesn't exist, we'll create a new one
+      stripeCustomerId = undefined;
+    }
   } else {
     // If Stripe ID is missing from Supabase, try to retrieve Stripe customer ID by email
-    const stripeCustomers = await stripe.customers.list({ email: email });
-    stripeCustomerId =
-      stripeCustomers.data.length > 0 ? stripeCustomers.data[0].id : undefined;
+    try {
+      console.log('[ADMIN] Searching for Stripe customer by email:', email);
+      const stripeCustomers = await stripe.customers.list({ email: email });
+      stripeCustomerId =
+        stripeCustomers.data.length > 0 ? stripeCustomers.data[0].id : undefined;
+      console.log('[ADMIN] Found Stripe customers by email:', stripeCustomers.data.length);
+    } catch (stripeError) {
+      console.error('[ADMIN] Stripe customer search error:', stripeError);
+      stripeCustomerId = undefined;
+    }
   }
 
   // If still no stripeCustomerId, create a new customer in Stripe
-  const stripeIdToInsert = stripeCustomerId
-    ? stripeCustomerId
-    : await createCustomerInStripe(uuid, email);
-  if (!stripeIdToInsert) throw new Error('Stripe customer creation failed.');
+  let stripeIdToInsert: string;
+  if (stripeCustomerId) {
+    stripeIdToInsert = stripeCustomerId;
+    console.log('[ADMIN] Using existing Stripe customer ID:', stripeIdToInsert);
+  } else {
+    console.log('[ADMIN] Creating new Stripe customer for:', { uuid, email });
+    stripeIdToInsert = await createCustomerInStripe(uuid, email);
+    console.log('[ADMIN] Created new Stripe customer ID:', stripeIdToInsert);
+  }
+  
+  if (!stripeIdToInsert) {
+    console.error('[ADMIN] Failed to get or create Stripe customer ID');
+    throw new Error('Stripe customer creation failed.');
+  }
 
   if (existingSupabaseCustomer && stripeCustomerId) {
     // If Supabase has a record but doesn't match Stripe, update Supabase record
     if (existingSupabaseCustomer.stripe_customer_id !== stripeCustomerId) {
+      console.log('[ADMIN] Updating Supabase customer record with new Stripe ID');
       const { error: updateError } = await supabase
         .from('customers')
         .update({ stripe_customer_id: stripeCustomerId })
         .eq('id', uuid);
 
-      if (updateError)
+      if (updateError) {
+        console.error('[ADMIN] Supabase customer update error:', updateError);
         throw new Error(
           `Supabase customer record update failed: ${updateError.message}`
         );
+      }
       console.warn(
         `Supabase customer record mismatched Stripe ID. Supabase record updated.`
       );
     }
     // If Supabase has a record and matches Stripe, return Stripe customer ID
+    console.log('[ADMIN] Returning existing Stripe customer ID:', stripeCustomerId);
     return stripeCustomerId;
   } else {
     console.warn(
@@ -193,13 +248,17 @@ const createOrRetrieveCustomer = async ({
     );
 
     // If Supabase has no record, create a new record and return Stripe customer ID
+    console.log('[ADMIN] Creating new Supabase customer record');
     const upsertedStripeCustomer = await upsertCustomerToSupabase(
       uuid,
       stripeIdToInsert
     );
-    if (!upsertedStripeCustomer)
+    if (!upsertedStripeCustomer) {
+      console.error('[ADMIN] Failed to upsert customer to Supabase');
       throw new Error('Supabase customer record creation failed.');
+    }
 
+    console.log('[ADMIN] Successfully created customer record, returning:', upsertedStripeCustomer);
     return upsertedStripeCustomer;
   }
 };

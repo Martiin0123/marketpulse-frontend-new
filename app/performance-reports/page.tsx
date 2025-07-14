@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/utils/supabase/server';
 import { getUser, getSubscription } from '@/utils/supabase/queries';
 import { calculateTradingStats } from '@/utils/stats';
+import ChatWidget from '@/components/ui/ChatWidget/ChatWidget';
 import {
   BarChart3,
   TrendingUp,
@@ -305,6 +306,7 @@ export default async function PerformanceReports() {
           </div>
         </div>
       </div>
+      <ChatWidget />
     </div>
   );
 }

@@ -335,7 +335,7 @@ export default function Dashboard({
 
               <Button
                 onClick={() =>
-                  window.open('https://discord.gg/N7taGVuz', '_blank')
+                  window.open('https://discord.gg/GDY4ZcXzes', '_blank')
                 }
                 variant="secondary"
                 size="sm"

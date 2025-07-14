@@ -14,6 +14,7 @@ import { Metadata } from 'next';
 import { Zap, Target, X, CheckCircle, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
+import ChatWidget from '@/components/ui/ChatWidget/ChatWidget';
 
 // SEO Metadata
 export const metadata: Metadata = {
@@ -148,15 +149,16 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* Limited Time Offer Banner */}
+      {/* Limited Time Offer Banner
       <div className="w-full bg-gradient-to-r from-emerald-500 via-blue-500 to-cyan-500 text-white text-center py-2 font-semibold tracking-wide shadow-lg relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-pulse"></div>
         <div className="relative z-10">
           Limited Time Offer:{' '}
           <span className="font-bold">Get 20% Off Your First Month!</span> Use
-          code <span className="bg-white/20 px-2 py-1 rounded">TRADE20</span>
+          code <span className="bg-white/20 px-2 py-1 rounded">EARLY20</span>
         </div>
       </div>
+       */}
 
       <div className="min-h-screen bg-slate-900 relative">
         {/* Animated Background Elements */}
@@ -451,6 +453,9 @@ export default async function HomePage() {
         {/* Footer */}
         {/* Assuming Footer component exists and is imported */}
         {/* <Footer /> */}
+
+        {/* AI Chat Widget */}
+        <ChatWidget />
       </div>
     </>
   );

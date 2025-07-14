@@ -1,4 +1,5 @@
 import Pricing from '@/components/ui/Pricing/Pricing';
+import ChatWidget from '@/components/ui/ChatWidget/ChatWidget';
 import { createClient } from '@/utils/supabase/server';
 import {
   getProducts,
@@ -40,10 +41,13 @@ export default async function PricingPage() {
   const data = await getData();
 
   return (
-    <Pricing
-      user={data.user}
-      products={data.products ?? []}
-      subscription={data.subscription}
-    />
+    <>
+      <Pricing
+        user={data.user}
+        products={data.products ?? []}
+        subscription={data.subscription}
+      />
+      <ChatWidget />
+    </>
   );
 }
