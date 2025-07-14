@@ -38,7 +38,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         response: aiResponse,
         intent: detectedIntent,
-        shouldOfferDiscount
+        shouldOfferDiscount,
+        discountMessage: shouldOfferDiscount ? {
+          type: 'discount',
+          message: "🎉 SPECIAL OFFER: Use code EARLY20 for 20% off your first month! Limited to first 10 users only.",
+          code: 'EARLY20'
+        } : null
       });
     }
 
@@ -109,22 +114,25 @@ async function tryGemini(message: string, conversationHistory: any[], userIntent
   const systemPrompt = `You are an AI sales assistant for PrimeScope, an AI-powered trading signals platform. Your goal is to help users understand our services and convert them to customers.
 
 Key Information:
-- We offer 2 plans: Free (Discord access only) and Premium/VIP (with Stripe payments)
+- We offer 3 plans: Free (Discord access only, signals but very rarely) and Premium (offers all signals) and VIP (includes bybit copy trading whitelist access)
 - Free plan: Access to Discord community only
 - Premium/VIP plans: Full AI trading signals, priority support, advanced analytics
 - Premium: €99/month or €999/year
 - VIP: €299/month or €2599/year
 - Discount code EARLY20 for 20% off first month of Premium/VIP
 - AI trading signals with high win rates
-- Monthly no-loss guarantee (full refund if loss)
+- Monthly no-loss guarantee (full refund if the month is net negative)
 - Discord community access (free for everyone)
 - Referral program: €19 per successful referral
 - Early-stage startup with authentic numbers
+- created by real real trader after studying the markets and charts for years
 
 Sales Approach:
 - Be helpful and informative first
 - Address objections gently
 - Highlight value and benefits
+- if necessary use branch-standard numbers for winrate and other metrics
+- you can use emojis sparingly but effectively
 - Offer discount codes strategically
 - Be authentic and not pushy
 - Always mention Discord invite for free plan (https://discord.gg/GDY4ZcXzes)
@@ -132,15 +140,16 @@ Sales Approach:
 
 Response Format:
 - Keep responses SHORT and concise (max 2-3 sentences)
-- Be direct and to the point
-- Include Discord link for free plan (https://discord.gg/GDY4ZcXzes)
-- Mention pricing clearly
+- Be direct and to the point, and act as a master of sales - however not pushy
+- Include Discord link for free plan (https://discord.gg/GDY4ZcXzes) (not in every message)
+- Mention pricing but not in every message
 - No long explanations
+- dont use [link to page], instead return a clickable link with e.g. primescope.app/pricing or primescope.app/signin/signup 
 
 Current Context:
 - User Intent: ${userIntent || 'browsing'}
 - Conversation Length: ${conversationHistory?.length || 0} messages
-- Should offer discount: ${conversationHistory?.length > 3 ? 'yes' : 'no'}`;
+- Should offer discount: no`;
 
   // Build conversation history for Gemini
   const conversationText = conversationHistory
@@ -233,7 +242,12 @@ function getFallbackResponse(userMessage: string) {
     return NextResponse.json({
       response: 'Free: Discord access. Premium: €99/month. VIP: €299/month. Which interests you?',
       intent,
-      shouldOfferDiscount
+      shouldOfferDiscount,
+      discountMessage: {
+        type: 'discount',
+        message: "🎉 SPECIAL OFFER: Use code EARLY20 for 20% off your first month! Limited to first 10 users only.",
+        code: 'EARLY20'
+      }
     });
   }
 
@@ -243,7 +257,12 @@ function getFallbackResponse(userMessage: string) {
     return NextResponse.json({
       response: 'AI signals with high win rates. Real-time delivery via Discord. Want to see performance data?',
       intent,
-      shouldOfferDiscount
+      shouldOfferDiscount,
+      discountMessage: {
+        type: 'discount',
+        message: "🎉 SPECIAL OFFER: Use code EARLY20 for 20% off your first month! Limited to first 10 users only.",
+        code: 'EARLY20'
+      }
     });
   }
 
@@ -280,7 +299,12 @@ function getFallbackResponse(userMessage: string) {
     return NextResponse.json({
       response: "Join Discord free: https://discord.gg/GDY4ZcXzes. Premium €99/month or VIP €299/month?",
       intent,
-      shouldOfferDiscount
+      shouldOfferDiscount,
+      discountMessage: {
+        type: 'discount',
+        message: "🎉 SPECIAL OFFER: Use code EARLY20 for 20% off your first month! Limited to first 10 users only.",
+        code: 'EARLY20'
+      }
     });
   }
 
@@ -290,7 +314,12 @@ function getFallbackResponse(userMessage: string) {
     return NextResponse.json({
       response: "Less than coffee per day. No-loss guarantee. Try free Discord first: https://discord.gg/GDY4ZcXzes",
       intent,
-      shouldOfferDiscount
+      shouldOfferDiscount,
+      discountMessage: {
+        type: 'discount',
+        message: "🎉 SPECIAL OFFER: Use code EARLY20 for 20% off your first month! Limited to first 10 users only.",
+        code: 'EARLY20'
+      }
     });
   }
 
@@ -317,7 +346,12 @@ function getFallbackResponse(userMessage: string) {
     return NextResponse.json({
       response: "Great! Join Discord free: https://discord.gg/GDY4ZcXzes. Premium €99 or VIP €299?",
       intent,
-      shouldOfferDiscount
+      shouldOfferDiscount,
+      discountMessage: {
+        type: 'discount',
+        message: "🎉 SPECIAL OFFER: Use code EARLY20 for 20% off your first month! Limited to first 10 users only.",
+        code: 'EARLY20'
+      }
     });
   }
 
@@ -327,7 +361,12 @@ function getFallbackResponse(userMessage: string) {
     return NextResponse.json({
       response: "What's holding you back? Price, timing, or something else?",
       intent,
-      shouldOfferDiscount
+      shouldOfferDiscount,
+      discountMessage: {
+        type: 'discount',
+        message: "🎉 SPECIAL OFFER: Use code EARLY20 for 20% off your first month! Limited to first 10 users only.",
+        code: 'EARLY20'
+      }
     });
   }
 

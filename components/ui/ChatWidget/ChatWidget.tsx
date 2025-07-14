@@ -83,7 +83,8 @@ export default function ChatWidget() {
       const {
         response: aiResponse,
         intent,
-        shouldOfferDiscount
+        shouldOfferDiscount,
+        discountMessage
       } = await response.json();
 
       // Update user intent
@@ -101,8 +102,24 @@ export default function ChatWidget() {
 
       setMessages((prev) => [...prev, botMessage]);
 
-      // Check if we should offer a discount
-      if (shouldOfferDiscount && !hasReceivedDiscount) {
+      // Add discount message if provided
+      if (discountMessage && !hasReceivedDiscount) {
+        const discountMsg: Message = {
+          id: (Date.now() + 2).toString(),
+          text: discountMessage.message,
+          sender: 'bot',
+          timestamp: new Date(),
+          type: 'discount'
+        };
+
+        setTimeout(() => {
+          setMessages((prev) => [...prev, discountMsg]);
+          setHasReceivedDiscount(true);
+        }, 1000);
+      }
+
+      // Check if we should offer a discount (legacy fallback)
+      if (shouldOfferDiscount && !hasReceivedDiscount && !discountMessage) {
         const conversationDuration =
           Date.now() - conversationStartTime.getTime();
         const shouldShowDiscount =
@@ -135,7 +152,28 @@ export default function ChatWidget() {
         setUserIntent(fallback.intent);
       }
 
-      if (fallback.shouldOfferDiscount && !hasReceivedDiscount) {
+      // Add discount message if provided in fallback
+      if (fallback.discountMessage && !hasReceivedDiscount) {
+        const discountMsg: Message = {
+          id: (Date.now() + 2).toString(),
+          text: fallback.discountMessage.message,
+          sender: 'bot',
+          timestamp: new Date(),
+          type: 'discount'
+        };
+
+        setTimeout(() => {
+          setMessages((prev) => [...prev, discountMsg]);
+          setHasReceivedDiscount(true);
+        }, 1000);
+      }
+
+      // Legacy fallback discount logic
+      if (
+        fallback.shouldOfferDiscount &&
+        !hasReceivedDiscount &&
+        !fallback.discountMessage
+      ) {
         const conversationDuration =
           Date.now() - conversationStartTime.getTime();
         const shouldShowDiscount =
@@ -350,6 +388,11 @@ export default function ChatWidget() {
     response: string;
     intent: 'browsing' | 'interested' | 'ready' | 'objection';
     shouldOfferDiscount: boolean;
+    discountMessage?: {
+      type: 'discount';
+      message: string;
+      code: string;
+    };
   } => {
     const input = userInput.toLowerCase();
     let intent: 'browsing' | 'interested' | 'ready' | 'objection' = 'browsing';
