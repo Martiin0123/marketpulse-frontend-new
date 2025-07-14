@@ -60,14 +60,14 @@ export default function Hero({ user, monthlyPnL, positions }: HeroProps) {
               AI-Powered Trading Signals
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500">
                 {' '}
-                That Actually Work
+                for Serious Traders
               </span>
             </h1>
 
             {/* Simple Subtitle */}
             <p className="text-xl text-slate-300 mb-8">
-              Join 500+ traders using our proven AI algorithms. No loss
-              guarantee included.
+              Join our growing community of traders using AI algorithms. No loss
+              guarantee + earn rewards through our referral program.
             </p>
 
             {/* CTA Buttons */}

@@ -119,16 +119,21 @@ export default function AccountPage({
 
     setIsLoading(true);
     try {
-      if (!supabase) {
-        throw new Error('Supabase client not available');
-      }
-
-      const { error } = await supabase.auth.updateUser({
-        password: passwordData.newPassword
+      const response = await fetch('/api/auth/update-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          password: passwordData.newPassword,
+          passwordConfirm: passwordData.confirmPassword
+        })
       });
 
-      if (error) {
-        throw error;
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update password');
       }
 
       alert('Password updated successfully');
@@ -138,6 +143,9 @@ export default function AccountPage({
         newPassword: '',
         confirmPassword: ''
       });
+
+      // Refresh the page to show updated status
+      router.refresh();
     } catch (error: any) {
       console.error('Error updating password:', error);
       alert(error.message || 'Failed to update password');

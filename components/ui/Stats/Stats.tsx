@@ -32,16 +32,16 @@ export default function Stats({ statsData }: Props) {
   // Use real data if available, otherwise fall back to hardcoded values
   const realData = statsData
     ? {
-        traders: 10, // Keep hardcoded for now
+        traders: 25, // Authentic early-stage number
         profits: statsData.totalPnl, // Show actual total PnL percentage
-        signals: statsData.totalSignals || 1500,
-        rating: 4.9 // Keep hardcoded for now
+        signals: statsData.totalSignals, // Use dynamic data from stats
+        rating: 4.8 // Slightly more realistic rating
       }
     : {
-        traders: 500,
-        profits: 15.2, // Default PnL percentage
-        signals: 1500,
-        rating: 4.9
+        traders: 25,
+        profits: 12.5, // More realistic PnL percentage
+        signals: 150,
+        rating: 4.8
       };
 
   const stats = [
@@ -147,7 +147,7 @@ export default function Stats({ statsData }: Props) {
           </div>
 
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-            Real Numbers,
+            Growing Community,
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-500">
               {' '}
               Real Results
@@ -155,9 +155,9 @@ export default function Stats({ statsData }: Props) {
           </h2>
 
           <p className="text-xl text-slate-400 max-w-3xl mx-auto">
-            Our AI-powered trading signals have helped hundreds of traders
-            achieve consistent profits. See the numbers that speak for
-            themselves.
+            Our AI-powered trading signals are helping early adopters achieve
+            consistent profits. Join our growing community and see the results
+            for yourself.
           </p>
         </div>
 

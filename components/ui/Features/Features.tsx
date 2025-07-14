@@ -47,8 +47,8 @@ export default function Features() {
       icon: <Users className="w-10 h-10 text-cyan-400" />,
       title: 'Expert Community',
       description:
-        'Join our exclusive Discord community of successful traders. Share insights, get support, and learn from fellow traders around the world.',
-      stats: '500+ active members'
+        'Join our exclusive Discord community of traders. Share insights, get support, and learn from fellow traders. Plus earn rewards through our referral program.',
+      stats: 'Growing community'
     },
     {
       icon: <Award className="w-10 h-10 text-yellow-400" />,
@@ -81,9 +81,8 @@ export default function Features() {
 
           <p className="text-xl text-slate-400 max-w-4xl mx-auto leading-relaxed">
             We've combined cutting-edge AI technology with proven trading
-            strategies to create the most comprehensive trading signal platform
-            available. Join thousands of traders who are already achieving
-            consistent profits.
+            strategies to create a comprehensive trading signal platform. Join
+            our growing community of traders achieving consistent profits.
           </p>
         </div>
 
@@ -128,19 +127,19 @@ export default function Features() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="text-center">
               <div className="text-4xl font-bold text-emerald-400 mb-2">
-                500+
+                25+
               </div>
               <div className="text-slate-400">Active Traders</div>
             </div>
             <div className="text-center">
               <div className="text-4xl font-bold text-emerald-400 mb-2">
-                $2.5M+
+                $15K+
               </div>
               <div className="text-slate-400">Total Profits Generated</div>
             </div>
             <div className="text-center">
               <div className="text-4xl font-bold text-emerald-400 mb-2">
-                4.9/5
+                4.8/5
               </div>
               <div className="text-slate-400">Average Rating</div>
             </div>

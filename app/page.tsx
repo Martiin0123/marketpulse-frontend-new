@@ -11,21 +11,23 @@ import { getUser } from '@/utils/supabase/queries';
 import { getSubscription } from '@/utils/supabase/queries';
 import { getPositions } from '@/utils/supabase/queries';
 import { Metadata } from 'next';
-import { Zap, Target, X, CheckCircle } from 'lucide-react';
+import { Zap, Target, X, CheckCircle, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
+import Button from '@/components/ui/Button';
 
 // SEO Metadata
 export const metadata: Metadata = {
   title:
-    'PrimeScope - AI-Powered Trading Signals | Transform Your Trading Results',
+    'PrimeScope - AI-Powered Trading Signals | Early Access for Serious Traders',
   description:
-    'Join 500+ successful traders using our AI-powered trading signals. Get real-time alerts with proven win rates, risk-free monthly guarantee, and instant access. Start profiting from the markets today.',
+    'Join our growing community of traders using AI-powered signals. Get real-time alerts, risk-free monthly guarantee, and earn rewards through our referral program. Limited early access available.',
   keywords:
-    'trading signals, AI trading, stock signals, forex signals, crypto signals, trading alerts, automated trading, trading bot, market analysis, trading strategy',
+    'trading signals, AI trading, crypto signals, trading alerts, automated trading, trading bot, market analysis, trading strategy, referral program, early access',
   openGraph: {
     title:
-      'PrimeScope - AI-Powered Trading Signals | Transform Your Trading Results',
+      'PrimeScope - AI-Powered Trading Signals | Early Access for Serious Traders',
     description:
-      'Join 500+ successful traders using our AI-powered trading signals. Get real-time alerts with proven win rates and risk-free monthly guarantee.',
+      'Join our growing community of traders using AI-powered signals. Get real-time alerts, risk-free monthly guarantee, and earn rewards through our referral program.',
     type: 'website',
     url: 'https://primescope.com',
     siteName: 'PrimeScope',
@@ -42,7 +44,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'PrimeScope - AI-Powered Trading Signals',
     description:
-      'Transform your trading with AI-powered signals. Join 500+ successful traders today.',
+      'Join our growing community of traders using AI-powered signals. Limited early access available.',
     images: ['/demo.png']
   },
   robots: {
@@ -174,6 +176,123 @@ export default async function HomePage() {
 
         {/* Features Section */}
         <Features />
+
+        {/* Referral Program Section */}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 my-20">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold text-white mb-4">
+              Earn Rewards with Our
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-500">
+                {' '}
+                Referral Program
+              </span>
+            </h2>
+            <p className="text-xl text-slate-400 max-w-3xl mx-auto">
+              Share PrimeScope with other traders and earn rewards for every
+              successful referral
+            </p>
+          </div>
+
+          <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+              {/* How It Works */}
+              <div>
+                <h3 className="text-2xl font-bold text-white mb-6">
+                  How It Works
+                </h3>
+                <div className="space-y-6">
+                  <div className="flex items-start space-x-4">
+                    <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 mt-1">
+                      1
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-semibold text-white mb-2">
+                        Get Your Referral Link
+                      </h4>
+                      <p className="text-slate-400">
+                        Access your unique referral link from your dashboard
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-4">
+                    <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 mt-1">
+                      2
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-semibold text-white mb-2">
+                        Share with Traders
+                      </h4>
+                      <p className="text-slate-400">
+                        Share your link with other traders who might be
+                        interested
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-4">
+                    <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 mt-1">
+                      3
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-semibold text-white mb-2">
+                        Earn Rewards
+                      </h4>
+                      <p className="text-slate-400">
+                        Get paid when your referrals subscribe to premium plans
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rewards */}
+              <div>
+                <h3 className="text-2xl font-bold text-white mb-6">Rewards</h3>
+                <div className="space-y-4">
+                  <div className="bg-slate-700/30 rounded-xl p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-white font-semibold">
+                        Any Referral
+                      </span>
+                      <span className="text-emerald-400 font-bold">€19</span>
+                    </div>
+                    <p className="text-slate-400 text-sm">
+                      When someone subscribes to any premium plan
+                    </p>
+                  </div>
+                  <div className="bg-slate-700/30 rounded-xl p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-white font-semibold">
+                        Monthly Payouts
+                      </span>
+                    </div>
+                    <p className="text-slate-400 text-sm">
+                      Get paid monthly for all your referrals
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="text-center mt-8">
+              {user ? (
+                <Link href="/referrals">
+                  <Button variant="primary" size="lg" className="group">
+                    View My Referrals
+                    <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </Link>
+              ) : (
+                <Link href="/signin">
+                  <Button variant="primary" size="lg" className="group">
+                    Start Earning Rewards
+                    <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* Comparison Section */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 my-20">

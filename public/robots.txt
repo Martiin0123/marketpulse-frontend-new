@@ -1,0 +1,24 @@
+User-agent: *
+Allow: /
+
+# Disallow private and admin pages
+Disallow: /dashboard
+Disallow: /account
+Disallow: /referrals
+Disallow: /api/
+Disallow: /auth/
+Disallow: /signin/
+Disallow: /admin/
+
+# Allow public pages
+Allow: /
+Allow: /pricing
+Allow: /performance-reports
+Allow: /legal/
+Allow: /ref/
+
+# Sitemap (if you have one)
+# Sitemap: https://yourdomain.com/sitemap.xml
+
+# Crawl delay (optional - slows down crawlers)
+# Crawl-delay: 1 
