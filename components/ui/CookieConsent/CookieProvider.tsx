@@ -39,8 +39,10 @@ export function CookieProvider({ children }: CookieProviderProps) {
   });
   const [showConsent, setShowConsent] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     // Load saved settings from localStorage
     const savedSettings = localStorage.getItem('cookie-settings');
     if (savedSettings) {
@@ -107,7 +109,7 @@ export function CookieProvider({ children }: CookieProviderProps) {
       {children}
 
       {/* Cookie Consent Banner */}
-      {showConsent && (
+      {mounted && showConsent && (
         <CookieConsent
           onAccept={handleAccept}
           onReject={handleReject}
@@ -116,11 +118,13 @@ export function CookieProvider({ children }: CookieProviderProps) {
       )}
 
       {/* Cookie Settings Modal */}
-      <CookieModal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        onSave={handleModalSave}
-      />
+      {mounted && (
+        <CookieModal
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          onSave={handleModalSave}
+        />
+      )}
     </CookieContext.Provider>
   );
 }

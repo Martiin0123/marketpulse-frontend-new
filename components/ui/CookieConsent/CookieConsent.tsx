@@ -16,14 +16,21 @@ export default function CookieConsent({
   onCustomize
 }: CookieConsentProps) {
   const [isVisible, setIsVisible] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     // Check if user has already made a choice
     const consent = localStorage.getItem('cookie-consent');
     if (!consent) {
       setIsVisible(true);
     }
   }, []);
+
+  // Don't render anything until mounted to avoid SSR issues
+  if (!mounted) {
+    return null;
+  }
 
   const handleAccept = () => {
     localStorage.setItem('cookie-consent', 'accepted');

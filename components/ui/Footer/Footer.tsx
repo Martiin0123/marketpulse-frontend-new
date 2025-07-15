@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import Logo from '@/components/icons/Logo';
 import {
@@ -13,6 +15,7 @@ import {
 } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 import { Tables } from '@/types_db';
+import { useState, useEffect } from 'react';
 import { useCookieConsent } from '@/components/ui/CookieConsent';
 
 interface FooterProps {
@@ -29,7 +32,17 @@ interface FooterProps {
 }
 
 export default function Footer({ user, subscription }: FooterProps) {
-  const { showConsent } = useCookieConsent();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  let showConsent: (() => void) | undefined = undefined;
+  try {
+    showConsent = useCookieConsent().showConsent;
+  } catch {
+    showConsent = undefined;
+  }
 
   return (
     <footer className="bg-slate-900 border-t border-slate-800">
@@ -155,15 +168,17 @@ export default function Footer({ user, subscription }: FooterProps) {
                   Risk Disclosure
                 </Link>
               </li>
-              <li>
-                <button
-                  onClick={showConsent}
-                  className="text-slate-400 hover:text-white transition-colors flex items-center"
-                >
-                  <Settings className="w-3 h-3 mr-1" />
-                  Cookie Settings
-                </button>
-              </li>
+              {mounted && showConsent && (
+                <li>
+                  <button
+                    onClick={showConsent}
+                    className="text-slate-400 hover:text-white transition-colors flex items-center"
+                  >
+                    <Settings className="w-3 h-3 mr-1" />
+                    Cookie Settings
+                  </button>
+                </li>
+              )}
             </ul>
           </div>
         </div>

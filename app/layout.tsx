@@ -11,7 +11,7 @@ import { createClient } from '@/utils/supabase/server';
 import { getUser, getSubscription } from '@/utils/supabase/queries';
 import { AuthProvider } from '@/utils/auth-context';
 import AmplitudeProvider from '@/components/ui/Analytics/AmplitudeProvider';
-import { CookieProvider } from '@/components/ui/CookieConsent';
+import ClientWrapper from '@/components/ui/CookieConsent/ClientWrapper';
 
 const title = 'PrimeScope - AI-Powered Trading Platform';
 const description =
@@ -57,7 +57,7 @@ export default async function RootLayout({ children }: PropsWithChildren) {
           initialSubscription={subscription as any}
         >
           <AmplitudeProvider>
-            <CookieProvider>
+            <ClientWrapper>
               <Navbar />
               <main
                 id="skip"
@@ -70,7 +70,7 @@ export default async function RootLayout({ children }: PropsWithChildren) {
                 <Toaster />
               </Suspense>
               <SpeedInsights />
-            </CookieProvider>
+            </ClientWrapper>
           </AmplitudeProvider>
         </AuthProvider>
       </body>
