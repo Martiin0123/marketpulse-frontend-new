@@ -308,15 +308,11 @@ export default function Pricing({ user, products, subscription }: Props) {
                   </div>
 
                   <h3 className="text-2xl font-bold text-white mb-4">Free</h3>
-                  <p className="text-slate-400 text-sm mb-6 leading-relaxed">
-                    Get started with occasional trading signals and join our
-                    Discord community
-                  </p>
 
                   {/* Feature Indicators */}
                   <div className="mb-6">
-                    <div className="flex items-center space-x-2 p-3 bg-blue-500/10 rounded-lg border border-blue-500/30 mb-4">
-                      <div>
+                    <div className=" items-center space-x-2 p-3 bg-blue-500/10 rounded-lg border border-blue-500/30 mb-4">
+                      <div className="text-center">
                         <p className="text-blue-200 text-sm font-medium">
                           Free Trading Signals
                         </p>

@@ -4,33 +4,193 @@ import { User } from '@supabase/supabase-js';
 
 const PROTECTED_ROUTES = ['/dashboard', '/signals', '/account', '/referrals', '/performance-reports'];
 
-// Simple cache to reduce auth requests
-const authCache = new Map<string, { user: User | null; timestamp: number }>();
-const CACHE_DURATION = 30 * 1000; // 30 seconds only
+// Enhanced cache with better memory management
+const authCache = new Map<string, { user: User | null; timestamp: number; error?: string }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes for successful auth
+const ERROR_CACHE_DURATION = 30 * 1000; // 30 seconds for auth errors
 
-// Simplified rate limiting
-const rateLimitMap = new Map<string, { count: number; timestamp: number }>();
-const RATE_LIMIT_WINDOW = 10 * 1000; // 10 seconds
-const MAX_REQUESTS_PER_WINDOW = 3; // 3 requests per 10 seconds
+// Improved rate limiting with exponential backoff
+const rateLimitMap = new Map<string, { count: number; timestamp: number; blocked: boolean }>();
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute window
+const MAX_REQUESTS_PER_WINDOW = 10; // 10 requests per minute
+const BLOCK_DURATION = 5 * 60 * 1000; // 5 minutes block for excessive requests
 
-// Helper function to clean up expired cache entries on-demand
+// Global rate limit state
+let globalRateLimitCount = 0;
+let globalRateLimitTimestamp = Date.now();
+const GLOBAL_RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const GLOBAL_MAX_REQUESTS = 50; // 50 requests per minute globally
+
+// Rate limiting statistics
+const rateLimitStats = {
+  totalRequests: 0,
+  rateLimited: 0,
+  authErrors: 0,
+  cacheHits: 0,
+  cacheMisses: 0
+};
+
+// Redis client (optional - falls back to in-memory if not available)
+let redisClient: any = null;
+let redisAvailable = false;
+
+try {
+  const Redis = require('ioredis');
+  redisClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+    retryDelayOnFailover: 100,
+    enableReadyCheck: false,
+    maxRetriesPerRequest: null,
+    lazyConnect: true
+  });
+  
+  redisClient.on('connect', () => {
+    console.log('✅ Redis connected for rate limiting');
+    redisAvailable = true;
+  });
+  
+  redisClient.on('error', (error: any) => {
+    console.log('⚠️ Redis connection error:', error.message);
+    redisAvailable = false;
+  });
+  
+  redisClient.on('close', () => {
+    console.log('⚠️ Redis connection closed');
+    redisAvailable = false;
+  });
+  
+} catch (error) {
+  console.log('⚠️ Redis not available, using in-memory rate limiting');
+}
+
+// Helper function to clean up expired cache entries
 const cleanupExpiredEntries = () => {
   const now = Date.now();
-  authCache.forEach((value, key) => {
-    if (now - value.timestamp > CACHE_DURATION) {
+  
+  // Clean auth cache
+  Array.from(authCache.entries()).forEach(([key, value]) => {
+    const duration = value.error ? ERROR_CACHE_DURATION : CACHE_DURATION;
+    if (now - value.timestamp > duration) {
       authCache.delete(key);
     }
   });
-  rateLimitMap.forEach((value, key) => {
+  
+  // Clean rate limit cache
+  Array.from(rateLimitMap.entries()).forEach(([key, value]) => {
     if (now - value.timestamp > RATE_LIMIT_WINDOW) {
       rateLimitMap.delete(key);
     }
   });
+  
+  // Clean global rate limit
+  if (now - globalRateLimitTimestamp > GLOBAL_RATE_LIMIT_WINDOW) {
+    globalRateLimitCount = 0;
+    globalRateLimitTimestamp = now;
+  }
 };
 
 // Simple helper to check if we should skip auth checks
 const shouldSkipAuth = () => {
   return process.env.DISABLE_AUTH_MIDDLEWARE === 'true';
+};
+
+// Check if we're globally rate limited
+const isGloballyRateLimited = () => {
+  const now = Date.now();
+  if (now - globalRateLimitTimestamp > GLOBAL_RATE_LIMIT_WINDOW) {
+    globalRateLimitCount = 0;
+    globalRateLimitTimestamp = now;
+  }
+  
+  if (globalRateLimitCount >= GLOBAL_MAX_REQUESTS) {
+    console.log('🚨 Global rate limit exceeded, allowing requests through');
+    return true;
+  }
+  
+  globalRateLimitCount++;
+  return false;
+};
+
+// Redis-based rate limiting with fallback
+const checkRedisRateLimit = async (key: string, maxRequests: number, windowMs: number) => {
+  if (!redisClient || !redisAvailable) {
+    // Fallback to in-memory rate limiting
+    return checkInMemoryRateLimit(key, maxRequests, windowMs);
+  }
+  
+  try {
+    const now = Date.now();
+    const windowStart = now - windowMs;
+    
+    // Use Redis pipeline for atomic operations
+    const pipeline = redisClient.pipeline();
+    
+    // Remove old entries
+    pipeline.zremrangebyscore(key, 0, windowStart);
+    
+    // Count current entries
+    pipeline.zcard(key);
+    
+    // Add current request
+    pipeline.zadd(key, now, now.toString());
+    
+    // Set expiry
+    pipeline.expire(key, Math.ceil(windowMs / 1000));
+    
+    const results = await pipeline.exec();
+    const currentCount = results[1][1] as number;
+    
+    const allowed = currentCount < maxRequests;
+    const remaining = Math.max(0, maxRequests - currentCount);
+    
+    return { allowed, remaining };
+  } catch (error) {
+    console.error('Redis rate limit error:', error);
+    // Fallback to in-memory rate limiting
+    return checkInMemoryRateLimit(key, maxRequests, windowMs);
+  }
+};
+
+// In-memory rate limiting fallback
+const checkInMemoryRateLimit = (key: string, maxRequests: number, windowMs: number) => {
+  const now = Date.now();
+  const rateLimit = rateLimitMap.get(key);
+  
+  if (rateLimit) {
+    if (rateLimit.blocked && (now - rateLimit.timestamp) < BLOCK_DURATION) {
+      return { allowed: false, remaining: 0 };
+    }
+    
+    if ((now - rateLimit.timestamp) < windowMs) {
+      if (rateLimit.count >= maxRequests) {
+        rateLimit.blocked = true;
+        rateLimit.timestamp = now;
+        return { allowed: false, remaining: 0 };
+      }
+      rateLimit.count++;
+      return { allowed: true, remaining: maxRequests - rateLimit.count };
+    } else {
+      rateLimitMap.set(key, { count: 1, timestamp: now, blocked: false });
+      return { allowed: true, remaining: maxRequests - 1 };
+    }
+  } else {
+    rateLimitMap.set(key, { count: 1, timestamp: now, blocked: false });
+    return { allowed: true, remaining: maxRequests - 1 };
+  }
+};
+
+// Log rate limiting statistics
+const logRateLimitStats = () => {
+  if (rateLimitStats.totalRequests % 100 === 0) {
+    console.log('📊 Rate Limit Stats:', {
+      totalRequests: rateLimitStats.totalRequests,
+      rateLimited: rateLimitStats.rateLimited,
+      authErrors: rateLimitStats.authErrors,
+      cacheHits: rateLimitStats.cacheHits,
+      cacheMisses: rateLimitStats.cacheMisses,
+      hitRate: rateLimitStats.totalRequests > 0 ? 
+        ((rateLimitStats.cacheHits / (rateLimitStats.cacheHits + rateLimitStats.cacheMisses)) * 100).toFixed(1) + '%' : '0%'
+    });
+  }
 };
 
 export const createClient = (request: NextRequest) => {
@@ -97,6 +257,13 @@ export const updateSession = async (request: NextRequest) => {
     const { supabase, response } = createClient(request);
     const pathname = request.nextUrl.pathname;
 
+    // Update statistics
+    rateLimitStats.totalRequests++;
+    logRateLimitStats();
+
+    // Clean up expired entries periodically
+    cleanupExpiredEntries();
+
     // Skip auth checks for static assets and API routes
     if (pathname.startsWith('/_next') || 
         pathname.startsWith('/api') || 
@@ -122,54 +289,99 @@ export const updateSession = async (request: NextRequest) => {
 
     // Check if this is a protected route
     if (PROTECTED_ROUTES.some(route => pathname.startsWith(route))) {
-      // Simple rate limiting
-      const clientIP = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
-      const now = Date.now();
-      const rateLimitKey = `${clientIP}:${pathname}`;
-      const rateLimit = rateLimitMap.get(rateLimitKey);
-      
-      if (rateLimit && (now - rateLimit.timestamp) < RATE_LIMIT_WINDOW) {
-        if (rateLimit.count >= MAX_REQUESTS_PER_WINDOW) {
-          console.log('⚠️ Rate limit exceeded, allowing request through');
-          return response;
-        }
-        rateLimit.count++;
-      } else {
-        rateLimitMap.set(rateLimitKey, { count: 1, timestamp: now });
+      // Check global rate limit first
+      if (isGloballyRateLimited()) {
+        console.log('⚠️ Global rate limit active, allowing request through');
+        return response;
       }
 
-      // Simple auth check with minimal caching
-      let user = null;
+      // Per-IP rate limiting with Redis
+      const clientIP = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
+      const rateLimitKey = `rate_limit:${clientIP}:${pathname}`;
       
-      // Check cache first (short duration)
+      const { allowed, remaining } = await checkRedisRateLimit(
+        rateLimitKey,
+        MAX_REQUESTS_PER_WINDOW,
+        RATE_LIMIT_WINDOW
+      );
+      
+      if (!allowed) {
+        rateLimitStats.rateLimited++;
+        console.log(`🚨 Rate limit exceeded for IP ${clientIP}, remaining: ${remaining}`);
+        return response;
+      }
+
+      // Enhanced auth check with better caching
+      let user = null;
+      let authError = null;
+      
+      // Check cache first
       const cacheKey = 'auth-check';
       const cached = authCache.get(cacheKey);
       
-      if (cached && (now - cached.timestamp) < CACHE_DURATION) {
-        user = cached.user;
-      } else {
+      if (cached) {
+        const duration = cached.error ? ERROR_CACHE_DURATION : CACHE_DURATION;
+        if ((Date.now() - cached.timestamp) < duration) {
+          user = cached.user;
+          authError = cached.error;
+          rateLimitStats.cacheHits++;
+          
+          if (authError) {
+            console.log('📝 Using cached auth error:', authError);
+            // Don't redirect on cached errors, let the page handle them
+            return response;
+          }
+        }
+      }
+      
+      // Only make auth request if not cached
+      if (!user && !authError) {
+        rateLimitStats.cacheMisses++;
         try {
           const { data, error } = await supabase.auth.getUser();
           user = data.user;
           
           if (error) {
             console.log('📝 Auth check error:', error.message);
-            // Don't cache auth errors, let the page handle them
+            authError = error.message;
+            rateLimitStats.authErrors++;
+            
+            // Cache auth errors briefly
+            authCache.set(cacheKey, { 
+              user: null, 
+              timestamp: Date.now(), 
+              error: error.message 
+            });
+            
+            // Don't redirect on auth errors, let the page handle them
             return response;
           }
           
-          // Cache the result briefly
-          authCache.set(cacheKey, { user: user || null, timestamp: now });
+          // Cache successful auth for longer
+          authCache.set(cacheKey, { 
+            user: user || null, 
+            timestamp: Date.now() 
+          });
           
         } catch (error: any) {
           console.error('❌ Auth error in middleware:', error);
+          authError = error.message;
+          rateLimitStats.authErrors++;
+          
+          // Cache auth errors briefly
+          authCache.set(cacheKey, { 
+            user: null, 
+            timestamp: Date.now(), 
+            error: error.message 
+          });
+          
           // On auth errors, let the page handle authentication
           return response;
         }
       }
       
-      if (!user) {
-        // If no user, redirect to sign in
+      if (!user && !authError) {
+        // If no user and no error, redirect to sign in
         const redirectUrl = new URL('/signin', request.url);
         redirectUrl.searchParams.set('next', pathname);
         console.log('🔐 Redirecting to signin for:', pathname);
