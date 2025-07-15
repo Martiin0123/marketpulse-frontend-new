@@ -753,15 +753,17 @@ export async function POST(request) {
         // Handle database operations based on proxy response
         try {
           // Check what action the proxy actually took
-          const actionTaken = orderResult.action_taken || 'unknown';
+          const actionTaken = orderResult.action_taken || orderResult.actions?.[0] || 'unknown';
           const actionDescription = orderResult.action_description || '';
           
           console.log('📊 Proxy response analysis:', {
             action_taken: actionTaken,
-            action_description: actionDescription
+            action_description: actionDescription,
+            actions: orderResult.actions
           });
           
-                    if (actionTaken === 'closed_position') {
+          // Handle different action types from proxy
+          if (actionTaken === 'closed_position' || actionTaken === 'CLOSE') {
             // Proxy closed a position - update existing signal
             console.log('🔍 Looking for active signal to close for symbol:', symbol.toUpperCase());
             
@@ -827,9 +829,9 @@ export async function POST(request) {
             } else {
               console.log('⚠️ No active signal found to close for symbol:', symbol.toUpperCase());
             }
-          } else if (actionTaken === 'opened_buy' || actionTaken === 'opened_sell') {
+          } else if (actionTaken === 'opened_buy' || actionTaken === 'opened_sell' || actionTaken === 'BUY' || actionTaken === 'SELL') {
             // Proxy opened a new position - create new signal
-            const signalType = actionTaken === 'opened_buy' ? 'buy' : 'sell';
+            const signalType = (actionTaken === 'opened_buy' || actionTaken === 'BUY') ? 'buy' : 'sell';
             const openExecutionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
             const { data: signal } = await supabase
               .from('signals')
@@ -927,8 +929,10 @@ export async function POST(request) {
             databaseResult = newSignal;
             
 
-          } else if (actionTaken === 'ignored_signal') {
+          } else if (actionTaken === 'ignored_signal' || actionTaken === 'NO_ACTION') {
             console.log('ℹ️ Signal ignored - no action taken');
+          } else {
+            console.log('⚠️ Unknown action taken:', actionTaken);
           }
 
           // Send Discord notification based on action_taken
@@ -962,6 +966,7 @@ export async function POST(request) {
             
             switch (actionTaken) {
               case 'opened_buy':
+              case 'BUY':
                 // Send "BUY opened" notification
                 console.log('📤 Sending BUY opened Discord notification');
                 await sendSuccessDiscordNotification({
@@ -976,6 +981,7 @@ export async function POST(request) {
                 break;
                 
               case 'opened_sell':
+              case 'SELL':
                 // Send "SELL opened" notification
                 console.log('📤 Sending SELL opened Discord notification');
                 await sendSuccessDiscordNotification({
@@ -1058,6 +1064,7 @@ export async function POST(request) {
                 break;
                 
               case 'closed_position':
+              case 'CLOSE':
                 // Send "BUY/SELL closed (xxx PnL)" notification
                 const closedAction = originalSignalForDiscord?.type === 'buy' ? 'BUY_CLOSED' : 'SELL_CLOSED';
                 
@@ -1081,7 +1088,21 @@ export async function POST(request) {
                 break;
                 
               case 'ignored_signal':
+              case 'NO_ACTION':
                 console.log('ℹ️ Signal ignored - no Discord notification sent');
+                break;
+              default:
+                console.log('⚠️ Unknown action taken, but order was successful:', actionTaken);
+                // Still send a basic notification for successful orders
+                await sendSuccessDiscordNotification({
+                  symbol: symbol.toUpperCase(),
+                  action: action,
+                  price: parseFloat(executionPrice),
+                  timestamp: validTimestamp,
+                  strategy_metadata: strategy_metadata,
+                  pnl_percentage: null,
+                  exitReason: null
+                }, orderResult.order || orderResult, discordWebhookUrl);
                 break;
             }
             
@@ -1102,6 +1123,22 @@ export async function POST(request) {
         } catch (dbError) {
           console.error('❌ Database error for action:', actionTaken, dbError);
           signalSaved = false;
+          
+          // Even if database fails, try to send Discord notification
+          if (discordWebhookUrl) {
+            console.log('📤 Sending Discord notification despite database error');
+            const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
+            
+            await sendSuccessDiscordNotification({
+              symbol: symbol.toUpperCase(),
+              action: action,
+              price: parseFloat(executionPrice),
+              timestamp: validTimestamp,
+              strategy_metadata: strategy_metadata,
+              pnl_percentage: null,
+              exitReason: null
+            }, orderResult.order || orderResult, discordWebhookUrl);
+          }
         }
 
         return new Response(JSON.stringify({

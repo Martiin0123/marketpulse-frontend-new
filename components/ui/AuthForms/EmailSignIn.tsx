@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Mail, Zap } from 'lucide-react';
 import Logo from '@/components/icons/Logo';
+import { trackEvent } from '@/utils/amplitude';
 
 // Define prop type with allowPassword boolean
 interface EmailSignInProps {
@@ -26,6 +27,7 @@ export default function EmailSignIn({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     setIsSubmitting(true);
+    trackEvent('Sign In Attempted', { method: 'email' });
     await handleRequest(e, signInWithEmail, router);
     setIsSubmitting(false);
   };

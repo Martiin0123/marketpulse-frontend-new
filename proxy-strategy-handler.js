@@ -3,6 +3,7 @@ async function handleStrategyAlert({ action, symbol, positionAfter, price }) {
   try {
     console.log('🔄 Processing strategy alert:', { action, symbol, positionAfter, price });
     
+    // Initialize actions array at the beginning
     const actions = [];
     let finalOrder = null;
     
@@ -110,10 +111,14 @@ app.post('/place-order', async (req, res) => {
   try {
     const { action, symbol, positionAfter, ...otherParams } = req.body;
     
+    // Initialize actions array for all code paths
+    let actions = [];
+    let result = null;
+    
     // Check if this is a strategy alert (has positionAfter)
     if (positionAfter !== undefined) {
       console.log('📨 Received strategy alert');
-      const result = await handleStrategyAlert({
+      result = await handleStrategyAlert({
         action,
         symbol,
         positionAfter,
@@ -124,7 +129,7 @@ app.post('/place-order', async (req, res) => {
     
     // Handle regular BUY/SELL/CLOSE actions (your existing logic)
     if (action === 'BUY' || action === 'SELL') {
-      const result = await placeBybitOrderWithDynamicSizing({
+      result = await placeBybitOrderWithDynamicSizing({
         symbol,
         side: action === 'BUY' ? 'Buy' : 'Sell',
         orderType: 'Market',
@@ -132,33 +137,49 @@ app.post('/place-order', async (req, res) => {
         timeInForce: 'GoodTillCancel'
       });
       
+      actions = [action]; // Ensure actions is defined
+      
       return res.json({
         success: true,
         message: `Bybit ${action.toLowerCase()} order submitted successfully`,
         order: result,
-        actions: [action],
+        actions: actions,
         timestamp: new Date().toISOString()
       });
     }
     
     if (action === 'CLOSE') {
-      const result = await closeBybitPosition(symbol);
+      result = await closeBybitPosition(symbol);
+      actions = ['CLOSE']; // Ensure actions is defined
       
       return res.json({
         success: true,
         message: 'Bybit position closed successfully',
         order: result,
-        actions: ['CLOSE'],
+        actions: actions,
         timestamp: new Date().toISOString()
       });
     }
     
     // Handle other actions...
+    actions = ['UNKNOWN_ACTION']; // Ensure actions is defined for unknown actions
+    
+    return res.json({
+      success: false,
+      message: 'Unknown action',
+      actions: actions,
+      timestamp: new Date().toISOString()
+    });
     
   } catch (error) {
     console.error('❌ Order failed:', error);
     res.status(400).json({
+      success: false,
       error: error.message,
+      details: `Failed to execute order`,
+      symbol: req.body.symbol,
+      action: req.body.action,
+      currentPrice: req.body.price,
       timestamp: new Date().toISOString()
     });
   }

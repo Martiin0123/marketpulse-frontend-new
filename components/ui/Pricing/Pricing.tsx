@@ -9,6 +9,7 @@ import { User } from '@supabase/supabase-js';
 import cn from 'classnames';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { trackEvent } from '@/utils/amplitude';
 import {
   Check,
   Star,
@@ -121,6 +122,14 @@ export default function Pricing({ user, products, subscription }: Props) {
       setPriceIdLoading(undefined);
       return router.push('/signin/signup');
     }
+
+    trackEvent('Checkout Started', {
+      price_id: price.id,
+      amount: price.unit_amount,
+      currency: price.currency,
+      interval: price.interval,
+      product_name: price.products?.name
+    });
 
     try {
       const { errorRedirect, sessionId } = await checkoutWithStripe(

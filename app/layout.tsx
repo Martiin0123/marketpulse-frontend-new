@@ -10,6 +10,7 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 import { createClient } from '@/utils/supabase/server';
 import { getUser, getSubscription } from '@/utils/supabase/queries';
 import { AuthProvider } from '@/utils/auth-context';
+import AmplitudeProvider from '@/components/ui/Analytics/AmplitudeProvider';
 
 const title = 'PrimeScope - AI-Powered Trading Platform';
 const description =
@@ -54,18 +55,20 @@ export default async function RootLayout({ children }: PropsWithChildren) {
           initialUser={user}
           initialSubscription={subscription as any}
         >
-          <Navbar />
-          <main
-            id="skip"
-            className="min-h-[calc(100dvh-4rem)] md:min-h-[calc(100dvh-5rem)] pt-24"
-          >
-            {children}
-          </main>
-          <Footer user={user} subscription={subscription as any} />
-          <Suspense>
-            <Toaster />
-          </Suspense>
-          <SpeedInsights />
+          <AmplitudeProvider>
+            <Navbar />
+            <main
+              id="skip"
+              className="min-h-[calc(100dvh-4rem)] md:min-h-[calc(100dvh-5rem)] pt-24"
+            >
+              {children}
+            </main>
+            <Footer user={user} subscription={subscription as any} />
+            <Suspense>
+              <Toaster />
+            </Suspense>
+            <SpeedInsights />
+          </AmplitudeProvider>
         </AuthProvider>
       </body>
     </html>
