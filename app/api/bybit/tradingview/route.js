@@ -701,7 +701,7 @@ export async function POST(request) {
       try {
         // Use proxy to execute the signal directly
         const signalPayload = {
-          action: action, // BUY or SELL
+          alert_message: signalData.originalMessage, // Send the original TradingView alert message
           symbol: bybitSymbol
           // Price will be fetched from Bybit by proxy
         };
@@ -1348,7 +1348,7 @@ export async function POST(request) {
           order_id: orderResult.order?.orderId,
           symbol: bybitSymbol,
           quantity: orderResult.order?.qty || 'N/A',
-          signal_id: signal?.id,
+          signal_id: databaseResult?.id || null,
           pnl_percentage: databaseResult?.pnl_percentage || null,
           exit_reason: exitReason,
           signalSaved,
@@ -1372,18 +1372,37 @@ export async function POST(request) {
           
           // Try to calculate PnL even if database failed
           let calculatedPnlPercentage = pnlPercentage;
-          if (originalSignal && executionPrice) {
-            const entryPrice = Number(originalSignal.entry_price);
+          
+          // Try to find the original signal even if the first attempt failed
+          let foundOriginalSignal = null;
+          try {
+            const { data: foundSignal } = await supabase
+              .from('signals')
+              .select('*')
+              .eq('symbol', symbol.toUpperCase())
+              .in('type', ['buy', 'sell'])
+              .eq('status', 'active')
+              .eq('exchange', 'bybit')
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .single();
+            foundOriginalSignal = foundSignal;
+          } catch (findError) {
+            console.log('⚠️ Could not find original signal for PnL calculation in catch block');
+          }
+          
+          if (foundOriginalSignal && executionPrice) {
+            const entryPrice = Number(foundOriginalSignal.entry_price);
             const exitPrice = Number(executionPrice);
             
-            if (originalSignal.type === 'buy') {
+            if (foundOriginalSignal.type === 'buy') {
               calculatedPnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
-            } else if (originalSignal.type === 'sell') {
+            } else if (foundOriginalSignal.type === 'sell') {
               calculatedPnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100;
             }
           }
           
-          const closeAction = originalSignal?.type === 'buy' ? 'BUY_CLOSED' : 'SELL_CLOSED';
+          const closeAction = foundOriginalSignal?.type === 'buy' ? 'BUY_CLOSED' : 'SELL_CLOSED';
           
           console.log('📊 Sending CLOSE Discord notification (database failed) with PnL:', calculatedPnlPercentage);
           

@@ -109,11 +109,13 @@ async function handleStrategyAlert({ action, symbol, positionAfter, price }) {
 
 app.post('/place-order', async (req, res) => {
   try {
-    const { action, symbol, positionAfter, ...otherParams } = req.body;
+    const { action, symbol, positionAfter, alert_message, ...otherParams } = req.body;
     
     // Initialize actions array for all code paths
     let actions = [];
     let result = null;
+    
+    console.log('📨 Received order request:', { action, symbol, positionAfter, alert_message });
     
     // Check if this is a strategy alert (has positionAfter)
     if (positionAfter !== undefined) {
@@ -125,6 +127,58 @@ app.post('/place-order', async (req, res) => {
         price: req.body.price
       });
       return res.json(result);
+    }
+    
+    // Handle TradingView alert messages
+    if (alert_message) {
+      console.log('📨 Processing TradingView alert:', alert_message);
+      
+      // Parse alert message to determine action
+      let parsedAction = null;
+      if (alert_message.includes('LONG Entry')) {
+        parsedAction = 'BUY';
+      } else if (alert_message.includes('SHORT Entry')) {
+        parsedAction = 'SELL';
+      } else if (alert_message.includes('LONG Exit') || alert_message.includes('SHORT Exit')) {
+        parsedAction = 'CLOSE';
+      }
+      
+      if (parsedAction) {
+        console.log('🎯 Parsed action from alert:', parsedAction);
+        
+        if (parsedAction === 'CLOSE') {
+          result = await closeBybitPosition(symbol);
+          actions = ['CLOSE'];
+        } else {
+          result = await placeBybitOrderWithDynamicSizing({
+            symbol,
+            side: parsedAction === 'BUY' ? 'Buy' : 'Sell',
+            orderType: 'Market',
+            category: 'linear',
+            timeInForce: 'GoodTillCancel'
+          });
+          actions = [parsedAction];
+        }
+        
+        return res.json({
+          success: true,
+          message: `Bybit ${parsedAction.toLowerCase()} order submitted successfully`,
+          order: result,
+          actions: actions,
+          alert_message: alert_message,
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        // If we couldn't parse the alert message, return an error response
+        console.log('⚠️ Could not parse alert message');
+        return res.json({
+          success: false,
+          message: 'Could not parse TradingView alert message',
+          actions: ['UNKNOWN_ALERT'],
+          alert_message: alert_message,
+          timestamp: new Date().toISOString()
+        });
+      }
     }
     
     // Handle regular BUY/SELL/CLOSE actions (your existing logic)
@@ -162,7 +216,9 @@ app.post('/place-order', async (req, res) => {
     }
     
     // Handle other actions...
-    actions = ['UNKNOWN_ACTION']; // Ensure actions is defined for unknown actions
+    if (!actions || actions.length === 0) {
+      actions = ['UNKNOWN_ACTION']; // Ensure actions is defined for unknown actions
+    }
     
     return res.json({
       success: false,
@@ -173,13 +229,14 @@ app.post('/place-order', async (req, res) => {
     
   } catch (error) {
     console.error('❌ Order failed:', error);
-    res.status(400).json({
+    res.status(500).json({
       success: false,
-      error: error.message,
-      details: `Failed to execute order`,
+      error: 'Failed to execute order',
+      details: error.message,
       symbol: req.body.symbol,
       action: req.body.action,
       currentPrice: req.body.price,
+      actions: ['ERROR'], // Ensure actions is always defined
       timestamp: new Date().toISOString()
     });
   }

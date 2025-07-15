@@ -1,47 +1,84 @@
-import * as amplitude from '@amplitude/analytics-browser';
+// Optional Amplitude import - won't crash if package is missing
+let amplitude: any = null;
+let initAmplitude: any = null;
+let trackEvent: any = null;
+let identifyUser: any = null;
+let setUserProperties: any = null;
+let resetUser: any = null;
 
-const API_KEY = '71f423db06513a8400f0f4f51b115aea';
-
-export const initAmplitude = () => {
-  amplitude.init(API_KEY, {
-    fetchRemoteConfig: true,
-    serverZone: 'EU',
-    autocapture: true,
-    defaultTracking: {
-      sessions: true,
-      pageViews: true,
-      formInteractions: true,
-      fileDownloads: true,
-    },
-  });
-};
-
-export const trackEvent = (eventName: string, eventProperties?: Record<string, any>) => {
-  amplitude.track(eventName, eventProperties);
-};
-
-export const identifyUser = (userId: string, userProperties?: Record<string, any>) => {
-  amplitude.setUserId(userId);
+try {
+  const amplitudeModule = require('@amplitude/analytics-browser');
+  amplitude = amplitudeModule.default || amplitudeModule;
   
-  if (userProperties) {
-    const identify = new amplitude.Identify();
-    Object.entries(userProperties).forEach(([key, value]) => {
-      identify.set(key, value);
-    });
-    amplitude.identify(identify);
-  }
-};
+  const API_KEY = '71f423db06513a8400f0f4f51b115aea';
 
-export const setUserProperties = (userProperties: Record<string, any>) => {
-  const identify = new amplitude.Identify();
-  Object.entries(userProperties).forEach(([key, value]) => {
-    identify.set(key, value);
-  });
-  amplitude.identify(identify);
-};
+  initAmplitude = () => {
+    if (amplitude && typeof amplitude.init === 'function') {
+      amplitude.init(API_KEY, {
+        fetchRemoteConfig: true,
+        serverZone: 'EU',
+        autocapture: true,
+        defaultTracking: {
+          sessions: true,
+          pageViews: true,
+          formInteractions: true,
+          fileDownloads: true,
+        },
+      });
+    }
+  };
 
-export const resetUser = () => {
-  amplitude.reset();
+  trackEvent = (eventName: string, eventProperties?: Record<string, any>) => {
+    if (amplitude && typeof amplitude.track === 'function') {
+      amplitude.track(eventName, eventProperties);
+    }
+  };
+
+  identifyUser = (userId: string, userProperties?: Record<string, any>) => {
+    if (amplitude && typeof amplitude.setUserId === 'function') {
+      amplitude.setUserId(userId);
+      
+      if (userProperties && typeof amplitude.Identify === 'function') {
+        const identify = new amplitude.Identify();
+        Object.entries(userProperties).forEach(([key, value]) => {
+          identify.set(key, value);
+        });
+        amplitude.identify(identify);
+      }
+    }
+  };
+
+  setUserProperties = (userProperties: Record<string, any>) => {
+    if (amplitude && typeof amplitude.Identify === 'function') {
+      const identify = new amplitude.Identify();
+      Object.entries(userProperties).forEach(([key, value]) => {
+        identify.set(key, value);
+      });
+      amplitude.identify(identify);
+    }
+  };
+
+  resetUser = () => {
+    if (amplitude && typeof amplitude.reset === 'function') {
+      amplitude.reset();
+    }
+  };
+} catch (error) {
+  console.warn('Amplitude analytics not available:', error);
+  // Provide no-op functions
+  initAmplitude = () => {};
+  trackEvent = () => {};
+  identifyUser = () => {};
+  setUserProperties = () => {};
+  resetUser = () => {};
+}
+
+export {
+  initAmplitude,
+  trackEvent,
+  identifyUser,
+  setUserProperties,
+  resetUser
 };
 
 export default {
