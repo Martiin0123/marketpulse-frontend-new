@@ -11,6 +11,7 @@ import { createClient } from '@/utils/supabase/server';
 import { getUser, getSubscription } from '@/utils/supabase/queries';
 import { AuthProvider } from '@/utils/auth-context';
 import AmplitudeProvider from '@/components/ui/Analytics/AmplitudeProvider';
+import { CookieProvider } from '@/components/ui/CookieConsent';
 
 const title = 'PrimeScope - AI-Powered Trading Platform';
 const description =
@@ -56,18 +57,20 @@ export default async function RootLayout({ children }: PropsWithChildren) {
           initialSubscription={subscription as any}
         >
           <AmplitudeProvider>
-            <Navbar />
-            <main
-              id="skip"
-              className="min-h-[calc(100dvh-4rem)] md:min-h-[calc(100dvh-5rem)] pt-24"
-            >
-              {children}
-            </main>
-            <Footer user={user} subscription={subscription as any} />
-            <Suspense>
-              <Toaster />
-            </Suspense>
-            <SpeedInsights />
+            <CookieProvider>
+              <Navbar />
+              <main
+                id="skip"
+                className="min-h-[calc(100dvh-4rem)] md:min-h-[calc(100dvh-5rem)] pt-24"
+              >
+                {children}
+              </main>
+              <Footer user={user} subscription={subscription as any} />
+              <Suspense>
+                <Toaster />
+              </Suspense>
+              <SpeedInsights />
+            </CookieProvider>
           </AmplitudeProvider>
         </AuthProvider>
       </body>

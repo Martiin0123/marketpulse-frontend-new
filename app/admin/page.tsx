@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client';
 import { useAuth } from '@/utils/auth-context';
 import Button from '@/components/ui/Button';
 import { Trash2, Plus, Edit, Eye, AlertTriangle } from 'lucide-react';
+import LoadingSpinner from '@/components/ui/LoadingSpinner/LoadingSpinner';
 
 interface Signal {
   id: string;
@@ -268,7 +269,14 @@ export default function AdminPage() {
               disabled={loading || !password}
               className="w-full"
             >
-              {loading ? 'Authenticating...' : 'Login'}
+              {loading ? (
+                <div className="flex items-center">
+                  <LoadingSpinner size="sm" className="mr-2" />
+                  Authenticating...
+                </div>
+              ) : (
+                'Login'
+              )}
             </Button>
           </div>
 
@@ -609,7 +617,14 @@ export default function AdminPage() {
                     disabled={loading}
                     className="w-full"
                   >
-                    {loading ? 'Loading...' : 'Refresh All Data'}
+                    {loading ? (
+                      <div className="flex items-center">
+                        <LoadingSpinner size="sm" className="mr-2" />
+                        Loading...
+                      </div>
+                    ) : (
+                      'Refresh All Data'
+                    )}
                   </Button>
 
                   {/* Quick Open Position */}

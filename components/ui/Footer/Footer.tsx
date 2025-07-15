@@ -8,10 +8,12 @@ import {
   Shield,
   Clock,
   Zap,
-  AlertTriangle
+  AlertTriangle,
+  Settings
 } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 import { Tables } from '@/types_db';
+import { useCookieConsent } from '@/components/ui/CookieConsent';
 
 interface FooterProps {
   user?: User | null;
@@ -27,6 +29,8 @@ interface FooterProps {
 }
 
 export default function Footer({ user, subscription }: FooterProps) {
+  const { showConsent } = useCookieConsent();
+
   return (
     <footer className="bg-slate-900 border-t border-slate-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -150,6 +154,15 @@ export default function Footer({ user, subscription }: FooterProps) {
                 >
                   Risk Disclosure
                 </Link>
+              </li>
+              <li>
+                <button
+                  onClick={showConsent}
+                  className="text-slate-400 hover:text-white transition-colors flex items-center"
+                >
+                  <Settings className="w-3 h-3 mr-1" />
+                  Cookie Settings
+                </button>
               </li>
             </ul>
           </div>

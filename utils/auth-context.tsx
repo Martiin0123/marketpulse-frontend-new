@@ -11,6 +11,7 @@ import {
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/utils/supabase/client';
 import { Tables } from '@/types_db';
+import LoadingSpinner from '@/components/ui/LoadingSpinner/LoadingSpinner';
 
 type Subscription = Tables<'subscriptions'>;
 
@@ -337,7 +338,7 @@ export function AuthProvider({
     return (
       <AuthContext.Provider value={{ ...value, loading: true }}>
         <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-          <div className="text-white">Loading...</div>
+          <LoadingSpinner size="lg" className="text-white" />
         </div>
       </AuthContext.Provider>
     );

@@ -14,6 +14,7 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import { User } from '@supabase/supabase-js';
 import { Tables } from '@/types_db';
+import LoadingSpinner from '@/components/ui/LoadingSpinner/LoadingSpinner';
 
 interface VIPWhitelistWidgetProps {
   user: User;
@@ -142,7 +143,7 @@ export default function VIPWhitelistWidget({
         disabled
         className="inline-flex items-center px-4 py-2 bg-slate-600 text-slate-400 text-sm font-medium rounded-lg cursor-not-allowed"
       >
-        <Clock className="w-4 h-4 mr-2 animate-spin" />
+        <LoadingSpinner size="sm" className="mr-2" />
         Loading...
       </button>
     );
