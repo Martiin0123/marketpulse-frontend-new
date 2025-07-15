@@ -5,7 +5,26 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import LoadingDots from '@/components/ui/LoadingDots';
+import Card from '@/components/ui/Card';
 import { trackEvent } from '@/utils/amplitude';
+import {
+  Activity,
+  TrendingUp,
+  TrendingDown,
+  Settings,
+  MessageCircle,
+  BarChart3,
+  Target,
+  Zap,
+  Clock,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  X,
+  Plus,
+  Trash2,
+  Edit
+} from 'lucide-react';
 
 interface Signal {
   id: string;
@@ -21,33 +40,445 @@ interface Signal {
   pnl_percentage?: number;
 }
 
+interface TabSwitcherProps {
+  activeTab: 'signals' | 'manual';
+  onTabChange: (tab: 'signals' | 'manual') => void;
+}
+
+function TabSwitcher({ activeTab, onTabChange }: TabSwitcherProps) {
+  const tabs = [
+    {
+      id: 'signals' as const,
+      label: 'Signal Management',
+      icon: <TrendingUp className="w-4 h-4" />
+    },
+    {
+      id: 'manual' as const,
+      label: 'Manual Trading',
+      icon: <Settings className="w-4 h-4" />
+    }
+  ];
+
+  return (
+    <div className="flex flex-wrap sm:flex-nowrap bg-slate-800/50 backdrop-blur-sm rounded-full p-1 border border-slate-700/50 mb-6 sm:mb-8">
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          onClick={() => onTabChange(tab.id)}
+          className={`flex items-center justify-center sm:justify-start space-x-1 sm:space-x-2 px-3 sm:px-6 py-2 sm:py-3 rounded-full text-xs sm:text-sm font-medium transition-all duration-300 flex-1 sm:flex-none ${
+            activeTab === tab.id
+              ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg'
+              : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+          }`}
+        >
+          {tab.icon}
+          <span className="hidden sm:inline">{tab.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function SignalsTab({
+  signals,
+  onUpdateSignal,
+  onDeleteSignal
+}: {
+  signals: Signal[];
+  onUpdateSignal: (signalId: string, updates: Partial<Signal>) => void;
+  onDeleteSignal: (signalId: string) => void;
+}) {
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 6
+    }).format(price);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString();
+  };
+
+  const activeSignals = signals.filter((s) => s.status === 'ACTIVE');
+
+  return (
+    <div className="space-y-6">
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4 sm:p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-blue-500/20 rounded-lg">
+              <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
+            </div>
+            <div className="ml-3 sm:ml-4">
+              <p className="text-xs sm:text-sm font-medium text-slate-400">
+                Total Signals
+              </p>
+              <p className="text-xl sm:text-2xl font-bold text-white">
+                {signals.length}
+              </p>
+              <p className="text-xs text-slate-500">
+                {activeSignals.length} active
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4 sm:p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-emerald-500/20 rounded-lg">
+              <Target className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400" />
+            </div>
+            <div className="ml-3 sm:ml-4">
+              <p className="text-xs sm:text-sm font-medium text-slate-400">
+                Active Signals
+              </p>
+              <p className="text-xl sm:text-2xl font-bold text-white">
+                {activeSignals.length}
+              </p>
+              <p className="text-xs text-slate-500">Currently running</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4 sm:p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-cyan-500/20 rounded-lg">
+              <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400" />
+            </div>
+            <div className="ml-3 sm:ml-4">
+              <p className="text-xs sm:text-sm font-medium text-slate-400">
+                Closed Signals
+              </p>
+              <p className="text-xl sm:text-2xl font-bold text-white">
+                {signals.filter((s) => s.status === 'CLOSED').length}
+              </p>
+              <p className="text-xs text-slate-500">Completed trades</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4 sm:p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-indigo-500/20 rounded-lg">
+              <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400" />
+            </div>
+            <div className="ml-3 sm:ml-4">
+              <p className="text-xs sm:text-sm font-medium text-slate-400">
+                Cancelled
+              </p>
+              <p className="text-xl sm:text-2xl font-bold text-white">
+                {signals.filter((s) => s.status === 'CANCELLED').length}
+              </p>
+              <p className="text-xs text-slate-500">Cancelled signals</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Current Signals Table */}
+      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-700">
+          <h3 className="text-lg font-semibold text-white">Active Signals</h3>
+          <p className="text-slate-400 text-sm mt-1">
+            Currently active trading signals
+          </p>
+        </div>
+        <div className="p-6">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-700">
+              <thead className="bg-slate-900/50">
+                <tr>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                    Symbol
+                  </th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                    Side
+                  </th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                    Entry
+                  </th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                    Stop Loss
+                  </th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                    Take Profit
+                  </th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                    Created
+                  </th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700">
+                {activeSignals.map((signal) => (
+                  <tr
+                    key={signal.id}
+                    className="hover:bg-slate-700/30 transition-colors"
+                  >
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
+                      {signal.symbol}
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          signal.side === 'LONG'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}
+                      >
+                        {signal.side === 'LONG' ? (
+                          <TrendingUp className="w-3 h-3 mr-1" />
+                        ) : (
+                          <TrendingDown className="w-3 h-3 mr-1" />
+                        )}
+                        {signal.side}
+                      </span>
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                      ${formatPrice(signal.entry_price)}
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                      ${formatPrice(signal.stop_loss)}
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                      ${formatPrice(signal.take_profit)}
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        {signal.status}
+                      </span>
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                      {formatDate(signal.created_at)}
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                      <div className="flex space-x-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            onUpdateSignal(signal.id, { status: 'CLOSED' })
+                          }
+                          className="text-xs"
+                        >
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Close
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onDeleteSignal(signal.id)}
+                          className="text-xs text-red-400 hover:text-red-300"
+                        >
+                          <Trash2 className="w-3 h-3 mr-1" />
+                          Delete
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {activeSignals.length === 0 && (
+              <div className="text-center py-12">
+                <Zap className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-slate-500" />
+                <h3 className="mt-4 text-base sm:text-lg font-medium text-slate-300">
+                  No active signals
+                </h3>
+                <p className="mt-2 text-sm sm:text-base text-slate-500">
+                  No active trading signals found.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ManualTradingTab({
+  testAlertSymbol,
+  setTestAlertSymbol,
+  testAlertLoading,
+  testAlertResult,
+  testAlertError,
+  onTestAlert
+}: {
+  testAlertSymbol: string;
+  setTestAlertSymbol: (value: string) => void;
+  testAlertLoading: boolean;
+  testAlertResult: string;
+  testAlertError: string;
+  onTestAlert: (alertType: string) => void;
+}) {
+  return (
+    <div className="space-y-6">
+      {/* Test Alert Section */}
+      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700">
+        <div className="px-6 py-4 border-b border-slate-700">
+          <h3 className="text-lg font-semibold text-white">
+            Test TradingView Alerts
+          </h3>
+          <p className="text-slate-400 text-sm mt-1">
+            Send test alerts to your Bybit TradingView webhook
+          </p>
+        </div>
+        <div className="p-6">
+          {/* Symbol Input Section */}
+          <div className="mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
+              <div>
+                <h4 className="text-base font-medium text-white mb-1">
+                  Trading Symbol
+                </h4>
+                <p className="text-sm text-slate-400">
+                  Enter the symbol for test alerts (e.g., BTCUSDT, ETHUSDT)
+                </p>
+              </div>
+              <div className="mt-4 sm:mt-0 sm:ml-4">
+                <div className="relative">
+                  <Input
+                    type="text"
+                    placeholder="BTCUSDT"
+                    value={testAlertSymbol}
+                    onChange={(value) =>
+                      setTestAlertSymbol(value.toUpperCase())
+                    }
+                    className="w-full sm:w-48 bg-slate-700/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500/20 rounded-lg"
+                  />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                    <Target className="w-4 h-4 text-slate-400" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Alert Buttons Section */}
+          <div className="mb-6">
+            <h4 className="text-base font-medium text-white mb-4">
+              Test Alert Types
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Button
+                onClick={() => onTestAlert('buy_alert')}
+                disabled={testAlertLoading}
+                variant="primary"
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                {testAlertLoading ? (
+                  <LoadingDots />
+                ) : (
+                  <>
+                    <TrendingUp className="w-4 h-4 mr-2" />
+                    Buy Alert
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={() => onTestAlert('sell_alert')}
+                disabled={testAlertLoading}
+                variant="primary"
+                size="sm"
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {testAlertLoading ? (
+                  <LoadingDots />
+                ) : (
+                  <>
+                    <TrendingDown className="w-4 h-4 mr-2" />
+                    Sell Alert
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={() => onTestAlert('close_alert')}
+                disabled={testAlertLoading}
+                variant="primary"
+                size="sm"
+                className="bg-yellow-600 hover:bg-yellow-700 text-white"
+              >
+                {testAlertLoading ? (
+                  <LoadingDots />
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Close Long
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={() => onTestAlert('close_short_alert')}
+                disabled={testAlertLoading}
+                variant="primary"
+                size="sm"
+                className="bg-orange-600 hover:bg-orange-700 text-white"
+              >
+                {testAlertLoading ? (
+                  <LoadingDots />
+                ) : (
+                  <>
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Close Short
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Test Alert Results */}
+          {(testAlertResult || testAlertError) && (
+            <div className="mt-8">
+              <h4 className="text-base font-medium text-white mb-4">
+                Test Results
+              </h4>
+              {testAlertResult && (
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 mb-4">
+                  <div className="flex items-center mb-3">
+                    <CheckCircle className="w-5 h-5 text-emerald-400 mr-2" />
+                    <h5 className="text-sm font-medium text-emerald-400">
+                      Test Alert Successful
+                    </h5>
+                  </div>
+                  <pre className="text-sm text-emerald-300 bg-slate-800 p-3 rounded overflow-x-auto">
+                    {testAlertResult}
+                  </pre>
+                </div>
+              )}
+              {testAlertError && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                  <div className="flex items-center mb-3">
+                    <XCircle className="w-5 h-5 text-red-400 mr-2" />
+                    <h5 className="text-sm font-medium text-red-400">
+                      Test Alert Error
+                    </h5>
+                  </div>
+                  <pre className="text-sm text-red-300 bg-slate-800 p-3 rounded overflow-x-auto">
+                    {testAlertError}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [simulating, setSimulating] = useState(false);
-  const [simulationResult, setSimulationResult] = useState<string>('');
-  const [simulationError, setSimulationError] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'signals' | 'manual'>('signals');
-
-  // Form states for new signal
-  const [newSignal, setNewSignal] = useState({
-    symbol: '',
-    side: 'LONG' as 'LONG' | 'SHORT',
-    entry_price: '',
-    stop_loss: '',
-    take_profit: ''
-  });
-
-  // Form states for simulation
-  const [simulationForm, setSimulationForm] = useState({
-    symbol: '',
-    action: 'LONG_ENTRY' as
-      | 'LONG_ENTRY'
-      | 'SHORT_ENTRY'
-      | 'LONG_EXIT'
-      | 'SHORT_EXIT',
-    price: ''
-  });
 
   // Test alert states
   const [testAlertSymbol, setTestAlertSymbol] = useState('BTCUSDT');
@@ -69,41 +500,6 @@ export default function AdminPage() {
       }
     } catch (error) {
       console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAddSignal = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const response = await fetch('/api/admin/add-signal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newSignal)
-      });
-
-      if (response.ok) {
-        setNewSignal({
-          symbol: '',
-          side: 'LONG',
-          entry_price: '',
-          stop_loss: '',
-          take_profit: ''
-        });
-        fetchData();
-        trackEvent('admin_signal_added', {
-          symbol: newSignal.symbol,
-          side: newSignal.side
-        });
-      } else {
-        const error = await response.text();
-        console.error('Error adding signal:', error);
-      }
-    } catch (error) {
-      console.error('Error adding signal:', error);
     } finally {
       setLoading(false);
     }
@@ -145,38 +541,6 @@ export default function AdminPage() {
       }
     } catch (error) {
       console.error('Error deleting signal:', error);
-    }
-  };
-
-  const handleSimulateAlert = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSimulating(true);
-    setSimulationResult('');
-    setSimulationError('');
-
-    try {
-      const response = await fetch('/api/admin/simulate-tradingview-alert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(simulationForm)
-      });
-
-      const result = await response.text();
-
-      if (response.ok) {
-        setSimulationResult(result);
-        trackEvent('admin_alert_simulated', {
-          symbol: simulationForm.symbol,
-          action: simulationForm.action
-        });
-      } else {
-        setSimulationError(result);
-      }
-    } catch (error) {
-      setSimulationError('Failed to simulate alert');
-      console.error('Error simulating alert:', error);
-    } finally {
-      setSimulating(false);
     }
   };
 
@@ -230,17 +594,6 @@ export default function AdminPage() {
     }
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 6
-    }).format(price);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -270,244 +623,29 @@ export default function AdminPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Tab Navigation */}
-        <div className="mb-8">
-          <div className="border-b border-slate-700">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setActiveTab('signals')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === 'signals'
-                    ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-slate-400 hover:text-slate-300 hover:border-slate-600'
-                }`}
-              >
-                Signal Management
-              </button>
-              <button
-                onClick={() => setActiveTab('manual')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === 'manual'
-                    ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-slate-400 hover:text-slate-300 hover:border-slate-600'
-                }`}
-              >
-                Manual Trading
-              </button>
-            </nav>
-          </div>
-        </div>
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        {/* Tabs */}
+        <TabSwitcher activeTab={activeTab} onTabChange={setActiveTab} />
 
+        {/* Tab Content */}
         {activeTab === 'signals' && (
-          <div className="space-y-6">
-            {/* Current Signals */}
-            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700">
-              <div className="px-6 py-4 border-b border-slate-700">
-                <h3 className="text-lg font-semibold text-white">
-                  Current Signals
-                </h3>
-                <p className="text-slate-400 text-sm mt-1">
-                  Currently active trading signals
-                </p>
-              </div>
-              <div className="p-6">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-slate-700">
-                        <th className="text-left py-3 px-4 font-medium text-slate-300">
-                          Symbol
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-300">
-                          Side
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-300">
-                          Entry
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-300">
-                          Stop Loss
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-300">
-                          Take Profit
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-300">
-                          Status
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-300">
-                          Created
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-300">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {signals
-                        .filter((s) => s.status === 'ACTIVE')
-                        .map((signal) => (
-                          <tr
-                            key={signal.id}
-                            className="border-b border-slate-700 hover:bg-slate-700/50"
-                          >
-                            <td className="py-3 px-4 font-medium text-white">
-                              {signal.symbol}
-                            </td>
-                            <td className="py-3 px-4">
-                              <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                  signal.side === 'LONG'
-                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                    : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                                }`}
-                              >
-                                {signal.side}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-white">
-                              {formatPrice(signal.entry_price)}
-                            </td>
-                            <td className="py-3 px-4 text-white">
-                              {formatPrice(signal.stop_loss)}
-                            </td>
-                            <td className="py-3 px-4 text-white">
-                              {formatPrice(signal.take_profit)}
-                            </td>
-                            <td className="py-3 px-4">
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                                {signal.status}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-sm text-slate-400">
-                              {formatDate(signal.created_at)}
-                            </td>
-                            <td className="py-3 px-4">
-                              <div className="flex space-x-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() =>
-                                    handleUpdateSignal(signal.id, {
-                                      status: 'CLOSED'
-                                    })
-                                  }
-                                  className="text-xs"
-                                >
-                                  Close
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleDeleteSignal(signal.id)}
-                                  className="text-xs text-red-400 hover:text-red-300"
-                                >
-                                  Delete
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                  {signals.filter((s) => s.status === 'ACTIVE').length ===
-                    0 && (
-                    <div className="text-center py-8 text-slate-400">
-                      No active signals found
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          <SignalsTab
+            signals={signals}
+            onUpdateSignal={handleUpdateSignal}
+            onDeleteSignal={handleDeleteSignal}
+          />
         )}
 
         {activeTab === 'manual' && (
-          <div className="space-y-6">
-            {/* Test Alert Buttons */}
-            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700">
-              <div className="px-6 py-4 border-b border-slate-700">
-                <h3 className="text-lg font-semibold text-white">
-                  Test Alert Buttons
-                </h3>
-                <p className="text-slate-400 text-sm mt-1">
-                  Send test alerts to your Bybit TradingView webhook
-                </p>
-              </div>
-              <div className="p-6">
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-slate-300 mb-1">
-                    Symbol
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder="BTCUSDT"
-                    value={testAlertSymbol}
-                    onChange={(value) =>
-                      setTestAlertSymbol(value.toUpperCase())
-                    }
-                    className="w-full max-w-xs"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <Button
-                    onClick={() => handleTestAlert('buy_alert')}
-                    disabled={testAlertLoading}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                  >
-                    {testAlertLoading ? <LoadingDots /> : 'Buy Alert'}
-                  </Button>
-                  <Button
-                    onClick={() => handleTestAlert('sell_alert')}
-                    disabled={testAlertLoading}
-                    className="bg-red-600 hover:bg-red-700 text-white"
-                  >
-                    {testAlertLoading ? <LoadingDots /> : 'Sell Alert'}
-                  </Button>
-                  <Button
-                    onClick={() => handleTestAlert('close_alert')}
-                    disabled={testAlertLoading}
-                    className="bg-yellow-600 hover:bg-yellow-700 text-white"
-                  >
-                    {testAlertLoading ? <LoadingDots /> : 'Close Long'}
-                  </Button>
-                  <Button
-                    onClick={() => handleTestAlert('close_short_alert')}
-                    disabled={testAlertLoading}
-                    className="bg-orange-600 hover:bg-orange-700 text-white"
-                  >
-                    {testAlertLoading ? <LoadingDots /> : 'Close Short'}
-                  </Button>
-                </div>
-
-                {/* Test Alert Results */}
-                {(testAlertResult || testAlertError) && (
-                  <div className="mt-6 p-4 rounded-lg border border-slate-600">
-                    {testAlertResult && (
-                      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
-                        <h4 className="text-sm font-medium text-emerald-400 mb-2">
-                          Test Alert Successful
-                        </h4>
-                        <pre className="text-sm text-emerald-300 bg-slate-800 p-3 rounded overflow-x-auto">
-                          {testAlertResult}
-                        </pre>
-                      </div>
-                    )}
-                    {testAlertError && (
-                      <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-                        <h4 className="text-sm font-medium text-red-400 mb-2">
-                          Test Alert Error
-                        </h4>
-                        <pre className="text-sm text-red-300 bg-slate-800 p-3 rounded overflow-x-auto">
-                          {testAlertError}
-                        </pre>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          <ManualTradingTab
+            testAlertSymbol={testAlertSymbol}
+            setTestAlertSymbol={setTestAlertSymbol}
+            testAlertLoading={testAlertLoading}
+            testAlertResult={testAlertResult}
+            testAlertError={testAlertError}
+            onTestAlert={handleTestAlert}
+          />
         )}
       </div>
     </div>
