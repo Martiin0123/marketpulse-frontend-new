@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     siteName: 'PrimeScope',
     images: [
       {
-        url: `${getURL()}/opengraph-image.png`,
+        url: `${getURL()}/share.png`,
         width: 1200,
         height: 630
       }
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: title,
     description: description,
-    images: [`${getURL()}/opengraph-image.png`]
+    images: [`${getURL()}/share.png`]
   }
 };
 
