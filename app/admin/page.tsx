@@ -139,7 +139,7 @@ export default function AdminPage() {
     }
   };
 
-  // Add manual signal
+  // Add manual signal (now opens position on Bybit)
   const addManualSignal = async (formData: FormData) => {
     setLoading(true);
     try {
@@ -155,14 +155,38 @@ export default function AdminPage() {
       });
 
       if (response.ok) {
-        setMessage('✅ Signal added successfully');
+        setMessage('✅ Position opened and signal added successfully');
         loadData();
       } else {
         const error = await response.json();
-        setMessage(`❌ Failed to add signal: ${error.error}`);
+        setMessage(`❌ Failed to open position: ${error.error}`);
       }
     } catch (error) {
-      setMessage('❌ Error adding signal');
+      setMessage('❌ Error opening position');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Quick open position
+  const quickOpenPosition = async (symbol: string, action: 'BUY' | 'SELL') => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/admin/open-position', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol, action, password })
+      });
+
+      if (response.ok) {
+        setMessage(`✅ ${action} position opened successfully for ${symbol}`);
+        loadData();
+      } else {
+        const error = await response.json();
+        setMessage(`❌ Failed to open position: ${error.error}`);
+      }
+    } catch (error) {
+      setMessage('❌ Error opening position');
     } finally {
       setLoading(false);
     }
@@ -522,7 +546,7 @@ export default function AdminPage() {
               {/* Add Signal Form */}
               <div className="bg-slate-700 p-6 rounded-lg">
                 <h3 className="text-lg font-medium text-white mb-4">
-                  Add Manual Signal
+                  Open Position & Add Signal
                 </h3>
                 <form action={addManualSignal} className="space-y-4">
                   <div>
@@ -567,7 +591,9 @@ export default function AdminPage() {
                   </div>
 
                   <Button type="submit" disabled={loading} className="w-full">
-                    {loading ? 'Adding...' : 'Add Signal'}
+                    {loading
+                      ? 'Opening Position...'
+                      : 'Open Position & Add Signal'}
                   </Button>
                 </form>
               </div>
@@ -585,6 +611,47 @@ export default function AdminPage() {
                   >
                     {loading ? 'Loading...' : 'Refresh All Data'}
                   </Button>
+
+                  {/* Quick Open Position */}
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-medium text-slate-300">
+                      Quick Open Position
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        onClick={() => quickOpenPosition('BTCUSDT', 'BUY')}
+                        disabled={loading}
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        BTC BUY
+                      </Button>
+                      <Button
+                        onClick={() => quickOpenPosition('BTCUSDT', 'SELL')}
+                        disabled={loading}
+                        size="sm"
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        BTC SELL
+                      </Button>
+                      <Button
+                        onClick={() => quickOpenPosition('ETHUSDT', 'BUY')}
+                        disabled={loading}
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        ETH BUY
+                      </Button>
+                      <Button
+                        onClick={() => quickOpenPosition('ETHUSDT', 'SELL')}
+                        disabled={loading}
+                        size="sm"
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        ETH SELL
+                      </Button>
+                    </div>
+                  </div>
 
                   <div className="p-4 bg-yellow-500/20 border border-yellow-500/30 rounded-lg">
                     <div className="flex items-center space-x-2">

@@ -15,7 +15,7 @@ function createSupabaseClient() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { symbol, type, entry_price, password } = await request.json();
+    const { symbol, action, password } = await request.json();
     
     // Validate admin password
     const adminPassword = process.env.ADMIN_PASSWORD;
@@ -29,21 +29,21 @@ export async function POST(request: NextRequest) {
     }
     
     // Validate required fields
-    if (!symbol || !type || !entry_price) {
+    if (!symbol || !action) {
       return NextResponse.json({ 
-        error: 'Missing required fields: symbol, type, entry_price' 
+        error: 'Missing required fields: symbol, action' 
       }, { status: 400 });
     }
     
-    if (!['buy', 'sell'].includes(type)) {
+    if (!['BUY', 'SELL'].includes(action.toUpperCase())) {
       return NextResponse.json({ 
-        error: 'Invalid type. Must be "buy" or "sell"' 
+        error: 'Invalid action. Must be "BUY" or "SELL"' 
       }, { status: 400 });
     }
     
-    console.log('🔍 Admin adding manual signal and opening position:', { symbol, type, entry_price });
+    console.log('🔍 Admin opening position:', { symbol, action });
     
-    // First, open the position on Bybit via proxy
+    // Open position on Bybit via proxy
     const proxyResponse = await fetch('https://primescope-tradeapi-production.up.railway.app/place-order', {
       method: 'POST',
       headers: {
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        action: type.toUpperCase(), // 'BUY' or 'SELL'
+        action: action.toUpperCase(),
         symbol: symbol.toUpperCase()
       })
     });
@@ -69,17 +69,19 @@ export async function POST(request: NextRequest) {
     console.log('✅ Position opened on Bybit:', orderResult);
     
     // Get current price from the order result
-    const currentPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || entry_price;
+    const currentPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || 0;
     
     // Add signal to database with actual order details
     const supabase = createSupabaseClient();
+    
+    const signalType = action.toUpperCase() === 'BUY' ? 'buy' : 'sell';
     
     const { data: signal, error: insertError } = await supabase
       .from('signals')
       .insert([{
         symbol: symbol.toUpperCase(),
-        type: type,
-        entry_price: Number(currentPrice), // Use actual execution price
+        type: signalType,
+        entry_price: Number(currentPrice),
         created_at: new Date().toISOString(),
         strategy_name: 'Manual Admin',
         signal_source: 'manual',
@@ -112,13 +114,13 @@ export async function POST(request: NextRequest) {
             username: 'Primescope Admin',
             avatar_url: 'https://primescope.com/logo.png',
             embeds: [{
-              title: `✅ ${symbol.toUpperCase()} ${type.toUpperCase()} opened (Admin)`,
-              description: `**${type.toUpperCase()}** position opened successfully via admin panel`,
-              color: type === 'buy' ? 0x00ff00 : 0xff0000,
+              title: `✅ ${symbol.toUpperCase()} ${action.toUpperCase()} opened (Admin)`,
+              description: `**${action.toUpperCase()}** position opened successfully via admin panel`,
+              color: action.toUpperCase() === 'BUY' ? 0x00ff00 : 0xff0000,
               fields: [
                 {
                   name: '🎯 Action',
-                  value: type.toUpperCase(),
+                  value: action.toUpperCase(),
                   inline: true
                 },
                 {
@@ -152,16 +154,18 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json({
       success: true,
-      message: 'Position opened and signal added successfully',
-      signal: signal,
+      message: 'Position opened successfully',
+      symbol: symbol.toUpperCase(),
+      action: action.toUpperCase(),
       order: orderResult.order,
-      execution_price: currentPrice
+      execution_price: currentPrice,
+      signal_id: signal.id
     });
     
   } catch (error) {
-    console.error('❌ Error adding signal:', error);
+    console.error('❌ Error opening position:', error);
     return NextResponse.json({ 
-      error: 'Failed to add signal',
+      error: 'Failed to open position',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
