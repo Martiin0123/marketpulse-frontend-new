@@ -22,7 +22,12 @@ import {
   DollarSign,
   Activity,
   Bell,
-  Sparkles
+  Sparkles,
+  Calendar,
+  ExternalLink,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus
 } from 'lucide-react';
 
 type Signal = Tables<'signals'>;
@@ -47,7 +52,7 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
   );
   const [filterExchange, setFilterExchange] = useState<'all' | 'bybit'>('all');
   const { user } = useAuth();
-  const supabase = createClient();
+  const supabase = createClient()!;
 
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null;
@@ -56,7 +61,7 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
     const setupChannel = async () => {
       try {
         // Avoid duplicate subscriptions
-        if (isSubscribed) return;
+        if (isSubscribed || !supabase) return;
 
         channel = supabase
           .channel('signals-changes-signalstab')
@@ -111,7 +116,7 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
     }
 
     return () => {
-      if (channel) {
+      if (channel && supabase) {
         supabase.removeChannel(channel);
         isSubscribed = false;
       }
@@ -182,13 +187,13 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
   const getSignalIcon = (type: string) => {
     switch (type) {
       case 'buy':
-        return <TrendingUp className="w-4 h-4 text-emerald-400" />;
+        return <TrendingUp className="w-5 h-5 text-emerald-400" />;
       case 'sell':
-        return <TrendingDown className="w-4 h-4 text-red-400" />;
+        return <TrendingDown className="w-5 h-5 text-red-400" />;
       case 'close':
-        return <XCircle className="w-4 h-4 text-orange-400" />;
+        return <XCircle className="w-5 h-5 text-orange-400" />;
       default:
-        return <Activity className="w-4 h-4 text-slate-400" />;
+        return <Activity className="w-5 h-5 text-slate-400" />;
     }
   };
 
@@ -200,6 +205,30 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
         return <XCircle className="w-4 h-4 text-slate-400" />;
       default:
         return <AlertTriangle className="w-4 h-4 text-yellow-400" />;
+    }
+  };
+
+  const getSignalColor = (type: string) => {
+    switch (type) {
+      case 'buy':
+        return 'border-emerald-500/30 bg-emerald-500/5';
+      case 'sell':
+        return 'border-red-500/30 bg-red-500/5';
+      case 'close':
+        return 'border-orange-500/30 bg-orange-500/5';
+      default:
+        return 'border-slate-500/30 bg-slate-500/5';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+      case 'closed':
+        return 'text-slate-400 bg-slate-500/10 border-slate-500/20';
+      default:
+        return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
     }
   };
 
@@ -358,120 +387,258 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
         </div>
       </div>
 
-      {/* Signals Table */}
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-700">
-            <thead className="bg-slate-900/50">
-              <tr>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                  Signal
-                </th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                  Symbol
-                </th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                  Entry Price
-                </th>
-                <th className="hidden md:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                  Exit Price
-                </th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                  P&L (%)
-                </th>
-                <th className="hidden md:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                  Exchange
-                </th>
-                <th className="hidden lg:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                  Created
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700">
-              {filteredSignals.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center">
-                    <Zap className="mx-auto h-12 w-12 text-slate-500 mb-4" />
-                    <h3 className="text-lg font-medium text-slate-300 mb-2">
-                      No signals found
-                    </h3>
-                    <p className="text-slate-500">
-                      Try adjusting your filters or wait for new signals from
-                      your Pine Script strategy.
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                filteredSignals.map((signal) => {
-                  const isNew = isNewSignal(signal.created_at);
-                  return (
-                    <tr
-                      key={signal.id}
-                      className={`hover:bg-slate-700/30 transition-all duration-200 ${
-                        isNew
-                          ? 'bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-l-4 border-blue-500'
-                          : ''
-                      }`}
-                    >
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          {getSignalIcon(signal.type)}
-                          <span className="ml-2 text-sm font-medium text-white">
-                            {signal.type?.toUpperCase()}
-                          </span>
-                          {isNew && (
-                            <div className="ml-2 flex items-center space-x-1 bg-blue-500/20 border border-blue-500/30 rounded-full px-2 py-1">
-                              <Sparkles className="w-3 h-3 text-blue-400" />
-                              <span className="text-xs font-medium text-blue-300">
-                                NEW
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
-                        {signal.symbol}
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+      {/* Active Signals Section */}
+      {activeSignals.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-emerald-500/20 rounded-lg">
+              <Activity className="w-5 h-5 text-emerald-400" />
+            </div>
+            <h3 className="text-lg font-bold text-white">Active Signals</h3>
+            <div className="bg-emerald-500/20 border border-emerald-500/30 rounded-full px-3 py-1">
+              <span className="text-xs font-medium text-emerald-300">
+                {activeSignals.length} Active
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+            {activeSignals.map((signal) => {
+              const isNew = isNewSignal(signal.created_at);
+
+              return (
+                <div
+                  key={signal.id}
+                  className={`relative bg-gradient-to-br from-emerald-900/30 to-emerald-800/20 backdrop-blur-sm rounded-xl border-2 border-emerald-500/40 p-6 hover:bg-emerald-700/20 transition-all duration-200 shadow-lg shadow-emerald-500/10 ${
+                    isNew
+                      ? 'ring-2 ring-blue-500/50 shadow-lg shadow-blue-500/20'
+                      : ''
+                  }`}
+                >
+                  {/* Active Signal Badge */}
+                  <div className="absolute -top-2 -left-2 flex items-center space-x-1 bg-emerald-500 border border-emerald-400 rounded-full px-3 py-1">
+                    <Activity className="w-3 h-3 text-emerald-300" />
+                    <span className="text-xs font-bold text-emerald-200">
+                      ACTIVE
+                    </span>
+                  </div>
+
+                  {/* New Signal Badge */}
+                  {isNew && (
+                    <div className="absolute -top-2 -right-2 flex items-center space-x-1 bg-blue-500 border border-blue-400 rounded-full px-3 py-1">
+                      <Sparkles className="w-3 h-3 text-blue-300" />
+                      <span className="text-xs font-bold text-blue-200">
+                        NEW
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Header */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center space-x-3">
+                      {getSignalIcon(signal.type)}
+                      <div>
+                        <h3 className="text-lg font-bold text-white">
+                          {signal.symbol}
+                        </h3>
+                        <p className="text-sm text-emerald-300 capitalize">
+                          {signal.type} Signal
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-1 px-2 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/20 text-xs font-medium text-emerald-300">
+                      {getStatusIcon(signal.status)}
+                      <span className="capitalize">{signal.status}</span>
+                    </div>
+                  </div>
+
+                  {/* Price Information */}
+                  <div className="space-y-3 mb-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-emerald-300">
+                        Entry Price
+                      </span>
+                      <span className="text-sm font-medium text-white">
                         ${Number(signal.entry_price).toFixed(2)}
-                      </td>
-                      <td className="hidden md:table-cell px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                        {signal.exit_price
-                          ? `$${Number(signal.exit_price).toFixed(2)}`
-                          : '-'}
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          {getStatusIcon(signal.status)}
-                          <span className="ml-2 text-sm font-medium text-white">
-                            {signal.status?.toUpperCase()}
+                      </span>
+                    </div>
+
+                    {signal.exit_price && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-emerald-300">
+                          Exit Price
+                        </span>
+                        <span className="text-sm font-medium text-white">
+                          ${Number(signal.exit_price).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-3 border-t border-emerald-700/30">
+                    <div className="flex items-center space-x-2 text-xs text-emerald-300">
+                      <Calendar className="w-3 h-3" />
+                      <span>{formatTime(signal.created_at)}</span>
+                    </div>
+                    <div className="flex items-center space-x-1 text-xs text-emerald-300">
+                      <span className="capitalize">{signal.exchange}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* All Signals Section */}
+      <div className="space-y-4">
+        <div className="flex items-center space-x-3">
+          <div className="p-2 bg-slate-500/20 rounded-lg">
+            <BarChart3 className="w-5 h-5 text-slate-400" />
+          </div>
+          <h3 className="text-lg font-bold text-white">All Signals</h3>
+          <div className="bg-slate-500/20 border border-slate-500/30 rounded-full px-3 py-1">
+            <span className="text-xs font-medium text-slate-300">
+              {filteredSignals.length} Total
+            </span>
+          </div>
+        </div>
+
+        {filteredSignals.length === 0 ? (
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-12 text-center">
+            <Zap className="mx-auto h-12 w-12 text-slate-500 mb-4" />
+            <h3 className="text-lg font-medium text-slate-300 mb-2">
+              No signals found
+            </h3>
+            <p className="text-slate-500">
+              Try adjusting your filters or wait for new signals from your Pine
+              Script strategy.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filteredSignals.map((signal) => {
+              const isNew = isNewSignal(signal.created_at);
+              const pnlValue = signal.pnl_percentage || 0;
+              const isPositive = pnlValue >= 0;
+              const isActive = signal.status === 'active';
+
+              return (
+                <div
+                  key={signal.id}
+                  className={`relative bg-slate-800/50 backdrop-blur-sm rounded-xl border ${getSignalColor(signal.type)} p-6 hover:bg-slate-700/30 transition-all duration-200 ${
+                    isNew
+                      ? 'ring-2 ring-blue-500/50 shadow-lg shadow-blue-500/20'
+                      : ''
+                  } ${
+                    isActive
+                      ? 'ring-2 ring-emerald-500/50 shadow-lg shadow-emerald-500/20'
+                      : ''
+                  }`}
+                >
+                  {/* Active Signal Badge */}
+                  {isActive && (
+                    <div className="absolute -top-2 -left-2 flex items-center space-x-1 bg-emerald-500 border border-emerald-400 rounded-full px-3 py-1">
+                      <Activity className="w-3 h-3 text-emerald-300" />
+                      <span className="text-xs font-bold text-emerald-200">
+                        ACTIVE
+                      </span>
+                    </div>
+                  )}
+
+                  {/* New Signal Badge */}
+                  {isNew && (
+                    <div className="absolute -top-2 -right-2 flex items-center space-x-1 bg-blue-500 border border-blue-400 rounded-full px-3 py-1">
+                      <Sparkles className="w-3 h-3 text-blue-300" />
+                      <span className="text-xs font-bold text-blue-200">
+                        NEW
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Header */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center space-x-3">
+                      {getSignalIcon(signal.type)}
+                      <div>
+                        <h3 className="text-lg font-bold text-white">
+                          {signal.symbol}
+                        </h3>
+                        <p className="text-sm text-slate-400 capitalize">
+                          {signal.type} Signal
+                        </p>
+                      </div>
+                    </div>
+                    <div
+                      className={`flex items-center space-x-1 px-2 py-1 rounded-full border text-xs font-medium ${getStatusColor(signal.status)}`}
+                    >
+                      {getStatusIcon(signal.status)}
+                      <span className="capitalize">{signal.status}</span>
+                    </div>
+                  </div>
+
+                  {/* Price Information */}
+                  <div className="space-y-3 mb-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-400">
+                        Entry Price
+                      </span>
+                      <span className="text-sm font-medium text-white">
+                        ${Number(signal.entry_price).toFixed(2)}
+                      </span>
+                    </div>
+
+                    {signal.exit_price && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-400">
+                          Exit Price
+                        </span>
+                        <span className="text-sm font-medium text-white">
+                          ${Number(signal.exit_price).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* P&L Display */}
+                    {signal.pnl_percentage !== null && (
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-700">
+                        <span className="text-sm text-slate-400">P&L</span>
+                        <div className="flex items-center space-x-1">
+                          {isPositive ? (
+                            <ArrowUpRight className="w-4 h-4 text-emerald-400" />
+                          ) : (
+                            <ArrowDownRight className="w-4 h-4 text-red-400" />
+                          )}
+                          <span
+                            className={`text-sm font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}
+                          >
+                            {isPositive ? '+' : ''}
+                            {pnlValue.toFixed(2)}%
                           </span>
                         </div>
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm">
-                        <span
-                          className={`${(signal.pnl_percentage || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
-                        >
-                          {(signal.pnl_percentage || 0) >= 0 ? '+' : ''}
-                          {(signal.pnl_percentage || 0).toFixed(2)}%
-                        </span>
-                      </td>
-                      <td className="hidden md:table-cell px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                        <span className="capitalize">{signal.exchange}</span>
-                      </td>
-                      <td className="hidden lg:table-cell px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                        {formatTime(signal.created_at)}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-700">
+                    <div className="flex items-center space-x-2 text-xs text-slate-400">
+                      <Calendar className="w-3 h-3" />
+                      <span>{formatTime(signal.created_at)}</span>
+                    </div>
+                    <div className="flex items-center space-x-1 text-xs text-slate-400">
+                      <span className="capitalize">{signal.exchange}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
