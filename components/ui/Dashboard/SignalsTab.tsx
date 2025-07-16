@@ -156,10 +156,13 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
     completedTrades.length > 0
       ? (winningTrades.length / completedTrades.length) * 100
       : 0;
-  const totalPnL = completedTrades.reduce(
-    (sum, signal) => sum + (signal.pnl_percentage || 0),
-    0
-  );
+  const totalPnL =
+    Math.round(
+      completedTrades.reduce(
+        (sum, signal) => sum + (signal.pnl_percentage || 0),
+        0
+      ) * 10
+    ) / 10;
 
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -288,7 +291,7 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
                 Win Rate
               </p>
               <p className="text-xl sm:text-2xl font-bold text-white">
-                {winRate.toFixed(1)}%
+                {Number(winRate.toFixed(1))}%
               </p>
               <p className="text-xs text-slate-500">
                 {winningTrades.length} / {completedTrades.length}
@@ -310,7 +313,7 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
                 className={`text-lg sm:text-xl font-bold ${totalPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
               >
                 {totalPnL >= 0 ? '+' : ''}
-                {totalPnL.toFixed(2)}%
+                {totalPnL}%
               </p>
             </div>
           </div>
@@ -616,7 +619,7 @@ export default function SignalsTab({ signals: initialSignals }: Props) {
                             className={`text-sm font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}
                           >
                             {isPositive ? '+' : ''}
-                            {pnlValue.toFixed(2)}%
+                            {Number(pnlValue.toFixed(1))}%
                           </span>
                         </div>
                       </div>

@@ -128,13 +128,13 @@ export default function Pricing({ user, products, subscription }: Props) {
       amount: price.unit_amount,
       currency: price.currency,
       interval: price.interval,
-      product_name: price.products?.name
+      product_name: price.description
     });
 
     try {
       const { errorRedirect, sessionId } = await checkoutWithStripe(
         price,
-        pathname || '/'
+        '/thank-you'
       );
 
       if (errorRedirect) {

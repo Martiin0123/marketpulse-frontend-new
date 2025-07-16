@@ -54,7 +54,7 @@ export default function Stats({ statsData }: Props) {
     },
     {
       icon: <DollarSign className="w-8 h-8 text-emerald-400" />,
-      value: counts.profits,
+      value: counts.profits.toFixed(2),
       prefix: counts.profits >= 0 ? '+' : '',
       suffix: '%',
       label: 'Total Performance',

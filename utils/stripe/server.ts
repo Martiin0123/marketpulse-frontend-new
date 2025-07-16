@@ -21,7 +21,7 @@ type CheckoutResponse = {
 
 export async function checkoutWithStripe(
   price: Price,
-  redirectPath: string = '/account'
+  redirectPath: string = '/thank-you'
 ): Promise<CheckoutResponse> {
   console.log('[SERVER] Starting checkout process');
   
@@ -54,6 +54,9 @@ export async function checkoutWithStripe(
       throw new Error('Unable to access customer record.');
     }
 
+    // Determine subscription type based on price
+    const subscriptionType = price.description?.toLowerCase().includes('vip') ? 'VIP' : 'Premium';
+
     let params: Stripe.Checkout.SessionCreateParams = {
       allow_promotion_codes: true,
       billing_address_collection: 'required',
@@ -68,7 +71,11 @@ export async function checkoutWithStripe(
         }
       ],
       cancel_url: getURL(),
-      success_url: getURL(redirectPath)
+      success_url: `${getURL(redirectPath)}?session_id={CHECKOUT_SESSION_ID}&subscription_type=${subscriptionType}`,
+      metadata: {
+        subscription_type: subscriptionType,
+        user_id: user.id
+      }
     };
 
     console.log('[SERVER] Trial period:', price.trial_period_days);
