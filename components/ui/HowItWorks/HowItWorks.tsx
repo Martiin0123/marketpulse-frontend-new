@@ -28,11 +28,11 @@ export default function HowItWorks() {
       color: 'emerald'
     },
     {
-      icon: <TrendingUp className="w-8 h-8 text-cyan-400" />,
+      icon: <TrendingUp className="w-8 h-8 text-orange-400" />,
       title: 'Execute Trades',
       description:
         'Follow our precise entry and exit signals with recommended position sizing and risk management.',
-      color: 'cyan'
+      color: 'orange'
     },
     {
       icon: <Shield className="w-8 h-8 text-purple-400" />,
@@ -80,7 +80,7 @@ export default function HowItWorks() {
         <div className="relative max-w-4xl mx-auto mb-16">
           {/* Vertical connecting line */}
           <div className="absolute left-1/2 transform -translate-x-1/2 w-0.5 h-full bg-gradient-to-b from-blue-500/30 via-emerald-500/30 to-purple-500/30 rounded-full"></div>
-          
+
           <div className="space-y-16">
             {steps.map((step, index) => (
               <div key={index} className="relative">
@@ -90,14 +90,24 @@ export default function HowItWorks() {
                     {index + 1}
                   </div>
                 </div>
-                
+
                 {/* Step content */}
-                <div className={`flex items-center ${index % 2 === 0 ? 'flex-row' : 'flex-row-reverse'}`}>
+                <div
+                  className={`flex items-center ${index % 2 === 0 ? 'flex-row' : 'flex-row-reverse'}`}
+                >
                   {/* Content side */}
-                  <div className={`w-5/12 ${index % 2 === 0 ? 'pr-8 text-right' : 'pl-8 text-left'}`}>
-                    <div className={`bg-gradient-to-br from-slate-800/40 to-slate-900/40 backdrop-blur-sm rounded-2xl border border-slate-700/50 p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 ${index % 2 === 0 ? 'hover:translate-x-2' : 'hover:-translate-x-2'}`}>
-                      <div className={`flex items-center mb-4 ${index % 2 === 0 ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`w-12 h-12 bg-gradient-to-br from-${step.color}-500/20 to-${step.color}-600/20 rounded-xl flex items-center justify-center backdrop-blur-sm border border-${step.color}-500/30 shadow-lg ${index % 2 === 0 ? 'ml-3' : 'mr-3 order-first'}`}>
+                  <div
+                    className={`w-5/12 ${index % 2 === 0 ? 'pr-8 text-right' : 'pl-8 text-left'}`}
+                  >
+                    <div
+                      className={`bg-gradient-to-br from-slate-800/40 to-slate-900/40 backdrop-blur-sm rounded-2xl border border-slate-700/50 p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 ${index % 2 === 0 ? 'hover:translate-x-2' : 'hover:-translate-x-2'}`}
+                    >
+                      <div
+                        className={`flex items-center mb-4 ${index % 2 === 0 ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div
+                          className={`w-12 h-12 bg-gradient-to-br from-${step.color}-500/20 to-${step.color}-600/20 rounded-xl flex items-center justify-center backdrop-blur-sm border border-${step.color}-500/30 shadow-lg mx-4`}
+                        >
                           {step.icon}
                         </div>
                         <h3 className="text-xl font-bold text-white">
@@ -109,51 +119,12 @@ export default function HowItWorks() {
                       </p>
                     </div>
                   </div>
-                  
+
                   {/* Empty space on the other side */}
                   <div className="w-5/12"></div>
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-
-        {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="bg-slate-800/20 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6 text-center hover:bg-slate-800/30 transition-all duration-300 hover:scale-105">
-            <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <Smartphone className="w-6 h-6 text-emerald-400" />
-            </div>
-            <div className="text-lg font-semibold text-white mb-2">
-              Mobile Ready
-            </div>
-            <div className="text-slate-400 text-sm">
-              Get alerts on any device
-            </div>
-          </div>
-
-          <div className="bg-slate-800/20 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6 text-center hover:bg-slate-800/30 transition-all duration-300 hover:scale-105">
-            <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <BarChart3 className="w-6 h-6 text-blue-400" />
-            </div>
-            <div className="text-lg font-semibold text-white mb-2">
-              Real-time Analytics
-            </div>
-            <div className="text-slate-400 text-sm">
-              Track performance instantly
-            </div>
-          </div>
-
-          <div className="bg-slate-800/20 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6 text-center hover:bg-slate-800/30 transition-all duration-300 hover:scale-105">
-            <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-6 h-6 text-purple-400" />
-            </div>
-            <div className="text-lg font-semibold text-white mb-2">
-              No Setup Required
-            </div>
-            <div className="text-slate-400 text-sm">
-              Start in under 2 minutes
-            </div>
           </div>
         </div>
       </div>

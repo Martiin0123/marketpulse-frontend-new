@@ -41,7 +41,7 @@ export default function Stats({ statsData }: Props) {
         traders: 25,
         profits: 12.5, // More realistic PnL percentage
         signals: 150,
-        rating: 4.8
+        rating: 4.9
       };
 
   const stats = [
@@ -185,33 +185,6 @@ export default function Stats({ statsData }: Props) {
               <div className="text-sm text-slate-400">{stat.description}</div>
             </div>
           ))}
-        </div>
-
-        {/* Additional Trust Indicators */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="bg-slate-800/20 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6 text-center">
-            <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <Clock className="w-6 h-6 text-blue-400" />
-            </div>
-            <div className="text-2xl font-bold text-white mb-2">24/7</div>
-            <div className="text-slate-400">Market Monitoring</div>
-          </div>
-
-          <div className="bg-slate-800/20 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6 text-center">
-            <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <Shield className="w-6 h-6 text-emerald-400" />
-            </div>
-            <div className="text-2xl font-bold text-white mb-2">100%</div>
-            <div className="text-slate-400">Money Back Guarantee</div>
-          </div>
-
-          <div className="bg-slate-800/20 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6 text-center">
-            <div className="w-12 h-12 bg-cyan-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <TrendingUp className="w-6 h-6 text-cyan-400" />
-            </div>
-            <div className="text-2xl font-bold text-white mb-2">95%</div>
-            <div className="text-slate-400">Signal Accuracy</div>
-          </div>
         </div>
       </div>
     </section>

@@ -62,6 +62,106 @@ export default function Features() {
   return (
     <section className="py-20 bg-slate-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Performance Guarantee Section - Moved to Top */}
+        <div className="text-center mb-20">
+          <div className="max-w-5xl mx-auto">
+            <div className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-500/20 to-green-500/20 backdrop-blur-sm rounded-full border-2 border-emerald-500/50 mb-8 animate-pulse">
+              <Shield className="w-6 h-6 text-emerald-400 mr-3" />
+              <span className="text-emerald-200 text-lg font-bold">
+                💰 RISK-FREE GUARANTEE
+              </span>
+            </div>
+
+            <h2 className="text-4xl md:text-6xl font-bold text-white mb-6">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-green-500 to-cyan-500">
+                No Loss Guarantee
+              </span>
+            </h2>
+
+            <p className="text-xl text-slate-300 mb-8 max-w-3xl mx-auto">
+              We're so confident in our signals that we offer a{' '}
+              <strong className="text-emerald-400">
+                Monthly No Loss Guarantee
+              </strong>
+              . If our signals result in a net loss for any month, you'll
+              receive a{' '}
+              <strong className="text-emerald-400">full refund</strong> for that
+              billing cycle.
+            </p>
+
+            <div className="bg-gradient-to-br from-emerald-900/30 to-green-900/20 backdrop-blur-sm rounded-2xl border-2 border-emerald-500/50 p-10 max-w-4xl mx-auto mb-8 shadow-2xl shadow-emerald-500/25">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
+                <div className="flex items-start space-x-4">
+                  <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-white text-lg mb-2">
+                      No Questions Asked
+                    </div>
+                    <div className="text-slate-300">
+                      Automatic refund if we don't deliver results
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-4">
+                  <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-white text-lg mb-2">
+                      Monthly Protection
+                    </div>
+                    <div className="text-slate-300">
+                      Covered every month, not just the first
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-4">
+                  <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-white text-lg mb-2">
+                      Transparent Tracking
+                    </div>
+                    <div className="text-slate-300">
+                      Real-time performance monitoring
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-4">
+                  <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-white text-lg mb-2">
+                      Instant Refunds
+                    </div>
+                    <div className="text-slate-300">
+                      Processed within 24 hours
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link href="/pricing">
+                <Button
+                  variant="slim"
+                  className="group bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white px-10 py-5 text-xl font-bold shadow-2xl shadow-emerald-500/25"
+                >
+                  <Target className="w-6 h-6 mr-3" />
+                  Start Risk-Free Today!
+                  <TrendingUp className="w-6 h-6 ml-3 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+
         {/* Section Header */}
         <div className="text-center mb-16">
           <div className="inline-flex items-center px-4 py-2 bg-blue-500/10 backdrop-blur-sm rounded-full border border-blue-500/30 mb-6">
@@ -71,13 +171,13 @@ export default function Features() {
             </span>
           </div>
 
-          <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+          <h3 className="text-4xl md:text-5xl font-bold text-white mb-6">
             Everything You Need to
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500">
               {' '}
               Succeed in Trading
             </span>
-          </h2>
+          </h3>
 
           <p className="text-xl text-slate-400 max-w-4xl mx-auto leading-relaxed">
             We've combined cutting-edge AI technology with proven trading
@@ -142,92 +242,6 @@ export default function Features() {
                 4.8/5
               </div>
               <div className="text-slate-400">Average Rating</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Performance Guarantee Section */}
-        <div className="text-center">
-          <div className="max-w-4xl mx-auto">
-            <div className="inline-flex items-center px-6 py-3 bg-emerald-500/10 backdrop-blur-sm rounded-full border border-emerald-500/30 mb-8">
-              <Shield className="w-5 h-5 text-emerald-400 mr-3" />
-              <span className="text-emerald-200 text-sm font-medium">
-                💰 No Loss Guarantee
-              </span>
-            </div>
-
-            <h3 className="text-3xl font-bold text-white mb-6">
-              What if the signals don't perform well?
-            </h3>
-
-            <div className="bg-slate-800/30 backdrop-blur-sm rounded-xl border border-slate-700/50 p-8 max-w-3xl mx-auto mb-8">
-              <p className="text-lg text-slate-200 mb-6 leading-relaxed">
-                We're so confident in our signals that we offer a{' '}
-                <strong>Monthly No Loss Guarantee</strong>. If our signals
-                result in a net loss for any month, you'll receive a{' '}
-                <strong>full refund</strong> for that billing cycle.
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
-                <div className="flex items-start space-x-3">
-                  <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-1" />
-                  <div>
-                    <div className="font-semibold text-white">
-                      No Questions Asked
-                    </div>
-                    <div className="text-sm text-slate-400">
-                      Automatic refund if we don't deliver
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-1" />
-                  <div>
-                    <div className="font-semibold text-white">
-                      Monthly Protection
-                    </div>
-                    <div className="text-sm text-slate-400">
-                      Covered every month, not just the first
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-1" />
-                  <div>
-                    <div className="font-semibold text-white">
-                      Transparent Tracking
-                    </div>
-                    <div className="text-sm text-slate-400">
-                      Real-time performance monitoring
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-1" />
-                  <div>
-                    <div className="font-semibold text-white">
-                      Instant Refunds
-                    </div>
-                    <div className="text-sm text-slate-400">
-                      Processed within 24 hours
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* CTA */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/pricing">
-                <Button
-                  variant="slim"
-                  className="group bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-8 py-4 text-lg font-semibold"
-                >
-                  <Target className="w-5 h-5 mr-2" />
-                  Start Winning Now!
-                  <TrendingUp className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </Link>
             </div>
           </div>
         </div>
