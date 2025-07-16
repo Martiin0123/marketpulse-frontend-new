@@ -55,37 +55,66 @@ export default function Hero({ user, monthlyPnL, positions }: HeroProps) {
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           {/* Left Column - Content */}
           <div className="text-center lg:text-left">
+            {/* Trust Badge */}
+            <div className="inline-flex items-center px-4 py-2 bg-emerald-500/10 backdrop-blur-sm rounded-full border border-emerald-500/30 mb-6">
+              <Award className="w-4 h-4 text-emerald-400 mr-2" />
+              <span className="text-emerald-200 text-sm font-medium">
+                Trusted by 1,000+ Active Traders
+              </span>
+            </div>
+
             {/* Main Headline */}
             <h1 className="text-5xl sm:text-6xl font-bold text-white mb-6 leading-tight">
-              AI-Powered Trading Signals
+              Turn Market Volatility Into
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500">
                 {' '}
-                for Serious Traders
+                Consistent Profits
               </span>
             </h1>
 
-            {/* Simple Subtitle */}
-            <p className="text-xl text-slate-300 mb-8">
-              Join our growing community of traders using AI algorithms. No loss
-              guarantee + earn rewards through our referral program.
+            {/* Value Proposition */}
+            <p className="text-xl text-slate-300 mb-6">
+              Get AI-powered trading signals that actually work. Join successful traders who've already generated real returns with our proven system.
             </p>
+
+            {/* Key Benefits */}
+            <div className="flex flex-wrap gap-4 mb-8 justify-center lg:justify-start">
+              <div className="inline-flex items-center px-3 py-1 bg-slate-800/50 rounded-full border border-slate-700/50">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2"></div>
+                <span className="text-slate-300 text-sm">Money-Back Guarantee</span>
+              </div>
+              <div className="inline-flex items-center px-3 py-1 bg-slate-800/50 rounded-full border border-slate-700/50">
+                <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                <span className="text-slate-300 text-sm">Real-Time Alerts</span>
+              </div>
+              <div className="inline-flex items-center px-3 py-1 bg-slate-800/50 rounded-full border border-slate-700/50">
+                <div className="w-2 h-2 bg-cyan-500 rounded-full mr-2"></div>
+                <span className="text-slate-300 text-sm">Proven Track Record</span>
+              </div>
+            </div>
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
               {user ? (
                 <Link href="/dashboard">
-                  <Button variant="primary" size="lg" className="group">
-                    Go to Dashboard
-                    <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                  <Button variant="primary" size="lg" className="group relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <span className="relative z-10 flex items-center">
+                      View My Signals
+                      <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                    </span>
                   </Button>
                 </Link>
               ) : (
                 <>
                   <Link href="/pricing">
-                    <Button variant="primary" size="lg" className="group">
-                      <Target className="w-5 h-5 mr-2" />
-                      Start Trading Now
-                      <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                    <Button variant="primary" size="lg" className="group relative overflow-hidden shadow-xl">
+                      <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      <span className="relative z-10 flex items-center">
+                        <Target className="w-5 h-5 mr-2" />
+                        Start Earning Today
+                        <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                      </span>
                     </Button>
                   </Link>
                   <a
@@ -93,30 +122,50 @@ export default function Hero({ user, monthlyPnL, positions }: HeroProps) {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <Button variant="outline" size="lg" className="group">
-                      <Star className="w-5 h-5 mr-2" />
-                      Join Free Discord
+                    <Button variant="outline" size="lg" className="group border-slate-600 hover:border-slate-500">
+                      <Users className="w-5 h-5 mr-2" />
+                      Join 1,000+ Traders
                     </Button>
                   </a>
                 </>
               )}
             </div>
+
+            {/* Trust Indicators */}
+            <div className="mt-8 text-center lg:text-left">
+              <p className="text-sm text-slate-400 mb-3">Risk-free trial • Cancel anytime • No hidden fees</p>
+              <div className="flex items-center justify-center lg:justify-start gap-4">
+                <div className="flex items-center">
+                  <div className="flex -space-x-2">
+                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full border-2 border-slate-800"></div>
+                    <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-green-500 rounded-full border-2 border-slate-800"></div>
+                    <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full border-2 border-slate-800"></div>
+                    <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-red-500 rounded-full border-2 border-slate-800"></div>
+                  </div>
+                  <span className="text-sm text-slate-400 ml-3">Join successful traders</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Right Column - Professional Performance Card */}
           <div className="relative">
-            <div className="bg-gradient-to-br from-slate-800/40 to-slate-900/40 backdrop-blur-xl rounded-3xl border border-slate-700/50 p-8 shadow-2xl">
+            {/* Glow effect */}
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 to-blue-500/20 rounded-3xl blur-xl"></div>
+            
+            <div className="relative bg-gradient-to-br from-slate-800/40 to-slate-900/40 backdrop-blur-xl rounded-3xl border border-slate-700/50 p-8 shadow-2xl">
               {/* Header */}
               <div className="text-center mb-8">
                 <div className="inline-flex items-center px-4 py-2 bg-emerald-500/10 backdrop-blur-sm rounded-full border border-emerald-500/30 mb-4">
                   <BarChart3 className="w-4 h-4 text-emerald-500 mr-2" />
                   <span className="text-emerald-200 text-sm font-medium">
-                    Live Performance
+                    🔥 Live Performance
                   </span>
                 </div>
                 <h3 className="text-2xl font-bold text-white">
-                  This Month's Performance
+                  Real Results from Real Traders
                 </h3>
+                <p className="text-slate-400 text-sm mt-2">Updated in real-time • This month's performance</p>
               </div>
 
               {/* Main P&L Display */}

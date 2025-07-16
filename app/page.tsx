@@ -5,11 +5,10 @@ import Stats from '@/components/ui/Stats/Stats';
 import HowItWorks from '@/components/ui/HowItWorks/HowItWorks';
 import FAQ from '@/components/ui/FAQ/FAQ';
 import Features from '@/components/ui/Features/Features';
+import PricingPlans from '@/components/ui/PricingPlans/PricingPlans';
 import { createClient } from '@/utils/supabase/server';
 import { calculateTradingStats } from '@/utils/stats';
-import { getUser } from '@/utils/supabase/queries';
-import { getSubscription } from '@/utils/supabase/queries';
-import { getPositions } from '@/utils/supabase/queries';
+import { getUser, getProducts, getSubscription } from '@/utils/supabase/queries';
 import { Metadata } from 'next';
 import { Zap, Target, X, CheckCircle, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
@@ -67,10 +66,32 @@ export const metadata: Metadata = {
 export default async function HomePage() {
   const supabase = createClient();
 
-  // Get user session
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  // Get user session and data
+  const [user, products, subscription] = await Promise.all([
+    getUser(supabase),
+    getProducts(supabase),
+    getSubscription(supabase)
+  ]);
+
+  const productsData = products || [];
+  
+  // Debug: Log products data
+  console.log('🔍 Homepage: Products data:', {
+    productsCount: productsData.length,
+    products: productsData.map(p => ({
+      id: p.id,
+      name: p.name,
+      active: p.active,
+      pricesCount: p.prices?.length || 0,
+      prices: p.prices?.map(price => ({
+        id: price.id,
+        unit_amount: price.unit_amount,
+        currency: price.currency,
+        interval: price.interval,
+        active: price.active
+      }))
+    }))
+  });
 
   // Get user's positions if logged in
   let positions: any[] = [];
@@ -178,6 +199,37 @@ export default async function HomePage() {
 
         {/* Features Section */}
         <Features />
+
+        {/* Pricing Section */}
+        <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 my-20">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center px-4 py-2 bg-blue-500/10 backdrop-blur-sm rounded-full border border-blue-500/30 mb-6">
+              <span className="text-blue-200 text-sm font-medium">
+                Choose Your Plan
+              </span>
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+              Start Trading with
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-500">
+                {' '}
+                AI Precision
+              </span>
+            </h2>
+            <p className="text-xl text-slate-400 max-w-3xl mx-auto">
+              Join thousands of traders using our AI-powered signals. Get real-time
+              alerts, risk-free guarantee, and earn rewards.
+            </p>
+          </div>
+          
+          <PricingPlans
+            products={productsData}
+            user={user}
+            subscription={subscription}
+            showTimer={true}
+            showHeader={false}
+            showGuarantee={true}
+          />
+        </section>
 
         {/* Referral Program Section */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 my-20">
