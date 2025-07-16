@@ -1,7 +1,7 @@
 'use client';
 
 import { User } from '@supabase/supabase-js';
-import Link from 'next/link';
+import LoadingLink from '@/components/ui/Loading/LoadingLink';
 import {
   ArrowRight,
   Shield,
@@ -26,20 +26,27 @@ export default function CTA({ user }: CTAProps) {
           <div className="text-center max-w-4xl mx-auto">
             {/* Urgency Badge */}
 
+            {/* Urgency Badge */}
+            <div className="inline-flex items-center px-4 py-2 bg-red-500/10 backdrop-blur-sm rounded-full border border-red-500/30 mb-6">
+              <Clock className="w-4 h-4 text-red-400 mr-2" />
+              <span className="text-red-200 text-sm font-medium">
+                🔥 Last Chance - Offer Ends Soon
+              </span>
+            </div>
+
             {/* Main Headline */}
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-              Ready to Transform Your
+              Stop Losing Money & Start
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500">
                 {' '}
-                Trading Results?
+                Making It
               </span>
             </h2>
 
             {/* Subheadline */}
             <p className="text-xl text-slate-300 mb-12 leading-relaxed">
-              Stop leaving money on the table. Join thousands of traders who are
-              already achieving consistent profits with our AI-powered signals.
-              Start your journey to financial freedom today.
+              This is your moment. While others hesitate, you can transform your trading with our proven AI signals. 
+              <strong className="text-white"> The question is: will you take action?</strong>
             </p>
 
             {/* Value Props Grid */}
@@ -86,27 +93,27 @@ export default function CTA({ user }: CTAProps) {
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
               {user ? (
-                <Link href="/dashboard">
+                <LoadingLink href="/dashboard">
                   <Button variant="secondary" size="lg" className="group">
                     <Target className="w-5 h-5 mr-2" />
                     Access Your Dashboard
                     <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                   </Button>
-                </Link>
+                </LoadingLink>
               ) : (
                 <>
-                  <Link href="/pricing">
-                    <Button variant="secondary" size="lg" className="group">
+                  <LoadingLink href="/pricing">
+                    <Button variant="secondary" size="lg" className="group shadow-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 border-0 text-white">
                       <TrendingUp className="w-5 h-5 mr-2" />
-                      Start Trading Now
+                      Yes, I Want to Start Earning
                       <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                     </Button>
-                  </Link>
-                  <Link href="/signin">
+                  </LoadingLink>
+                  <LoadingLink href="/signin">
                     <Button variant="ghost" size="lg">
                       Sign In
                     </Button>
-                  </Link>
+                  </LoadingLink>
                 </>
               )}
             </div>
@@ -115,8 +122,7 @@ export default function CTA({ user }: CTAProps) {
             <div className="mt-8 p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
               <p className="text-slate-300 text-sm">
                 <strong>Don't wait!</strong> Every day you delay is another day
-                of missed opportunities. Join the traders who are already
-                profiting from our AI signals.
+                of missed opportunities. Start your journey to smarter trading today.
               </p>
             </div>
           </div>

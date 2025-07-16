@@ -11,7 +11,7 @@ import { calculateTradingStats } from '@/utils/stats';
 import { getUser, getProducts, getSubscription } from '@/utils/supabase/queries';
 import { Metadata } from 'next';
 import { Zap, Target, X, CheckCircle, ArrowRight } from 'lucide-react';
-import Link from 'next/link';
+import LoadingLink from '@/components/ui/Loading/LoadingLink';
 import Button from '@/components/ui/Button';
 import ChatWidget from '@/components/ui/ChatWidget/ChatWidget';
 
@@ -74,24 +74,6 @@ export default async function HomePage() {
   ]);
 
   const productsData = products || [];
-  
-  // Debug: Log products data
-  console.log('🔍 Homepage: Products data:', {
-    productsCount: productsData.length,
-    products: productsData.map(p => ({
-      id: p.id,
-      name: p.name,
-      active: p.active,
-      pricesCount: p.prices?.length || 0,
-      prices: p.prices?.map(price => ({
-        id: price.id,
-        unit_amount: price.unit_amount,
-        currency: price.currency,
-        interval: price.interval,
-        active: price.active
-      }))
-    }))
-  });
 
   // Get user's positions if logged in
   let positions: any[] = [];
@@ -203,22 +185,26 @@ export default async function HomePage() {
         {/* Pricing Section */}
         <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 my-20">
           <div className="text-center mb-12">
-            <div className="inline-flex items-center px-4 py-2 bg-blue-500/10 backdrop-blur-sm rounded-full border border-blue-500/30 mb-6">
-              <span className="text-blue-200 text-sm font-medium">
-                Choose Your Plan
+            <div className="inline-flex items-center px-4 py-2 bg-emerald-500/10 backdrop-blur-sm rounded-full border border-emerald-500/30 mb-6">
+              <span className="text-emerald-200 text-sm font-medium">
+                ⚡ Limited Time Offer
               </span>
             </div>
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-              Start Trading with
+              Start Making Money
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-500">
                 {' '}
-                AI Precision
+                Today
               </span>
             </h2>
-            <p className="text-xl text-slate-400 max-w-3xl mx-auto">
-              Join thousands of traders using our AI-powered signals. Get real-time
-              alerts, risk-free guarantee, and earn rewards.
+            <p className="text-xl text-slate-400 max-w-3xl mx-auto mb-4">
+              Choose your plan and start receiving profitable trading signals within minutes. No setup required.
             </p>
+            <div className="inline-flex items-center px-4 py-2 bg-orange-500/10 backdrop-blur-sm rounded-full border border-orange-500/30">
+              <span className="text-orange-200 text-sm font-medium">
+                🎯 Start receiving profitable signals within minutes
+              </span>
+            </div>
           </div>
           
           <PricingPlans
@@ -234,16 +220,20 @@ export default async function HomePage() {
         {/* Referral Program Section */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 my-20">
           <div className="text-center mb-12">
+            <div className="inline-flex items-center px-4 py-2 bg-emerald-500/10 backdrop-blur-sm rounded-full border border-emerald-500/30 mb-6">
+              <span className="text-emerald-200 text-sm font-medium">
+                💰 Passive Income Opportunity
+              </span>
+            </div>
             <h2 className="text-4xl font-bold text-white mb-4">
-              Earn Rewards with Our
+              Earn €19 for Every
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-500">
                 {' '}
-                Referral Program
+                Trader You Refer
               </span>
             </h2>
             <p className="text-xl text-slate-400 max-w-3xl mx-auto">
-              Share PrimeScope with other traders and earn rewards for every
-              successful referral
+              Turn your network into a revenue stream. Get paid monthly for successful referrals with unlimited earning potential.
             </p>
           </div>
 
@@ -330,19 +320,19 @@ export default async function HomePage() {
             {/* CTA */}
             <div className="text-center mt-8">
               {user ? (
-                <Link href="/referrals">
+                <LoadingLink href="/referrals">
                   <Button variant="primary" size="lg" className="group">
                     View My Referrals
                     <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                   </Button>
-                </Link>
+                </LoadingLink>
               ) : (
-                <Link href="/signin">
+                <LoadingLink href="/signin">
                   <Button variant="primary" size="lg" className="group">
                     Start Earning Rewards
                     <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                   </Button>
-                </Link>
+                </LoadingLink>
               )}
             </div>
           </div>
@@ -351,15 +341,19 @@ export default async function HomePage() {
         {/* Comparison Section */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 my-20">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-white mb-4">
-              Why Choose{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500">
-                PrimeScope
+            <div className="inline-flex items-center px-4 py-2 bg-blue-500/10 backdrop-blur-sm rounded-full border border-blue-500/30 mb-6">
+              <span className="text-blue-200 text-sm font-medium">
+                🏆 Why We're Different
               </span>
-              ?
+            </div>
+            <h2 className="text-4xl font-bold text-white mb-4">
+              The Only Trading Service with a{' '}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500">
+                Money-Back Guarantee
+              </span>
             </h2>
             <p className="text-xl text-slate-400 max-w-3xl mx-auto">
-              See how we stack up against other trading signal services
+              We're so confident in our signals that we guarantee your money back if we don't perform. Can your current provider do that?
             </p>
           </div>
 
@@ -498,6 +492,33 @@ export default async function HomePage() {
 
         {/* FAQ Section */}
         <FAQ />
+
+        {/* Urgency Section */}
+        <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 my-20">
+          <div className="bg-gradient-to-r from-emerald-900/20 to-blue-900/20 backdrop-blur-sm border border-emerald-500/30 rounded-2xl p-8 text-center">
+            <div className="inline-flex items-center px-4 py-2 bg-orange-500/10 backdrop-blur-sm rounded-full border border-orange-500/30 mb-6">
+              <span className="text-orange-200 text-sm font-medium">
+                ⏰ Time-Sensitive Opportunity
+              </span>
+            </div>
+            <h2 className="text-3xl font-bold text-white mb-4">
+              Don't Wait - Markets Never Stop Moving
+            </h2>
+            <p className="text-lg text-slate-300 mb-6">
+              Every day you delay is potential profit lost. Markets never stop moving, and neither should your trading strategy.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <div className="flex items-center text-emerald-400">
+                <div className="w-3 h-3 bg-emerald-500 rounded-full mr-2 animate-pulse"></div>
+                <span className="text-sm">Real-time market analysis</span>
+              </div>
+              <div className="flex items-center text-blue-400">
+                <div className="w-3 h-3 bg-blue-500 rounded-full mr-2 animate-pulse"></div>
+                <span className="text-sm">Instant signal delivery</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* CTA Section */}
         <CTA user={user} />

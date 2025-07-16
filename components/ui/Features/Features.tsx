@@ -224,16 +224,8 @@ export default function Features() {
                   className="group bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-8 py-4 text-lg font-semibold"
                 >
                   <Target className="w-5 h-5 mr-2" />
-                  Start Your Free Trial
+                  Start Winning Now!
                   <TrendingUp className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </Link>
-              <Link href="/signin">
-                <Button
-                  variant="slim"
-                  className="group bg-transparent border-2 border-slate-600 hover:border-slate-500 text-white px-8 py-4 text-lg font-semibold"
-                >
-                  Sign In to Dashboard
                 </Button>
               </Link>
             </div>

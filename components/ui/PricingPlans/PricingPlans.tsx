@@ -109,7 +109,7 @@ export default function PricingPlans({
     });
   }, [user, subscription, products.length, showTimer, showHeader, showGuarantee]);
 
-  const handleGetStarted = (planType: string, price?: Price) => {
+  const handleGetStarted = async (planType: string, price?: Price) => {
     const eventData = {
       plan_type: planType,
       user_authenticated: !!user,
@@ -130,6 +130,9 @@ export default function PricingPlans({
     // Specific event based on plan type
     if (planType === 'free') {
       trackEvent('Free Plan Selected', eventData);
+      // For free plan, just redirect to Discord
+      window.open('https://discord.gg/GDY4ZcXzes', '_blank');
+      return;
     } else if (planType.includes('vip')) {
       trackEvent('VIP Plan Selected', eventData);
     } else {
@@ -141,13 +144,50 @@ export default function PricingPlans({
       ...eventData,
       cta_text: planType === 'free' ? 'Join Community' : 
                 planType.includes('vip') ? 'Get VIP Access' : 'Get Started',
-      next_step: user ? 'pricing_page' : 'signin_page'
+      next_step: user ? 'stripe_checkout' : 'signin_page'
     });
 
-    if (user) {
-      router.push('/pricing');
-    } else {
+    if (!user) {
       router.push('/signin');
+      return;
+    }
+
+    if (!price) {
+      console.error('No price provided for checkout');
+      return;
+    }
+
+    // Set loading state
+    setPriceIdLoading(price.id);
+
+    try {
+      // Import the server action
+      const { checkoutWithStripe } = await import('@/utils/stripe/server');
+      
+      // Call the checkout function
+      const result = await checkoutWithStripe(price);
+      
+      if (result.errorRedirect) {
+        // Handle error
+        console.error('Checkout error:', result.errorRedirect);
+        // You might want to show an error message to the user
+        return;
+      }
+
+      if (result.sessionId) {
+        // Redirect to Stripe Checkout
+        const { getStripe } = await import('@/utils/stripe/client');
+        const stripe = await getStripe();
+        
+        if (stripe) {
+          await stripe.redirectToCheckout({ sessionId: result.sessionId });
+        }
+      }
+    } catch (error) {
+      console.error('Checkout error:', error);
+      // Handle error - maybe show a toast or error message
+    } finally {
+      setPriceIdLoading(undefined);
     }
   };
 
@@ -174,18 +214,6 @@ export default function PricingPlans({
     .filter((item) => item.price)
     .sort((a, b) => a.priceAmount - b.priceAmount);
 
-  // Debug: Log sorted products
-  console.log('🔍 PricingPlans: Sorted products:', {
-    originalCount: products.length,
-    sortedCount: sortedProducts.length,
-    billingInterval,
-    sortedProducts: sortedProducts.map(item => ({
-      name: item.product.name,
-      priceAmount: item.priceAmount,
-      currency: item.price?.currency,
-      interval: item.price?.interval
-    }))
-  });
 
   // Original prices for highlighting discounts
   const originalPrices = {
@@ -501,14 +529,24 @@ export default function PricingPlans({
                 onClick={() => handleGetStarted(product.name?.toLowerCase() || 'premium', price)}
                 variant="primary"
                 size="lg"
+                disabled={priceIdLoading === price.id}
                 className={`w-full group ${
                   isVip
                     ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400'
                     : ''
-                }`}
+                } ${priceIdLoading === price.id ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                {isVip ? 'Get VIP Access' : 'Get Started'}
-                <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                {priceIdLoading === price.id ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    {isVip ? 'Get VIP Access' : 'Get Started'}
+                    <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
               </Button>
             </div>
           );
