@@ -4,6 +4,8 @@ import {
   convertSymbolFormat
 } from '@/utils/bybit/client'
 
+// IMPORTANT: All trades use 10x leverage - PnL calculations are multiplied by leverage factor
+
 // Create Supabase client function to avoid module-level initialization
 function createSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -794,11 +796,12 @@ export async function POST(request) {
               const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
               const exitPrice = Number(executionPrice);
               
-              // Calculate PnL based on position side
+              // Calculate PnL based on position side with 10x leverage
+              const leverage = 10; // All trades use 10x leverage
               if (originalSignal.type === 'buy') {
-                pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
+                pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100 * leverage;
               } else if (originalSignal.type === 'sell') {
-                pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100;
+                pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100 * leverage;
               }
               
               console.log('📊 Calculated PnL for closed_position:', {
@@ -876,12 +879,13 @@ export async function POST(request) {
               const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
               const exitPrice = Number(executionPrice);
               
-              // Calculate PnL based on position side
-              if (originalSignal.type === 'buy') {
-                pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
-              } else if (originalSignal.type === 'sell') {
-                pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100;
-              }
+                        // Calculate PnL based on position side with 10x leverage
+          const leverage = 10; // All trades use 10x leverage
+          if (originalSignal.type === 'buy') {
+            pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100 * leverage;
+          } else if (originalSignal.type === 'sell') {
+            pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100 * leverage;
+          }
 
               // Update the existing signal to closed
               await supabase
@@ -1258,15 +1262,16 @@ export async function POST(request) {
           const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
           const exitPrice = Number(executionPrice);
           
-          // Calculate PnL based on position type
-          let pnlPercentage;
-          if (originalSignal.type === 'buy') {
-            pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
-          } else if (originalSignal.type === 'sell') {
-            pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100;
-          } else {
-            pnlPercentage = 0;
-          }
+                        // Calculate PnL based on position type with 10x leverage
+              let pnlPercentage;
+              const leverage = 10; // All trades use 10x leverage
+              if (originalSignal.type === 'buy') {
+                pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100 * leverage;
+              } else if (originalSignal.type === 'sell') {
+                pnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100 * leverage;
+              } else {
+                pnlPercentage = 0;
+              }
 
           // Update the original signal with exit information
           const { data: updatedSignal, error: updateSignalError } = await supabase
@@ -1395,10 +1400,11 @@ export async function POST(request) {
             const entryPrice = Number(foundOriginalSignal.entry_price);
             const exitPrice = Number(executionPrice);
             
+            const leverage = 10; // All trades use 10x leverage
             if (foundOriginalSignal.type === 'buy') {
-              calculatedPnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100;
+              calculatedPnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100 * leverage;
             } else if (foundOriginalSignal.type === 'sell') {
-              calculatedPnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100;
+              calculatedPnlPercentage = ((entryPrice - exitPrice) / entryPrice) * 100 * leverage;
             }
           }
           

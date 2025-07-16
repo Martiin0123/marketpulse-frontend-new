@@ -479,10 +479,10 @@ export default function Dashboard({
                           <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
                             Symbol
                           </th>
-                          <th className="hidden sm:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                          <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
                             Entry Price
                           </th>
-                          <th className="hidden lg:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                          <th className="hidden md:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
                             Exit Price
                           </th>
                           <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
@@ -528,10 +528,10 @@ export default function Dashboard({
                             <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
                               {signal.symbol}
                             </td>
-                            <td className="hidden sm:table-cell px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                            <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-slate-300">
                               ${Number(signal.entry_price).toFixed(2)}
                             </td>
-                            <td className="hidden lg:table-cell px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                            <td className="hidden md:table-cell px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-slate-300">
                               {signal.exit_price
                                 ? `$${Number(signal.exit_price).toFixed(2)}`
                                 : '-'}
