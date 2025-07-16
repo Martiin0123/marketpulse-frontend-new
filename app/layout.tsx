@@ -51,6 +51,23 @@ export default async function RootLayout({ children }: PropsWithChildren) {
 
   return (
     <html lang="en">
+      <head>
+        {/* Google tag (gtag.js) */}
+        <script
+          async
+          src="https://www.googletagmanager.com/gtag/js?id=AW-17361459473"
+        ></script>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'AW-17361459473');
+            `
+          }}
+        />
+      </head>
       <body className="bg-slate-900 text-white">
         <AuthProvider
           initialUser={user}
