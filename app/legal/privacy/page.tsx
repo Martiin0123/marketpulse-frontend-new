@@ -8,7 +8,7 @@ export default function Privacy() {
         <p className="mb-4">
           PrimeScope Trading Platform
           <br />
-          Email: privacy@primescope.com
+          Email: hello@primescope.app
           <br />
           For data protection inquiries, please contact us through our support
           channels.
