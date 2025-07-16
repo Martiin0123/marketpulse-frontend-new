@@ -6,15 +6,12 @@ export default function Privacy() {
       <section className="mb-8">
         <h2 className="text-xl font-semibold mb-4">1. Data Controller</h2>
         <p className="mb-4">
-          Martin Zangerl
+          PrimeScope Trading Platform
           <br />
-          Dorfstraße 22
+          Email: privacy@primescope.com
           <br />
-          6561 Ischgl
-          <br />
-          Austria
-          <br />
-          Email: zangerl.martin@hotmail.com
+          For data protection inquiries, please contact us through our support
+          channels.
         </p>
       </section>
 
