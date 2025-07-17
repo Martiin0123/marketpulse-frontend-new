@@ -23,13 +23,17 @@ export async function GET(request: NextRequest) {
       positionSizing: exchangeConfig.position_sizing_percentage
     });
     
-    return NextResponse.json({
+    const response = {
       success: true,
       exchangeName: exchangeConfig.name,
       positionSizing: exchangeConfig.position_sizing_percentage,
       isActive: exchangeConfig.is_active,
       updatedAt: exchangeConfig.updated_at
-    });
+    };
+    
+    console.log('📤 Sending response:', response);
+    
+    return NextResponse.json(response);
     
   } catch (error) {
     console.error('❌ Error getting position sizing:', error);

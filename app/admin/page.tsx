@@ -25,8 +25,10 @@ import {
   Trash2,
   Edit,
   Lock,
-  Shield
+  Shield,
+  Users
 } from 'lucide-react';
+import UsersTab, { UserData } from '@/components/ui/Admin/UsersTab';
 
 interface Signal {
   id: string;
@@ -43,8 +45,8 @@ interface Signal {
 }
 
 interface TabSwitcherProps {
-  activeTab: 'signals' | 'manual';
-  onTabChange: (tab: 'signals' | 'manual') => void;
+  activeTab: 'signals' | 'manual' | 'users';
+  onTabChange: (tab: 'signals' | 'manual' | 'users') => void;
 }
 
 function TabSwitcher({ activeTab, onTabChange }: TabSwitcherProps) {
@@ -58,6 +60,11 @@ function TabSwitcher({ activeTab, onTabChange }: TabSwitcherProps) {
       id: 'manual' as const,
       label: 'Manual Trading',
       icon: <Settings className="w-4 h-4" />
+    },
+    {
+      id: 'users' as const,
+      label: 'Users',
+      icon: <Users className="w-4 h-4" />
     }
   ];
 
@@ -451,6 +458,7 @@ function ManualTradingTab({
             <div className="mt-4 sm:mt-0 sm:ml-4">
               <div className="flex items-center space-x-3">
                 <Input
+                  key={`position-sizing-${positionSizing}`}
                   type="number"
                   placeholder="5"
                   value={positionSizing.toString()}
@@ -458,7 +466,7 @@ function ManualTradingTab({
                     const num = parseFloat(value) || 0;
                     setPositionSizing(Math.min(Math.max(num, 0), 100));
                   }}
-                  className="w-24 bg-slate-700/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500/20 rounded-lg"
+                  className="w-24 bg-slate-700/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500/20 rounded-lg"
                 />
                 <span className="text-white font-medium">%</span>
                 <Button
@@ -490,6 +498,10 @@ function ManualTradingTab({
                 </span>
               )}
             </p>
+            {/* Debug: Show current state value */}
+            <div className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-600">
+              Debug: State = {positionSizing} | Last fetched from database
+            </div>
           </div>
         </div>
       </div>
@@ -651,7 +663,9 @@ function ManualTradingTab({
 export default function AdminPage() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'signals' | 'manual'>('signals');
+  const [activeTab, setActiveTab] = useState<'signals' | 'manual' | 'users'>(
+    'signals'
+  );
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Test alert states
@@ -659,6 +673,18 @@ export default function AdminPage() {
   const [testAlertLoading, setTestAlertLoading] = useState(false);
   const [testAlertResult, setTestAlertResult] = useState<string>('');
   const [testAlertError, setTestAlertError] = useState<string>('');
+
+  // Users states
+  const [users, setUsers] = useState<UserData[]>([]);
+  const [usersStats, setUsersStats] = useState({
+    total_users: 0,
+    active_subscriptions: 0,
+    new_users_this_month: 0,
+    users_with_referral_codes: 0,
+    users_referred_by_others: 0,
+    whitelist_requests: 0,
+    pending_whitelist_requests: 0
+  });
 
   // Position sizing states
   const [positionSizing, setPositionSizing] = useState(5); // Default to 5%, will be updated from database
@@ -669,7 +695,10 @@ export default function AdminPage() {
         const response = await fetch('/api/admin/auth/check');
         if (response.ok) {
           setIsAuthenticated(true);
-          fetchData();
+          // Fetch data after authentication is confirmed
+          setTimeout(() => {
+            fetchData();
+          }, 100);
         } else {
           setIsAuthenticated(false);
         }
@@ -713,6 +742,65 @@ export default function AdminPage() {
     }
   };
 
+  const fetchSizingData = async () => {
+    try {
+      const response = await fetch(
+        `/api/admin/get-sizing-direct?exchange=bybit&t=${Date.now()}`,
+        {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            Pragma: 'no-cache'
+          }
+        }
+      );
+
+      if (response.ok) {
+        const sizingData = await response.json();
+        const newSizing = sizingData.positionSizing || 5;
+        setPositionSizing(newSizing);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('positionSizing');
+        }
+      }
+    } catch (sizingError) {
+      // Silent error handling
+    }
+  };
+
+  const handleRefreshSizing = () => {
+    fetchSizingData();
+  };
+
+  const fetchUsersData = async () => {
+    try {
+      console.log('🔍 Fetching users data...');
+      const usersRes = await fetch('/api/admin/users');
+
+      if (usersRes.ok) {
+        const usersData = await usersRes.json();
+        setUsers(usersData.users || []);
+        setUsersStats(
+          usersData.stats || {
+            total_users: 0,
+            active_subscriptions: 0,
+            new_users_this_month: 0,
+            users_with_referral_codes: 0,
+            users_referred_by_others: 0,
+            whitelist_requests: 0,
+            pending_whitelist_requests: 0
+          }
+        );
+        console.log('📊 Users data loaded:', usersData.stats);
+      } else {
+        console.error('❌ Failed to fetch users data');
+      }
+    } catch (error) {
+      console.error('❌ Error fetching users data:', error);
+    }
+  };
+
   const fetchData = async () => {
     try {
       const signalsRes = await fetch('/api/admin/signals');
@@ -722,37 +810,11 @@ export default function AdminPage() {
         setSignals(signalsData);
       }
 
-      // Fetch current position sizing from database
-      try {
-        const sizingResponse = await fetch(
-          '/api/admin/get-sizing?exchange=bybit',
-          {
-            method: 'GET'
-          }
-        );
+      // Fetch sizing data separately
+      await fetchSizingData();
 
-        if (sizingResponse.ok) {
-          const sizingData = await sizingResponse.json();
-          setPositionSizing(sizingData.positionSizing || 5);
-          console.log(
-            '📊 Loaded current position sizing from database:',
-            sizingData.positionSizing
-          );
-          // Clear any stale localStorage value
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('positionSizing');
-          }
-        } else {
-          console.log(
-            '⚠️ Could not fetch current sizing from database, using default'
-          );
-        }
-      } catch (sizingError) {
-        console.log(
-          '⚠️ Error fetching current sizing from database:',
-          sizingError
-        );
-      }
+      // Fetch users data
+      await fetchUsersData();
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -862,16 +924,12 @@ export default function AdminPage() {
         })
       });
 
-      const data = await response.json();
-
       if (response.ok) {
-        console.log('Position sizing updated successfully:', sizing);
+        setPositionSizing(sizing);
         trackEvent();
-      } else {
-        console.error('Failed to update position sizing:', data.error);
       }
     } catch (error) {
-      console.error('Error updating position sizing:', error);
+      // Silent error handling
     }
   };
 
@@ -948,6 +1006,8 @@ export default function AdminPage() {
             onUpdateSizing={handleUpdateSizing}
           />
         )}
+
+        {activeTab === 'users' && <UsersTab users={users} stats={usersStats} />}
       </div>
     </div>
   );

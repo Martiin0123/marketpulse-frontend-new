@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { updateExchangePositionSizing } from '@/utils/supabase/exchanges';
+import { createClient } from '@supabase/supabase-js';
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,22 +21,48 @@ export async function POST(request: NextRequest) {
     
     console.log('🔍 Admin updating position sizing:', { exchangeName, positionSizing });
     
-    // Update position sizing in database
-    const dbSuccess = await updateExchangePositionSizing(exchangeName, positionSizing);
+    // Create Supabase client
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     
-    if (!dbSuccess) {
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase configuration missing');
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    // Simple direct update
+    const { data, error } = await supabase
+      .from('exchanges')
+      .update({ 
+        position_sizing_percentage: positionSizing,
+        updated_at: new Date().toISOString()
+      })
+      .eq('name', exchangeName)
+      .eq('is_active', true)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Database update error:', error);
       return NextResponse.json({ 
-        error: 'Failed to update position sizing in database'
+        error: 'Database update failed',
+        details: error.message
       }, { status: 500 });
     }
     
-    console.log('✅ Position sizing updated successfully in database');
+    console.log('✅ Position sizing updated successfully:', {
+      exchangeName,
+      newValue: positionSizing,
+      updatedRecord: data
+    });
     
     return NextResponse.json({
       success: true,
-      message: 'Position sizing updated successfully in database',
+      message: 'Position sizing updated successfully',
       exchangeName,
-      positionSizing: positionSizing
+      positionSizing: positionSizing,
+      updatedAt: data.updated_at
     });
     
   } catch (error) {
