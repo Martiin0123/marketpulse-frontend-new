@@ -34,33 +34,8 @@ const rateLimitStats = {
 let redisClient: any = null;
 let redisAvailable = false;
 
-try {
-  const Redis = require('ioredis');
-  redisClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-    retryDelayOnFailover: 100,
-    enableReadyCheck: false,
-    maxRetriesPerRequest: null,
-    lazyConnect: true
-  });
-  
-  redisClient.on('connect', () => {
-    console.log('✅ Redis connected for rate limiting');
-    redisAvailable = true;
-  });
-  
-  redisClient.on('error', (error: any) => {
-    console.log('⚠️ Redis connection error:', error.message);
-    redisAvailable = false;
-  });
-  
-  redisClient.on('close', () => {
-    console.log('⚠️ Redis connection closed');
-    redisAvailable = false;
-  });
-  
-} catch (error) {
-  console.log('⚠️ Redis not available, using in-memory rate limiting');
-}
+// Disable Redis for now to avoid build errors
+console.log('⚠️ Redis disabled, using in-memory rate limiting');
 
 // Helper function to clean up expired cache entries
 const cleanupExpiredEntries = () => {

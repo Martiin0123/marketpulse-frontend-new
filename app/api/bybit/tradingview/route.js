@@ -701,10 +701,29 @@ export async function POST(request) {
       console.log('🔍 Entering proxy API call section...');
       
       try {
+        // Get current position sizing from database
+        let currentSizing = 5; // Default fallback
+        try {
+          const sizingResponse = await fetch('/api/admin/get-sizing?exchange=bybit', {
+            method: 'GET'
+          });
+          
+          if (sizingResponse.ok) {
+            const sizingData = await sizingResponse.json();
+            currentSizing = sizingData.positionSizing || 5;
+            console.log('📊 Retrieved current position sizing from database:', currentSizing);
+          } else {
+            console.log('⚠️ Could not fetch sizing from database, using default:', currentSizing);
+          }
+        } catch (sizingError) {
+          console.log('⚠️ Error fetching sizing from database, using default:', currentSizing);
+        }
+
         // Use proxy to execute the signal directly
         const signalPayload = {
           alert_message: signalData.originalMessage, // Send the original TradingView alert message
-          symbol: bybitSymbol
+          symbol: bybitSymbol,
+          position_sizing: currentSizing // Send current position sizing percentage
           // Price will be fetched from Bybit by proxy
         };
 

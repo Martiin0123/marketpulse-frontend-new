@@ -310,7 +310,10 @@ function ManualTradingTab({
   testAlertLoading,
   testAlertResult,
   testAlertError,
-  onTestAlert
+  onTestAlert,
+  positionSizing,
+  setPositionSizing,
+  onUpdateSizing
 }: {
   testAlertSymbol: string;
   setTestAlertSymbol: (value: string) => void;
@@ -318,9 +321,78 @@ function ManualTradingTab({
   testAlertResult: string;
   testAlertError: string;
   onTestAlert: (alertType: string) => void;
+  positionSizing: number;
+  setPositionSizing: (value: number) => void;
+  onUpdateSizing: (sizing: number) => void;
 }) {
   return (
     <div className="space-y-6">
+      {/* Position Sizing Configuration */}
+      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700">
+        <div className="px-6 py-4 border-b border-slate-700">
+          <h3 className="text-lg font-semibold text-white">
+            Position Sizing Configuration
+          </h3>
+          <p className="text-slate-400 text-sm mt-1">
+            Configure the percentage of wallet balance to use per trade
+          </p>
+        </div>
+        <div className="p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
+            <div>
+              <h4 className="text-base font-medium text-white mb-1">
+                Position Size (% of Wallet)
+              </h4>
+              <p className="text-sm text-slate-400">
+                Set the percentage of your wallet balance to use for each trade
+              </p>
+            </div>
+            <div className="mt-4 sm:mt-0 sm:ml-4">
+              <div className="flex items-center space-x-3">
+                <Input
+                  type="number"
+                  placeholder="5"
+                  value={positionSizing.toString()}
+                  onChange={(value) => {
+                    const num = parseFloat(value) || 0;
+                    setPositionSizing(Math.min(Math.max(num, 0), 100));
+                  }}
+                  className="w-24 bg-slate-700/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500/20 rounded-lg"
+                />
+                <span className="text-white font-medium">%</span>
+                <Button
+                  onClick={() => onUpdateSizing(positionSizing)}
+                  variant="primary"
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Update Sizing
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+            <div className="flex items-center mb-2">
+              <Target className="w-4 h-4 text-blue-400 mr-2" />
+              <span className="text-blue-200 text-sm font-medium">
+                Current Setting
+              </span>
+            </div>
+            <p className="text-sm text-slate-300">
+              Each trade will use{' '}
+              <strong className="text-blue-400">{positionSizing}%</strong> of
+              your wallet balance.
+              {positionSizing > 20 && (
+                <span className="text-orange-400 ml-2">
+                  ⚠️ High risk setting
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Test Alert Section */}
       <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700">
         <div className="px-6 py-4 border-b border-slate-700">
@@ -486,6 +558,16 @@ export default function AdminPage() {
   const [testAlertResult, setTestAlertResult] = useState<string>('');
   const [testAlertError, setTestAlertError] = useState<string>('');
 
+  // Position sizing states
+  const [positionSizing, setPositionSizing] = useState(() => {
+    // Try to get from localStorage first, fallback to 5%
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('positionSizing');
+      return stored ? parseInt(stored, 10) : 5;
+    }
+    return 5;
+  });
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -497,6 +579,34 @@ export default function AdminPage() {
       if (signalsRes.ok) {
         const signalsData = await signalsRes.json();
         setSignals(signalsData);
+      }
+
+      // Fetch current position sizing from database
+      try {
+        const sizingResponse = await fetch(
+          '/api/admin/get-sizing?exchange=bybit',
+          {
+            method: 'GET'
+          }
+        );
+
+        if (sizingResponse.ok) {
+          const sizingData = await sizingResponse.json();
+          setPositionSizing(sizingData.positionSizing || 5);
+          console.log(
+            '📊 Loaded current position sizing from database:',
+            sizingData.positionSizing
+          );
+        } else {
+          console.log(
+            '⚠️ Could not fetch current sizing from database, using default'
+          );
+        }
+      } catch (sizingError) {
+        console.log(
+          '⚠️ Error fetching current sizing from database:',
+          sizingError
+        );
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -518,7 +628,7 @@ export default function AdminPage() {
 
       if (response.ok) {
         fetchData();
-        trackEvent('admin_signal_updated', { signalId });
+        trackEvent();
       }
     } catch (error) {
       console.error('Error updating signal:', error);
@@ -537,7 +647,7 @@ export default function AdminPage() {
 
       if (response.ok) {
         fetchData();
-        trackEvent('admin_signal_deleted', { signalId });
+        trackEvent();
       }
     } catch (error) {
       console.error('Error deleting signal:', error);
@@ -579,10 +689,7 @@ export default function AdminPage() {
 
       if (response.ok) {
         setTestAlertResult(result);
-        trackEvent('admin_test_alert_sent', {
-          alertType,
-          symbol: testAlertSymbol
-        });
+        trackEvent();
       } else {
         setTestAlertError(result);
       }
@@ -591,6 +698,32 @@ export default function AdminPage() {
       console.error('Error sending test alert:', error);
     } finally {
       setTestAlertLoading(false);
+    }
+  };
+
+  const handleUpdateSizing = async (sizing: number) => {
+    try {
+      const response = await fetch('/api/admin/update-sizing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          positionSizing: sizing,
+          password: process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin'
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log('Position sizing updated successfully:', sizing);
+        trackEvent();
+      } else {
+        console.error('Failed to update position sizing:', data.error);
+      }
+    } catch (error) {
+      console.error('Error updating position sizing:', error);
     }
   };
 
@@ -645,6 +778,9 @@ export default function AdminPage() {
             testAlertResult={testAlertResult}
             testAlertError={testAlertError}
             onTestAlert={handleTestAlert}
+            positionSizing={positionSizing}
+            setPositionSizing={setPositionSizing}
+            onUpdateSizing={handleUpdateSizing}
           />
         )}
       </div>

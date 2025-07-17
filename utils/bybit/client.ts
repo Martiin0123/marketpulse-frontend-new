@@ -215,6 +215,24 @@ export async function submitBybitOrder(orderData: {
 }): Promise<any> {
   try {
     // NEW: Submit order to external trade API - using placeBybitOrder function
+    // Get current position sizing from database
+    let currentSizing = 5; // Default fallback
+    try {
+      const sizingResponse = await fetch('/api/admin/get-sizing?exchange=bybit', {
+        method: 'GET'
+      });
+      
+      if (sizingResponse.ok) {
+        const sizingData = await sizingResponse.json();
+        currentSizing = sizingData.positionSizing || 5;
+        console.log('📊 Retrieved current position sizing for order from database:', currentSizing);
+      } else {
+        console.log('⚠️ Could not fetch sizing for order from database, using default:', currentSizing);
+      }
+    } catch (sizingError) {
+      console.log('⚠️ Error fetching sizing for order from database, using default:', currentSizing);
+    }
+
     const orderPayload = {
       action: 'placeOrder',
       symbol: orderData.symbol,
@@ -228,7 +246,8 @@ export async function submitBybitOrder(orderData: {
       price: orderData.price,
       reduceOnly: orderData.reduceOnly,
       closeOnTrigger: orderData.closeOnTrigger,
-      orderLinkId: orderData.orderLinkId
+      orderLinkId: orderData.orderLinkId,
+      position_sizing: currentSizing // Include position sizing
     };
 
     console.log('📤 Submitting order to external API with data:', orderPayload);
@@ -316,13 +335,32 @@ export async function submitBybitOrderWithDynamicSizing(orderData: {
     // Convert side to action format expected by proxy
     const action = orderData.side === 'Buy' ? 'BUY' : 'SELL';
     
+    // Get current position sizing from database
+    let currentSizing = 5; // Default fallback
+    try {
+      const sizingResponse = await fetch('/api/admin/get-sizing?exchange=bybit', {
+        method: 'GET'
+      });
+      
+      if (sizingResponse.ok) {
+        const sizingData = await sizingResponse.json();
+        currentSizing = sizingData.positionSizing || 5;
+        console.log('📊 Retrieved current position sizing for dynamic order from database:', currentSizing);
+      } else {
+        console.log('⚠️ Could not fetch sizing for dynamic order from database, using default:', currentSizing);
+      }
+    } catch (sizingError) {
+      console.log('⚠️ Error fetching sizing for dynamic order from database, using default:', currentSizing);
+    }
+
     const orderPayload = {
       action: action,
       symbol: orderData.symbol,
       side: orderData.side,
       orderType: orderData.orderType || 'Market',
       category: orderData.category || 'linear',
-      timeInForce: orderData.timeInForce || 'GoodTillCancel'
+      timeInForce: orderData.timeInForce || 'GoodTillCancel',
+      position_sizing: currentSizing // Include position sizing
     };
 
     console.log('📤 Submitting dynamic sizing order to external API:', orderPayload);
