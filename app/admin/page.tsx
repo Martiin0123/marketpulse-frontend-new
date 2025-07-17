@@ -23,7 +23,9 @@ import {
   X,
   Plus,
   Trash2,
-  Edit
+  Edit,
+  Lock,
+  Shield
 } from 'lucide-react';
 
 interface Signal {
@@ -75,6 +77,105 @@ function TabSwitcher({ activeTab, onTabChange }: TabSwitcherProps) {
           <span className="hidden sm:inline">{tab.label}</span>
         </button>
       ))}
+    </div>
+  );
+}
+
+// Admin Login Component
+function AdminLogin({ onLogin }: { onLogin: (password: string) => void }) {
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ password })
+      });
+
+      if (response.ok) {
+        onLogin(password);
+      } else {
+        const data = await response.json();
+        setError(data.error || 'Invalid password');
+      }
+    } catch (error) {
+      setError('Failed to authenticate');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center px-4">
+      <div className="w-full max-w-md">
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-8">
+          <div className="text-center mb-8">
+            <div className="mx-auto w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mb-4">
+              <Shield className="w-8 h-8 text-blue-400" />
+            </div>
+            <h1 className="text-2xl font-bold text-white mb-2">Admin Access</h1>
+            <p className="text-slate-400">Enter admin password to continue</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-slate-300 mb-2"
+              >
+                Admin Password
+              </label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter admin password"
+                  value={password}
+                  onChange={(value) => setPassword(value)}
+                  className="w-full bg-slate-700/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500/20 rounded-lg pr-10"
+                />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                  <Lock className="w-4 h-4 text-slate-400" />
+                </div>
+              </div>
+            </div>
+
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                <div className="flex items-center">
+                  <AlertTriangle className="w-4 h-4 text-red-400 mr-2" />
+                  <span className="text-red-200 text-sm">{error}</span>
+                </div>
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              disabled={isLoading || !password.trim()}
+              variant="primary"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {isLoading ? (
+                <LoadingDots />
+              ) : (
+                <>
+                  <Shield className="w-4 h-4 mr-2" />
+                  Access Admin Panel
+                </>
+              )}
+            </Button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }
@@ -551,6 +652,7 @@ export default function AdminPage() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'signals' | 'manual'>('signals');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Test alert states
   const [testAlertSymbol, setTestAlertSymbol] = useState('BTCUSDT');
@@ -569,8 +671,54 @@ export default function AdminPage() {
   });
 
   useEffect(() => {
-    fetchData();
+    const checkAuthentication = async () => {
+      try {
+        const response = await fetch('/api/admin/auth/check');
+        if (response.ok) {
+          setIsAuthenticated(true);
+          fetchData();
+        } else {
+          setIsAuthenticated(false);
+        }
+      } catch (error) {
+        setIsAuthenticated(false);
+      }
+    };
+    checkAuthentication();
   }, []);
+
+  const handleLogin = async (password: string) => {
+    try {
+      const response = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ password })
+      });
+
+      if (response.ok) {
+        setIsAuthenticated(true);
+        fetchData();
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Invalid password');
+      }
+    } catch (error) {
+      alert('Failed to authenticate');
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/admin/auth/logout', {
+        method: 'POST'
+      });
+      setIsAuthenticated(false);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -682,7 +830,10 @@ export default function AdminPage() {
       const response = await fetch('/api/bybit/tradingview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alert_message: alertMessage })
+        body: JSON.stringify({
+          alert_message: alertMessage,
+          test: true // Mark as test signal
+        })
       });
 
       const result = await response.text();
@@ -710,7 +861,7 @@ export default function AdminPage() {
         },
         body: JSON.stringify({
           positionSizing: sizing,
-          password: process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin'
+          exchangeName: 'bybit'
         })
       });
 
@@ -726,6 +877,10 @@ export default function AdminPage() {
       console.error('Error updating position sizing:', error);
     }
   };
+
+  if (!isAuthenticated) {
+    return <AdminLogin onLogin={handleLogin} />;
+  }
 
   if (loading) {
     return (
@@ -745,13 +900,26 @@ export default function AdminPage() {
       {/* Header */}
       <div className="pt-16 sm:pt-20 pb-8 sm:pb-12 bg-gradient-to-b from-slate-900 to-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4 sm:mb-6">
-              Admin Dashboard
-            </h1>
-            <p className="text-lg sm:text-xl text-slate-400 max-w-3xl mx-auto mb-4 sm:mb-6">
-              Manage signals and test TradingView alerts
-            </p>
+          <div className="flex justify-between items-center mb-6">
+            <div className="text-center flex-1">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4 sm:mb-6">
+                Admin Dashboard
+              </h1>
+              <p className="text-lg sm:text-xl text-slate-400 max-w-3xl mx-auto mb-4 sm:mb-6">
+                Manage signals and test TradingView alerts
+              </p>
+            </div>
+            <div className="flex-shrink-0">
+              <Button
+                onClick={handleLogout}
+                variant="secondary"
+                size="sm"
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                <Shield className="w-4 h-4 mr-2" />
+                Logout
+              </Button>
+            </div>
           </div>
         </div>
       </div>

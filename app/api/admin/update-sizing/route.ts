@@ -3,17 +3,13 @@ import { updateExchangePositionSizing } from '@/utils/supabase/exchanges';
 
 export async function POST(request: NextRequest) {
   try {
-    const { positionSizing, password, exchangeName = 'bybit' } = await request.json();
+    const { positionSizing, exchangeName = 'bybit' } = await request.json();
     
-    // Validate admin password
-    const adminPassword = process.env.ADMIN_PASSWORD;
+    // Check for admin authentication cookie
+    const authCookie = request.cookies.get('admin_auth');
     
-    if (!adminPassword) {
-      return NextResponse.json({ error: 'Admin access not configured' }, { status: 500 });
-    }
-    
-    if (password !== adminPassword) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!authCookie || authCookie.value !== 'authenticated') {
+      return NextResponse.json({ error: 'Unauthorized - Please login' }, { status: 401 });
     }
     
     // Validate position sizing

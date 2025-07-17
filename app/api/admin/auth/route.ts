@@ -4,23 +4,43 @@ export async function POST(request: NextRequest) {
   try {
     const { password } = await request.json();
     
+    // Get admin password from environment
     const adminPassword = process.env.ADMIN_PASSWORD;
     
     if (!adminPassword) {
-      console.error('❌ ADMIN_PASSWORD not set in environment variables');
-      return NextResponse.json({ error: 'Admin access not configured' }, { status: 500 });
+      return NextResponse.json({ 
+        error: 'Admin access not configured' 
+      }, { status: 500 });
     }
     
+    // Check if password matches
     if (password !== adminPassword) {
-      console.log('❌ Invalid admin password attempt');
-      return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
+      return NextResponse.json({ 
+        error: 'Invalid password' 
+      }, { status: 401 });
     }
     
-    console.log('✅ Admin authentication successful');
-    return NextResponse.json({ success: true });
+    // Set authentication cookie
+    const response = NextResponse.json({ 
+      success: true,
+      message: 'Authentication successful'
+    });
+    
+    // Set secure HTTP-only cookie
+    response.cookies.set('admin_auth', 'authenticated', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 60 * 60 * 24 // 24 hours
+    });
+    
+    return response;
     
   } catch (error) {
-    console.error('❌ Admin auth error:', error);
-    return NextResponse.json({ error: 'Authentication failed' }, { status: 500 });
+    console.error('❌ Error in admin authentication:', error);
+    return NextResponse.json({ 
+      error: 'Authentication failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 } 

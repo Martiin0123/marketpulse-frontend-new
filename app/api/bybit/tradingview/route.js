@@ -96,7 +96,7 @@ function parseAIAlgorithmAlert(alertMessage) {
 }
 
 // Send success Discord notification
-async function sendSuccessDiscordNotification(signal, orderDetails, webhookUrl, isEveryFifthTrade = false) {
+async function sendSuccessDiscordNotification(signal, orderDetails, webhookUrl, isTestMode = false) {
   try {
     if (!webhookUrl || !webhookUrl.includes('discord.com/api/webhooks/')) {
       console.error('❌ Invalid Discord webhook URL');
@@ -153,8 +153,8 @@ async function sendSuccessDiscordNotification(signal, orderDetails, webhookUrl, 
     }
 
     const embed = {
-      title: title,
-      description: description,
+      title: isTestMode ? `🧪 TEST: ${title}` : title,
+      description: isTestMode ? `🧪 **TEST MODE** - ${description}` : description,
       color: getColor(signal.action),
       fields: [
         {
@@ -175,7 +175,7 @@ async function sendSuccessDiscordNotification(signal, orderDetails, webhookUrl, 
       ],
       timestamp: new Date().toISOString(),
       footer: {
-        text: isEveryFifthTrade ? 'Primescope Crypto Strategy - Bybit (Free Tier)' : 'Primescope Crypto Strategy - Bybit'
+        text: isTestMode ? '🧪 TEST MODE - Primescope Crypto Strategy - Bybit' : 'Primescope Crypto Strategy - Bybit'
       }
     };
 
@@ -204,12 +204,12 @@ async function sendSuccessDiscordNotification(signal, orderDetails, webhookUrl, 
     }
 
     const webhookData = {
-      username: isEveryFifthTrade ? 'Primescope Free Trading Bot' : 'Primescope Bybit Trading Bot',
+      username: isTestMode ? '🧪 Primescope Test Bot' : 'Primescope Bybit Trading Bot',
       avatar_url: 'https://primescope.com/logo.png',
       embeds: [embed]
     };
 
-    console.log(`📡 Sending success notification to Discord${isEveryFifthTrade ? ' (Free Tier)' : ''}:`, {
+    console.log(`📡 Sending success notification to Discord${isTestMode ? ' (TEST MODE)' : ''}:`, {
       symbol: signal.symbol,
       action: signal.action,
       price: signal.price,
@@ -229,11 +229,11 @@ async function sendSuccessDiscordNotification(signal, orderDetails, webhookUrl, 
       throw new Error(`Discord webhook failed: ${response.status} ${errorText}`);
     }
 
-    console.log(`✅ Success notification sent to Discord${isEveryFifthTrade ? ' (Free Tier)' : ''}`);
+    console.log(`✅ Success notification sent to Discord${isTestMode ? ' (TEST MODE)' : ''}`);
     return true;
 
   } catch (error) {
-    console.error(`❌ Error sending success notification to Discord${isEveryFifthTrade ? ' (Free Tier)' : ''}:`, error);
+    console.error(`❌ Error sending success notification to Discord${isTestMode ? ' (TEST MODE)' : ''}:`, error);
     return false;
   }
 }
@@ -321,7 +321,7 @@ async function sendProfitTeaserNotification(signal, orderDetails, webhookUrl) {
 }
 
 // Send error Discord notification
-async function sendErrorDiscordNotification(signal, error, webhookUrl) {
+async function sendErrorDiscordNotification(signal, error, webhookUrl, isTestMode = false) {
   try {
     if (!webhookUrl || !webhookUrl.includes('discord.com/api/webhooks/')) {
       console.error('❌ Invalid Discord webhook URL');
@@ -329,8 +329,8 @@ async function sendErrorDiscordNotification(signal, error, webhookUrl) {
     }
 
     const embed = {
-      title: `❌ Bybit Order Failed: ${signal.symbol}`,
-      description: `**${signal.action}** order failed on Bybit`,
+      title: isTestMode ? `🧪 TEST: ❌ Bybit Order Failed: ${signal.symbol}` : `❌ Bybit Order Failed: ${signal.symbol}`,
+      description: isTestMode ? `🧪 **TEST MODE** - **${signal.action}** order failed on Bybit` : `**${signal.action}** order failed on Bybit`,
       color: 0xff0000, // Red for error
       fields: [
         {
@@ -361,17 +361,17 @@ async function sendErrorDiscordNotification(signal, error, webhookUrl) {
       ],
       timestamp: new Date().toISOString(),
       footer: {
-        text: 'Primescope Crypto Strategy - Bybit'
+        text: isTestMode ? '🧪 TEST MODE - Primescope Crypto Strategy - Bybit' : 'Primescope Crypto Strategy - Bybit'
       }
     };
 
     const webhookData = {
-      username: 'Primescope Bybit Trading Bot',
+      username: isTestMode ? '🧪 Primescope Test Bot' : 'Primescope Bybit Trading Bot',
       avatar_url: 'https://primescope.com/logo.png',
       embeds: [embed]
     };
 
-    console.log('📡 Sending error notification to Discord:', {
+    console.log(`📡 Sending error notification to Discord${isTestMode ? ' (TEST MODE)' : ''}:`, {
       symbol: signal.symbol,
       action: signal.action,
       error: error.message
@@ -390,11 +390,11 @@ async function sendErrorDiscordNotification(signal, error, webhookUrl) {
       throw new Error(`Discord webhook failed: ${response.status} ${errorText}`);
     }
 
-    console.log('✅ Error notification sent to Discord');
+    console.log(`✅ Error notification sent to Discord${isTestMode ? ' (TEST MODE)' : ''}`);
     return true;
 
   } catch (discordError) {
-    console.error('❌ Error sending error notification to Discord:', discordError);
+    console.error(`❌ Error sending error notification to Discord${isTestMode ? ' (TEST MODE)' : ''}:`, discordError);
     return false;
   }
 }
@@ -719,11 +719,15 @@ export async function POST(request) {
           console.log('⚠️ Error fetching sizing from database, using default:', currentSizing);
         }
 
+        // Check if this is a test signal (from admin panel)
+        const isTestSignal = body.test === true || body.test === 'true';
+        
         // Use proxy to execute the signal directly
         const signalPayload = {
           alert_message: signalData.originalMessage, // Send the original TradingView alert message
           symbol: bybitSymbol,
-          position_sizing: currentSizing // Send current position sizing percentage
+          position_sizing: currentSizing, // Send current position sizing percentage
+          test: isTestSignal // Flag to indicate if this is a test signal
           // Price will be fetched from Bybit by proxy
         };
 
@@ -959,8 +963,11 @@ export async function POST(request) {
           }
 
           // Send Discord notification based on action_taken
-          if (discordWebhookUrl) {
-            console.log('📤 Sending Discord notifications for action:', actionTaken);
+          const discordWebhookToUse = isTestSignal ? discordErrorWebhookUrl : discordWebhookUrl;
+          const isTestNotification = isTestSignal;
+          
+          if (discordWebhookToUse) {
+            console.log(`📤 Sending Discord notifications for action: ${actionTaken}${isTestSignal ? ' (TEST MODE)' : ''}`);
             const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
             
             // Ensure originalSignal is available for Discord notifications
@@ -991,7 +998,7 @@ export async function POST(request) {
               case 'opened_buy':
               case 'BUY':
                 // Send "BUY opened" notification
-                console.log('📤 Sending BUY opened Discord notification');
+                console.log(`📤 Sending BUY opened Discord notification${isTestSignal ? ' (TEST MODE)' : ''}`);
                 await sendSuccessDiscordNotification({
                   symbol: symbol.toUpperCase(),
                   action: 'BUY',
@@ -1000,13 +1007,13 @@ export async function POST(request) {
                   strategy_metadata: strategy_metadata,
                   pnl_percentage: null,
                   exitReason: null
-                }, orderResult.order || orderResult, discordWebhookUrl);
+                }, orderResult.order || orderResult, discordWebhookToUse, isTestNotification);
                 break;
                 
               case 'opened_sell':
               case 'SELL':
                 // Send "SELL opened" notification
-                console.log('📤 Sending SELL opened Discord notification');
+                console.log(`📤 Sending SELL opened Discord notification${isTestSignal ? ' (TEST MODE)' : ''}`);
                 await sendSuccessDiscordNotification({
                   symbol: symbol.toUpperCase(),
                   action: 'SELL',
@@ -1015,15 +1022,15 @@ export async function POST(request) {
                   strategy_metadata: strategy_metadata,
                   pnl_percentage: null,
                   exitReason: null
-                }, orderResult.order || orderResult, discordWebhookUrl);
+                }, orderResult.order || orderResult, discordWebhookToUse, isTestNotification);
                 break;
                 
               case 'reversed_to_buy':
                 // Send "SELL closed (xxx PnL)" then "BUY opened"
-                console.log('🔄 Sending reversal Discord notifications for BUY');
+                console.log(`🔄 Sending reversal Discord notifications for BUY${isTestSignal ? ' (TEST MODE)' : ''}`);
                 // First, send close notification using the original signal data
                 if (originalSignalForDiscord) {
-                  console.log('📤 Sending SELL_CLOSED Discord notification');
+                  console.log(`📤 Sending SELL_CLOSED Discord notification${isTestSignal ? ' (TEST MODE)' : ''}`);
                   await sendSuccessDiscordNotification({
                     symbol: symbol.toUpperCase(),
                     action: 'SELL_CLOSED',
@@ -1032,7 +1039,7 @@ export async function POST(request) {
                     strategy_metadata: strategy_metadata,
                     pnl_percentage: pnlPercentage,
                     exitReason: 'signal_reversal'
-                  }, orderResult.order || orderResult, discordWebhookUrl);
+                  }, orderResult.order || orderResult, discordWebhookToUse, isTestNotification);
                   
 
                 } else {
@@ -1040,7 +1047,7 @@ export async function POST(request) {
                 }
                 
                 // Then send "BUY opened" notification
-                console.log('📤 Sending BUY opened Discord notification');
+                console.log(`📤 Sending BUY opened Discord notification${isTestSignal ? ' (TEST MODE)' : ''}`);
                 await sendSuccessDiscordNotification({
                   symbol: symbol.toUpperCase(),
                   action: 'BUY',
@@ -1049,15 +1056,15 @@ export async function POST(request) {
                   strategy_metadata: strategy_metadata,
                   pnl_percentage: null,
                   exitReason: null
-                }, orderResult.order || orderResult, discordWebhookUrl);
+                }, orderResult.order || orderResult, discordWebhookToUse, isTestNotification);
                 break;
                 
               case 'reversed_to_sell':
                 // Send "BUY closed (xxx PnL)" then "SELL opened"
-                console.log('🔄 Sending reversal Discord notifications for SELL');
+                console.log(`🔄 Sending reversal Discord notifications for SELL${isTestSignal ? ' (TEST MODE)' : ''}`);
                 // First, send close notification using the original signal data
                 if (originalSignalForDiscord) {
-                  console.log('📤 Sending BUY_CLOSED Discord notification');
+                  console.log(`📤 Sending BUY_CLOSED Discord notification${isTestSignal ? ' (TEST MODE)' : ''}`);
                   await sendSuccessDiscordNotification({
                     symbol: symbol.toUpperCase(),
                     action: 'BUY_CLOSED',
@@ -1066,7 +1073,7 @@ export async function POST(request) {
                     strategy_metadata: strategy_metadata,
                     pnl_percentage: pnlPercentage,
                     exitReason: 'signal_reversal'
-                  }, orderResult.order || orderResult, discordWebhookUrl);
+                  }, orderResult.order || orderResult, discordWebhookToUse, isTestNotification);
                   
 
                 } else {
@@ -1074,7 +1081,7 @@ export async function POST(request) {
                 }
                 
                 // Then send "SELL opened" notification
-                console.log('📤 Sending SELL opened Discord notification');
+                console.log(`📤 Sending SELL opened Discord notification${isTestSignal ? ' (TEST MODE)' : ''}`);
                 await sendSuccessDiscordNotification({
                   symbol: symbol.toUpperCase(),
                   action: 'SELL',
@@ -1083,7 +1090,7 @@ export async function POST(request) {
                   strategy_metadata: strategy_metadata,
                   pnl_percentage: null,
                   exitReason: null
-                }, orderResult.order || orderResult, discordWebhookUrl);
+                }, orderResult.order || orderResult, discordWebhookToUse, isTestNotification);
                 break;
                 
               case 'closed_position':
@@ -1097,7 +1104,7 @@ export async function POST(request) {
                   closePnlPercentage = originalSignalForDiscord.pnl_percentage;
                 }
                 
-                console.log('📊 Sending CLOSE Discord notification with PnL:', closePnlPercentage);
+                console.log(`📊 Sending CLOSE Discord notification with PnL: ${closePnlPercentage}${isTestSignal ? ' (TEST MODE)' : ''}`);
                 
                 await sendSuccessDiscordNotification({
                   symbol: symbol.toUpperCase(),
@@ -1107,7 +1114,7 @@ export async function POST(request) {
                   strategy_metadata: strategy_metadata,
                   pnl_percentage: closePnlPercentage,
                   exitReason: 'direct_signal'
-                }, orderResult.order || orderResult, discordWebhookUrl);
+                }, orderResult.order || orderResult, discordWebhookToUse, isTestNotification);
                 break;
                 
               case 'ignored_signal':
@@ -1125,7 +1132,7 @@ export async function POST(request) {
                   strategy_metadata: strategy_metadata,
                   pnl_percentage: null,
                   exitReason: null
-                }, orderResult.order || orderResult, discordWebhookUrl);
+                }, orderResult.order || orderResult, discordWebhookToUse, isTestNotification);
                 break;
             }
             
@@ -1184,7 +1191,7 @@ export async function POST(request) {
             symbol: symbol.toUpperCase(),
             action: action,
             price: 0
-          }, directError, discordErrorWebhookUrl);
+          }, directError, discordErrorWebhookUrl, isTestSignal);
         }
         
         return new Response(JSON.stringify({
