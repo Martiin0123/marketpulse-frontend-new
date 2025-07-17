@@ -1220,7 +1220,7 @@ export async function POST(request) {
             action: 'CLOSE',
             price: 0,
             dbErrorHint
-          }, closeError, discordErrorWebhookUrl);
+          }, closeError, discordErrorWebhookUrl, isTestSignal);
         }
         
         return new Response(JSON.stringify({ 
@@ -1331,13 +1331,16 @@ export async function POST(request) {
         }
 
         // Send Discord notifications for CLOSE action
-        if (discordWebhookUrl && databaseResult) {
+        const discordWebhookToUse = isTestSignal ? discordErrorWebhookUrl : discordWebhookUrl;
+        const isTestNotification = isTestSignal;
+        
+        if (discordWebhookToUse && databaseResult) {
           const executionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
           
           // Determine the action type for Discord
           const closeAction = originalSignal?.type === 'buy' ? 'BUY_CLOSED' : 'SELL_CLOSED';
           
-          console.log('📊 Sending CLOSE Discord notification with PnL:', databaseResult.pnl_percentage);
+          console.log(`📊 Sending CLOSE Discord notification with PnL: ${databaseResult.pnl_percentage}${isTestSignal ? ' (TEST MODE)' : ''}`);
           
           await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
@@ -1347,7 +1350,7 @@ export async function POST(request) {
             strategy_metadata: strategy_metadata,
             pnl_percentage: databaseResult.pnl_percentage,
             exitReason: exitReason
-          }, orderResult.order || orderResult, discordWebhookUrl);
+          }, orderResult.order || orderResult, discordWebhookToUse, isTestNotification);
           
           // Check if this is every 5th trade for free webhook
           if (discordFreeWebhookUrl) {
@@ -1398,7 +1401,7 @@ export async function POST(request) {
         let pnlPercentage = null;
         
         // Return success even if database fails
-        if (discordWebhookUrl) {
+        if (discordWebhookToUse) {
           const executionPrice = orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || orderResult.currentPrice || 0;
           
           // Try to calculate PnL even if database failed
@@ -1436,7 +1439,7 @@ export async function POST(request) {
           
           const closeAction = foundOriginalSignal?.type === 'buy' ? 'BUY_CLOSED' : 'SELL_CLOSED';
           
-          console.log('📊 Sending CLOSE Discord notification (database failed) with PnL:', calculatedPnlPercentage);
+          console.log(`📊 Sending CLOSE Discord notification (database failed) with PnL: ${calculatedPnlPercentage}${isTestSignal ? ' (TEST MODE)' : ''}`);
           
           await sendSuccessDiscordNotification({
             symbol: symbol.toUpperCase(),
@@ -1446,7 +1449,7 @@ export async function POST(request) {
             strategy_metadata: strategy_metadata,
             pnl_percentage: calculatedPnlPercentage,
             exitReason: exitReason
-          }, orderResult.order || orderResult, discordWebhookUrl);
+          }, orderResult.order || orderResult, discordWebhookToUse, isTestNotification);
           
           // Check if this is every 5th trade for free webhook
           if (discordFreeWebhookUrl) {

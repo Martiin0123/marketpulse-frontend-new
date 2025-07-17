@@ -30,36 +30,13 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
     
-    // Send sizing update to proxy
-    const proxyResponse = await fetch('https://primescope-tradeapi-production.up.railway.app/update-sizing', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.PROXY_APP_SECRET}`
-      },
-      body: JSON.stringify({
-        positionSizing: positionSizing
-      })
-    });
-    
-    if (!proxyResponse.ok) {
-      const errorText = await proxyResponse.text();
-      console.error('❌ Proxy sizing update error:', proxyResponse.status, errorText);
-      return NextResponse.json({ 
-        error: 'Failed to update position sizing on proxy',
-        details: errorText
-      }, { status: 500 });
-    }
-    
-    const proxyResult = await proxyResponse.json();
-    console.log('✅ Position sizing updated successfully on proxy:', proxyResult);
+    console.log('✅ Position sizing updated successfully in database');
     
     return NextResponse.json({
       success: true,
-      message: 'Position sizing updated successfully',
+      message: 'Position sizing updated successfully in database',
       exchangeName,
-      positionSizing: positionSizing,
-      proxy_result: proxyResult
+      positionSizing: positionSizing
     });
     
   } catch (error) {
