@@ -68,6 +68,11 @@ export default async function RootLayout({ children }: PropsWithChildren) {
             `
           }}
         />
+        {/* Trustpilot Domain Verification */}
+        <meta
+          name="trustpilot-one-time-domain-verification-id"
+          content="e4ffd8c6-503e-47e2-a79e-7a113962fb10"
+        />
       </head>
       <body className="bg-slate-900 text-white">
         <AuthProvider
