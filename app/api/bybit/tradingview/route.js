@@ -731,6 +731,8 @@ export async function POST(request) {
           // Price will be fetched from Bybit by proxy
         };
 
+        console.log('📤 Signal payload being sent to proxy:', JSON.stringify(signalPayload, null, 2));
+
         console.log('📤 Submitting direct signal to proxy:', signalPayload);
         console.log('🔑 Proxy secret available:', !!process.env.PROXY_APP_SECRET);
         
@@ -1212,8 +1214,50 @@ export async function POST(request) {
       const isTestSignal = body.test === true || body.test === 'true';
       
       try {
-        // Submit close position order via proxy (handles position validation automatically)
-        orderResult = await closeBybitPosition(bybitSymbol);
+        // Get current position sizing from database for close orders too
+        let currentSizing = 5; // Default fallback
+        try {
+          const sizingResponse = await fetch('/api/admin/get-sizing?exchange=bybit', {
+            method: 'GET'
+          });
+          
+          if (sizingResponse.ok) {
+            const sizingData = await sizingResponse.json();
+            currentSizing = sizingData.positionSizing || 5;
+            console.log('📊 Retrieved current position sizing for close order:', currentSizing);
+          } else {
+            console.log('⚠️ Could not fetch sizing for close order, using default:', currentSizing);
+          }
+        } catch (sizingError) {
+          console.log('⚠️ Error fetching sizing for close order, using default:', currentSizing);
+        }
+
+        // Submit close position order via proxy with position sizing
+        const closePayload = {
+          action: 'CLOSE',
+          symbol: bybitSymbol,
+          position_sizing: currentSizing,
+          test: isTestSignal
+        };
+
+        console.log('📤 Submitting close position to proxy:', closePayload);
+        
+        const response = await fetch('https://primescope-tradeapi-production.up.railway.app/place-order', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.PROXY_APP_SECRET}`
+          },
+          body: JSON.stringify(closePayload)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Close position failed: ${response.status} ${response.statusText} - ${errorText}`);
+        }
+
+        orderResult = await response.json();
+        console.log('📥 Close position response:', JSON.stringify(orderResult, null, 2));
       } catch (closeError) {
         console.error('❌ Failed to close position:', closeError);
         

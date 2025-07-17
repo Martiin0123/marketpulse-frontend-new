@@ -661,14 +661,7 @@ export default function AdminPage() {
   const [testAlertError, setTestAlertError] = useState<string>('');
 
   // Position sizing states
-  const [positionSizing, setPositionSizing] = useState(() => {
-    // Try to get from localStorage first, fallback to 5%
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('positionSizing');
-      return stored ? parseInt(stored, 10) : 5;
-    }
-    return 5;
-  });
+  const [positionSizing, setPositionSizing] = useState(5); // Default to 5%, will be updated from database
 
   useEffect(() => {
     const checkAuthentication = async () => {
@@ -745,6 +738,10 @@ export default function AdminPage() {
             '📊 Loaded current position sizing from database:',
             sizingData.positionSizing
           );
+          // Clear any stale localStorage value
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('positionSizing');
+          }
         } else {
           console.log(
             '⚠️ Could not fetch current sizing from database, using default'
