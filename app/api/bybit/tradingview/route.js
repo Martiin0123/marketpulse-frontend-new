@@ -1208,6 +1208,9 @@ export async function POST(request) {
     if (action.toUpperCase() === 'CLOSE') {
       console.log('📊 Submitting close position via proxy for:', bybitSymbol);
       
+      // Check if this is a test signal (from admin panel)
+      const isTestSignal = body.test === true || body.test === 'true';
+      
       try {
         // Submit close position order via proxy (handles position validation automatically)
         orderResult = await closeBybitPosition(bybitSymbol);
