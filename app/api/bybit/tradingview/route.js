@@ -3,6 +3,7 @@ import {
   closeBybitPosition, 
   convertSymbolFormat
 } from '@/utils/bybit/client'
+import { getExchangeConfig } from '@/utils/supabase/exchanges'
 
 // IMPORTANT: All trades use 10x leverage - PnL calculations are multiplied by leverage factor
 
@@ -704,13 +705,10 @@ export async function POST(request) {
         // Get current position sizing from database
         let currentSizing = 5; // Default fallback
         try {
-          const sizingResponse = await fetch('/api/admin/get-sizing?exchange=bybit', {
-            method: 'GET'
-          });
+          const exchangeConfig = await getExchangeConfig('bybit');
           
-          if (sizingResponse.ok) {
-            const sizingData = await sizingResponse.json();
-            currentSizing = sizingData.positionSizing || 5;
+          if (exchangeConfig) {
+            currentSizing = exchangeConfig.position_sizing_percentage;
             console.log('📊 Retrieved current position sizing from database:', currentSizing);
           } else {
             console.log('⚠️ Could not fetch sizing from database, using default:', currentSizing);
@@ -1217,13 +1215,10 @@ export async function POST(request) {
         // Get current position sizing from database for close orders too
         let currentSizing = 5; // Default fallback
         try {
-          const sizingResponse = await fetch('/api/admin/get-sizing?exchange=bybit', {
-            method: 'GET'
-          });
+          const exchangeConfig = await getExchangeConfig('bybit');
           
-          if (sizingResponse.ok) {
-            const sizingData = await sizingResponse.json();
-            currentSizing = sizingData.positionSizing || 5;
+          if (exchangeConfig) {
+            currentSizing = exchangeConfig.position_sizing_percentage;
             console.log('📊 Retrieved current position sizing for close order:', currentSizing);
           } else {
             console.log('⚠️ Could not fetch sizing for close order, using default:', currentSizing);
