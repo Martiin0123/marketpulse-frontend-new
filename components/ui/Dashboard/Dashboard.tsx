@@ -18,7 +18,9 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
-  X
+  X,
+  Crown,
+  ExternalLink
 } from 'lucide-react';
 import { Database } from '@/types_db';
 import BalanceChart from '@/components/ui/Charts/BalanceChart';
@@ -66,6 +68,7 @@ export default function Dashboard({
     type: 'success' | 'error';
     message: string;
   } | null>(null);
+  const [discordModalOpen, setDiscordModalOpen] = useState(false);
 
   // Use auth context data if available, otherwise fall back to props
   const user = authUser || initialUser;
@@ -239,111 +242,18 @@ export default function Dashboard({
               Welcome back, {user?.user_metadata?.full_name || user?.email}
             </p>
 
-            {/* Discord Connection Status and VIP Whitelist */}
-            <div className="flex flex-col sm:flex-row justify-center items-center space-y-3 sm:space-y-0 sm:space-x-4">
-              {user?.user_metadata?.discord_user_id ? (
-                <div className="flex items-center space-x-2">
-                  <div className="inline-flex items-center px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg">
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Connected to Discord
-                  </div>
-                  <Button
-                    onClick={async () => {
-                      if (
-                        confirm(
-                          'Are you sure you want to remove your Discord connection? This will remove your Discord role and you will no longer receive notifications.'
-                        )
-                      ) {
-                        try {
-                          const response = await fetch(
-                            '/api/discord/remove-connection',
-                            {
-                              method: 'POST'
-                            }
-                          );
-                          if (response.ok) {
-                            setNotification({
-                              type: 'success',
-                              message:
-                                'Discord connection removed successfully!'
-                            });
-                            // Refresh the page to update the UI
-                            window.location.reload();
-                          } else {
-                            throw new Error(
-                              'Failed to remove Discord connection'
-                            );
-                          }
-                        } catch (error) {
-                          setNotification({
-                            type: 'error',
-                            message: 'Failed to remove Discord connection'
-                          });
-                        }
-                      }
-                    }}
-                    variant="outline"
-                    size="sm"
-                    className="inline-flex items-center text-red-400 border-red-400 hover:bg-red-400/10"
-                  >
-                    <X className="w-3 h-3 mr-1" />
-                    Remove Discord Connection
-                  </Button>
-                  <Button
-                    onClick={async () => {
-                      try {
-                        const response = await fetch(
-                          '/api/discord/assign-role',
-                          {
-                            method: 'POST'
-                          }
-                        );
-                        if (response.ok) {
-                          setNotification({
-                            type: 'success',
-                            message: 'Discord role assigned successfully!'
-                          });
-                        } else {
-                          throw new Error('Failed to assign role');
-                        }
-                      } catch (error) {
-                        setNotification({
-                          type: 'error',
-                          message: 'Failed to assign Discord role'
-                        });
-                      }
-                    }}
-                    variant="primary"
-                    size="sm"
-                    className="inline-flex items-center"
-                  >
-                    <Target className="w-3 h-3 mr-1" />
-                    Assign Role
-                  </Button>{' '}
-                </div>
-              ) : (
-                <Button
-                  onClick={() => (window.location.href = '/api/auth/discord')}
-                  variant="secondary"
-                  size="sm"
-                  className="inline-flex items-center"
-                >
-                  <MessageCircle className="w-4 h-4 mr-2" />
-                  Connect Discord Account
-                </Button>
-              )}
-
+            {/* Discord Configuration */}
+            <div className="flex flex-col sm:flex-row justify-center items-center gap-3">
               <Button
-                onClick={() =>
-                  window.open('https://discord.gg/GDY4ZcXzes', '_blank')
-                }
-                variant="secondary"
+                onClick={() => setDiscordModalOpen(true)}
+                variant="outline"
                 size="sm"
-                className="inline-flex items-center"
+                className="inline-flex items-center border-slate-600 hover:border-slate-500 text-slate-300 hover:text-white"
               >
-                <MessageCircle className="w-4 h-4 mr-2" />
-                Join Discord Community
+                <Settings className="w-4 h-4 mr-2" />
+                Discord Settings
               </Button>
+
               {/* VIP Whitelist Button */}
               <VIPWhitelistWidget user={user} subscription={subscription} />
             </div>
@@ -604,6 +514,225 @@ export default function Dashboard({
           </div>
         )}
       </div>
+
+      {/* Discord Settings Modal */}
+      {discordModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 rounded-2xl border border-slate-700 max-w-lg w-full">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-slate-700">
+              <div className="flex items-center">
+                <div className="p-2 bg-indigo-500/20 rounded-lg mr-3">
+                  <MessageCircle className="w-5 h-5 text-indigo-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">
+                    Discord Community
+                  </h3>
+                  <p className="text-sm text-slate-400">
+                    Connect and manage your Discord access
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setDiscordModalOpen(false)}
+                className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              {/* Status Card */}
+              <div className="mb-6">
+                {user?.user_metadata?.discord_user_id ? (
+                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                    <div className="flex items-center mb-2">
+                      <CheckCircle className="w-5 h-5 text-emerald-400 mr-2" />
+                      <span className="text-emerald-400 font-medium">
+                        Connected
+                      </span>
+                    </div>
+                    <p className="text-slate-400 text-sm">
+                      Your Discord account is linked and you can receive
+                      notifications
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-slate-700/30 border border-slate-600 rounded-xl">
+                    <div className="flex items-center mb-2">
+                      <XCircle className="w-5 h-5 text-slate-400 mr-2" />
+                      <span className="text-slate-300 font-medium">
+                        Not Connected
+                      </span>
+                    </div>
+                    <p className="text-slate-400 text-sm">
+                      Connect your Discord to receive trading signals and join
+                      the community
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Main Actions */}
+              <div className="space-y-3 mb-6">
+                {user?.user_metadata?.discord_user_id ? (
+                  <>
+                    <Button
+                      onClick={() => {
+                        setDiscordModalOpen(false);
+                        window.open('https://discord.gg/GDY4ZcXzes', '_blank');
+                      }}
+                      variant="primary"
+                      size="sm"
+                      className="w-full justify-center"
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Open Discord Community
+                    </Button>
+
+                    <Button
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(
+                            '/api/discord/assign-role',
+                            {
+                              method: 'POST'
+                            }
+                          );
+                          if (response.ok) {
+                            setNotification({
+                              type: 'success',
+                              message: 'Discord role assigned successfully!'
+                            });
+                            setDiscordModalOpen(false);
+                          } else {
+                            throw new Error('Failed to assign role');
+                          }
+                        } catch (error) {
+                          setNotification({
+                            type: 'error',
+                            message: 'Failed to assign Discord role'
+                          });
+                        }
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-center"
+                    >
+                      <Target className="w-4 h-4 mr-2" />
+                      Refresh Discord Role
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    onClick={() => {
+                      setDiscordModalOpen(false);
+                      window.location.href = '/api/auth/discord';
+                    }}
+                    variant="primary"
+                    size="sm"
+                    className="w-full justify-center"
+                  >
+                    <MessageCircle className="w-4 h-4 mr-2" />
+                    Connect Discord Account
+                  </Button>
+                )}
+              </div>
+
+              {/* VIP Status */}
+              {subscription && (
+                <div className="p-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl mb-6">
+                  <div className="flex items-center mb-2">
+                    <Crown className="w-4 h-4 text-purple-400 mr-2" />
+                    <span className="text-purple-400 font-medium">
+                      VIP Member
+                    </span>
+                  </div>
+                  <p className="text-slate-400 text-sm">
+                    You have access to exclusive VIP channels and priority
+                    support
+                  </p>
+                </div>
+              )}
+
+              {/* Benefits */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium text-slate-300">
+                  What you get:
+                </h4>
+                <div className="space-y-2 text-sm text-slate-400">
+                  <div className="flex items-center">
+                    <CheckCircle className="w-4 h-4 text-emerald-400 mr-3" />
+                    <span>Real-time trading signal notifications</span>
+                  </div>
+                  <div className="flex items-center">
+                    <CheckCircle className="w-4 h-4 text-emerald-400 mr-3" />
+                    <span>Community discussions and support</span>
+                  </div>
+                  <div className="flex items-center">
+                    <CheckCircle className="w-4 h-4 text-emerald-400 mr-3" />
+                    <span>Educational content and resources</span>
+                  </div>
+                  <div className="flex items-center">
+                    <CheckCircle className="w-4 h-4 text-emerald-400 mr-3" />
+                    <span>Direct access to trading team</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Disconnect Option */}
+              {user?.user_metadata?.discord_user_id && (
+                <div className="mt-6 pt-6 border-t border-slate-700">
+                  <Button
+                    onClick={async () => {
+                      if (
+                        confirm(
+                          'Are you sure you want to disconnect your Discord account? You will no longer receive notifications.'
+                        )
+                      ) {
+                        try {
+                          const response = await fetch(
+                            '/api/discord/remove-connection',
+                            {
+                              method: 'POST'
+                            }
+                          );
+                          if (response.ok) {
+                            setNotification({
+                              type: 'success',
+                              message:
+                                'Discord connection removed successfully!'
+                            });
+                            setDiscordModalOpen(false);
+                            window.location.reload();
+                          } else {
+                            throw new Error(
+                              'Failed to remove Discord connection'
+                            );
+                          }
+                        } catch (error) {
+                          setNotification({
+                            type: 'error',
+                            message: 'Failed to remove Discord connection'
+                          });
+                        }
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-center text-red-400 border-red-400 hover:bg-red-400/10"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Disconnect Discord
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

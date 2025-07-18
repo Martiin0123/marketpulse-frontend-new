@@ -319,6 +319,38 @@ const manageSubscriptionStatusChange = async (
   const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
     expand: ['default_payment_method']
   });
+
+  // Get the product name to determine the role
+  const priceId = subscription.items.data[0].price.id;
+  const { data: priceData } = await supabase
+    .from('prices')
+    .select(`
+      products:product_id (
+        name
+      )
+    `)
+    .eq('id', priceId)
+    .single();
+
+  // Determine role based on product name
+  let role = 'free';
+  if (priceData?.products?.name) {
+    const productName = priceData.products.name.toLowerCase();
+    if (productName.includes('premium') || productName.includes('vip')) {
+      role = 'premium';
+    } else if (productName.includes('pro')) {
+      role = 'pro';
+    } else {
+      role = 'free';
+    }
+  }
+
+  console.log('Determined role for subscription:', {
+    subscriptionId,
+    productName: priceData?.products?.name,
+    role
+  });
+
   // Upsert the latest status of the subscription object.
   const subscriptionData: TablesInsert<'subscriptions'> = {
     id: subscription.id,
@@ -328,6 +360,7 @@ const manageSubscriptionStatusChange = async (
     price_id: subscription.items.data[0].price.id,
     // Subscription quantity - default to 1 if not specified
     quantity: subscription.items.data[0].quantity || 1,
+    role: role, // Set the determined role
     cancel_at_period_end: subscription.cancel_at_period_end,
     cancel_at: subscription.cancel_at
       ? toDateTime(subscription.cancel_at).toISOString()

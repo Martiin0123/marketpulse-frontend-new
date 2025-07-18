@@ -236,6 +236,37 @@ async function handleSubscriptionCreated(
       return;
     }
     
+    // Get the product name to determine the role
+    const priceId = subscription.items.data[0]?.price.id;
+    const { data: priceData } = await supabase
+      .from('prices')
+      .select(`
+        products:product_id (
+          name
+        )
+      `)
+      .eq('id', priceId)
+      .single();
+
+    // Determine role based on product name
+    let role = 'free';
+    if (priceData?.products?.name) {
+      const productName = priceData.products.name.toLowerCase();
+      if (productName.includes('premium') || productName.includes('vip')) {
+        role = 'premium';
+      } else if (productName.includes('pro')) {
+        role = 'pro';
+      } else {
+        role = 'free';
+      }
+    }
+
+    console.log('Determined role for subscription:', {
+      subscriptionId: subscription.id,
+      productName: priceData?.products?.name,
+      role
+    });
+
     // Create subscription record with idempotent upsert
     const { error } = await supabase
       .from('subscriptions')
@@ -245,6 +276,7 @@ async function handleSubscriptionCreated(
         status: subscription.status,
         price_id: subscription.items.data[0]?.price.id,
         quantity: subscription.items.data[0]?.quantity || 1,
+        role: role, // Set the determined role
         cancel_at_period_end: subscription.cancel_at_period_end,
         created: new Date(subscription.created * 1000).toISOString(),
         current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
@@ -311,11 +343,43 @@ async function handleSubscriptionUpdated(
   subscription: Stripe.Subscription,
   supabase: any
 ) {
+  // Get the product name to determine the role
+  const priceId = subscription.items.data[0]?.price.id;
+  const { data: priceData } = await supabase
+    .from('prices')
+    .select(`
+      products:product_id (
+        name
+      )
+    `)
+    .eq('id', priceId)
+    .single();
+
+  // Determine role based on product name
+  let role = 'free';
+  if (priceData?.products?.name) {
+    const productName = priceData.products.name.toLowerCase();
+    if (productName.includes('premium') || productName.includes('vip')) {
+      role = 'premium';
+    } else if (productName.includes('pro')) {
+      role = 'pro';
+    } else {
+      role = 'free';
+    }
+  }
+
+  console.log('Updated role for subscription:', {
+    subscriptionId: subscription.id,
+    productName: priceData?.products?.name,
+    role
+  });
+
   // Update subscription record
   await supabase
     .from('subscriptions')
     .update({
       status: subscription.status,
+      role: role, // Update the role
       cancel_at_period_end: subscription.cancel_at_period_end,
       current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
       current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),

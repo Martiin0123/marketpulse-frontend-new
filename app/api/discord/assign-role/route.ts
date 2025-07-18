@@ -34,14 +34,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No subscription found' }, { status: 400 });
     }
 
-    // Determine plan based on subscription role column
+    // Determine plan based on product name from subscription
     let plan = 'free';
+    let productName = null;
+    
     if (subscription.status === 'active' || subscription.status === 'trialing') {
-      // Use the role column from the subscription table
-      plan = subscription.role || 'free';
+      // Get the product name from the subscription's price
+      const { data: priceData } = await supabase
+        .from('prices')
+        .select(`
+          products:product_id (
+            name
+          )
+        `)
+        .eq('id', subscription.price_id)
+        .single();
+
+      // Determine plan based on product name
+      if (priceData?.products?.name) {
+        productName = priceData.products.name;
+        const productNameLower = productName.toLowerCase();
+        if (productNameLower.includes('premium') || productNameLower.includes('vip')) {
+          plan = 'premium';
+        } else if (productNameLower.includes('pro')) {
+          plan = 'pro';
+        } else {
+          plan = 'free';
+        }
+      }
       
-      console.log('Plan determination from role column:', {
-        role: subscription.role,
+      console.log('Plan determination from product name:', {
+        productName: productName,
         plan,
         subscriptionStatus: subscription.status,
         priceId: subscription.price_id
@@ -85,16 +108,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to assign Discord role' }, { status: 500 });
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: `Assigned ${plan} role to Discord user ${discordUserId}`,
-      debug: {
-        plan,
-        role: subscription.role,
-        priceId: subscription.price_id,
-        subscriptionStatus: subscription.status
-      }
-    });
+
 
   } catch (error) {
     console.error('Error assigning Discord role:', error);
