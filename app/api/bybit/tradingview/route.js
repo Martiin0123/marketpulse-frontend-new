@@ -859,6 +859,15 @@ export async function POST(request) {
             // Proxy opened a new position - create new signal
             const signalType = (actionTaken === 'opened_buy' || actionTaken === 'BUY') ? 'buy' : 'sell';
             const openExecutionPrice = orderResult.currentPrice || orderResult.order?.avgPrice || orderResult.order?.price || orderResult.avgPrice || 0;
+
+            // Get and increment trade counter
+            const { data: tradeCounter } = await supabase
+              .rpc('get_and_increment_trade_counter')
+              .single();
+            
+            const isEveryFifthTrade = tradeCounter && tradeCounter % 5 === 0;
+            console.log(`📊 Trade counter: ${tradeCounter}, Is 5th trade: ${isEveryFifthTrade}`);
+
             const { data: signal } = await supabase
               .from('signals')
               .insert([{
@@ -871,10 +880,23 @@ export async function POST(request) {
                 exchange: 'bybit',
                 status: 'active',
                 order_id: orderResult.order?.orderId || orderResult.orderId || null,
-                executed_at: validTimestamp
+                executed_at: validTimestamp,
+                is_fifth_trade: isEveryFifthTrade // Mark if this is a 5th trade
               }])
               .select()
               .single();
+
+            // If this is a 5th trade, send the open signal to free webhook
+            if (isEveryFifthTrade && discordFreeWebhookUrl) {
+              console.log(`🎯 Sending OPEN to free webhook for 5th trade (counter: ${tradeCounter})`);
+              await sendSuccessDiscordNotification({
+                symbol: symbol.toUpperCase(),
+                action: signalType.toUpperCase(),
+                price: parseFloat(openExecutionPrice),
+                timestamp: validTimestamp,
+                strategy_metadata: strategy_metadata
+              }, orderResult.order || orderResult, discordFreeWebhookUrl, false);
+            }
 
             databaseResult = signal;
             console.log('✅ Created new position signal:', signalType);
@@ -1394,28 +1416,18 @@ export async function POST(request) {
             exitReason: exitReason
           }, orderResult.order || orderResult, discordWebhookToUse, isTestNotification);
           
-          // Check if this is every 5th trade for free webhook
-          if (discordFreeWebhookUrl) {
-            const { count: totalSignals } = await supabase
-              .from('signals')
-              .select('*', { count: 'exact', head: true });
-            
-            const isEveryFifthTrade = totalSignals && (totalSignals % 5 === 0);
-            
-            if (isEveryFifthTrade) {
-              console.log(`🎯 Sending CLOSE to free webhook (total signals: ${totalSignals})`);
-              await sendSuccessDiscordNotification({
-                symbol: symbol.toUpperCase(),
-                action: closeAction,
-                price: parseFloat(executionPrice),
-                timestamp: validTimestamp,
-                strategy_metadata: strategy_metadata,
-                pnl_percentage: databaseResult.pnl_percentage,
-                exitReason: exitReason
-              }, orderResult.order || orderResult, discordFreeWebhookUrl, false);
-            } else {
-              console.log(`📊 Not sending CLOSE to free webhook (total signals: ${totalSignals}, not divisible by 5)`);
-            }
+            // Check if this trade was marked as a 5th trade when it was opened
+          if (discordFreeWebhookUrl && originalSignal?.is_fifth_trade) {
+            console.log(`🎯 Sending CLOSE to free webhook for 5th trade (signal ID: ${originalSignal.id})`);
+            await sendSuccessDiscordNotification({
+              symbol: symbol.toUpperCase(),
+              action: closeAction,
+              price: parseFloat(executionPrice),
+              timestamp: validTimestamp,
+              strategy_metadata: strategy_metadata,
+              pnl_percentage: databaseResult.pnl_percentage,
+              exitReason: exitReason
+            }, orderResult.order || orderResult, discordFreeWebhookUrl, false);
           }
         }
 
