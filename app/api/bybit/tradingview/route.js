@@ -820,7 +820,7 @@ export async function POST(request) {
               const exitPrice = Number(executionPrice);
               
               // Calculate PnL based on position side with 10x leverage
-              const leverage = 1; // All trades use 10x leverage
+              const leverage = 10; // All trades use 10x leverage
               if (originalSignal.type === 'buy') {
                 pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100 * leverage;
               } else if (originalSignal.type === 'sell') {
