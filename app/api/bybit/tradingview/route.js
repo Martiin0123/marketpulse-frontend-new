@@ -1412,7 +1412,7 @@ export async function POST(request) {
                 strategy_metadata: strategy_metadata,
                 pnl_percentage: databaseResult.pnl_percentage,
                 exitReason: exitReason
-              }, orderResult.order || orderResult, discordFreeWebhookUrl, true);
+              }, orderResult.order || orderResult, discordFreeWebhookUrl, false);
             } else {
               console.log(`📊 Not sending CLOSE to free webhook (total signals: ${totalSignals}, not divisible by 5)`);
             }
