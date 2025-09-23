@@ -925,7 +925,7 @@ export async function POST(request) {
               const exitPrice = Number(executionPrice);
               
                         // Calculate PnL based on position side with 10x leverage
-          const leverage = 10; // All trades use 10x leverage
+          const leverage = 1; // All trades use 1x leverage
           if (originalSignal.type === 'buy') {
             pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100 * leverage;
           } else if (originalSignal.type === 'sell') {
@@ -1354,7 +1354,7 @@ export async function POST(request) {
           
                         // Calculate PnL based on position type with 10x leverage
               let pnlPercentage;
-              const leverage = 10; // All trades use 10x leverage
+              const leverage = 1; // All trades use 1x leverage
               if (originalSignal.type === 'buy') {
                 pnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100 * leverage;
               } else if (originalSignal.type === 'sell') {
@@ -1483,7 +1483,7 @@ export async function POST(request) {
             const entryPrice = Number(foundOriginalSignal.entry_price);
             const exitPrice = Number(executionPrice);
             
-            const leverage = 10; // All trades use 10x leverage
+            const leverage = 1; // All trades use 1x leverage
             if (foundOriginalSignal.type === 'buy') {
               calculatedPnlPercentage = ((exitPrice - entryPrice) / entryPrice) * 100 * leverage;
             } else if (foundOriginalSignal.type === 'sell') {
