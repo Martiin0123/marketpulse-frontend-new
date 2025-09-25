@@ -279,8 +279,7 @@ export default function BalanceChart({
       balanceData.push({
         date: 'Initial',
         balance: runningBalance,
-        timestamp:
-          getEntryTimestamp(completedTrades[0]) - 24 * 60 * 60 * 1000, // One day before first trade
+        timestamp: getEntryTimestamp(completedTrades[0]) - 24 * 60 * 60 * 1000, // One day before first trade
         type: 'entry',
         signal: {} as Signal
       });

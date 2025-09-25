@@ -1,6 +1,7 @@
 {
   "private": true,
   "scripts": {
+    "pls": "npm run supabase:start && next dev",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -44,8 +45,9 @@
     "@amplitude/session-replay-browser": "^1.26.1",
     "@radix-ui/react-toast": "^1.1.5",
     "@stripe/stripe-js": "2.4.0",
+    "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/ssr": "^0.1.0",
-    "@supabase/supabase-js": "^2.43.4",
+    "@supabase/supabase-js": "^2.58.0",
     "@vercel/speed-insights": "^1.2.0",
     "apexcharts": "^4.7.0",
     "bybit-api": "^4.1.13",
@@ -61,6 +63,7 @@
     "micro": "^10.0.1",
     "next": "14.2.3",
     "node-polyfill-webpack-plugin": "^4.1.0",
+    "openai": "^5.23.0",
     "react": "^18.3.1",
     "react-apexcharts": "^1.7.0",
     "react-dom": "^18.3.1",

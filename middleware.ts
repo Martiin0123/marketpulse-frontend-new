@@ -25,7 +25,8 @@ export const config = {
     '/account/:path*',
     '/referrals/:path*',
     '/signals/:path*',
-    '/signin/:path*'
+    '/signin/:path*',
+    '/journal/:path*'
     // Removed '/performance-reports' to allow all authenticated users
     // Removed '/pricing' and '/' to reduce middleware calls
   ]
