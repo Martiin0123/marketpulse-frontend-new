@@ -81,6 +81,7 @@ export default function ImageTradeModal({
   const [availableTags, setAvailableTags] = useState<
     Array<{ id: string; name: string; color: string }>
   >([]);
+  const [imageData, setImageData] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const supabase = createClient();
@@ -440,6 +441,17 @@ export default function ImageTradeModal({
         throw new Error('Please upload a PNG, JPEG, GIF, or WebP image');
       }
 
+      // Convert file to base64 for storage
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      // Store the image data for later saving
+      setImageData(base64);
+
       // Create form data
       const formData = new FormData();
       formData.append('image', file);
@@ -562,7 +574,8 @@ export default function ImageTradeModal({
                 ? new Date().toISOString()
                 : null,
             notes: analyzedData.context || '',
-            balance: calculatedBalance
+            balance: calculatedBalance,
+            image_data: imageData // Store the base64 image data
           };
         })
       );

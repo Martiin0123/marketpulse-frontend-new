@@ -277,6 +277,32 @@ export default function TradeList({
                       {trade.status}
                     </span>
                   </div>
+
+                  {/* Image Preview */}
+                  {trade.image_data && (
+                    <div className="flex justify-center">
+                      <img
+                        src={trade.image_data}
+                        alt="Trade chart"
+                        className="w-16 h-12 object-cover rounded border border-slate-600 cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => {
+                          // Open image in full screen
+                          const newWindow = window.open();
+                          if (newWindow) {
+                            newWindow.document.write(`
+                              <html>
+                                <head><title>Trade Chart - ${trade.symbol}</title></head>
+                                <body style="margin:0;background:#000;display:flex;justify-content:center;align-items:center;">
+                                  <img src="${trade.image_data}" style="max-width:100%;max-height:100%;object-fit:contain;" />
+                                </body>
+                              </html>
+                            `);
+                          }
+                        }}
+                        title="Click to view full size"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Action Buttons */}

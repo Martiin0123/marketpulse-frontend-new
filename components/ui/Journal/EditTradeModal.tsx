@@ -182,6 +182,37 @@ export default function EditTradeModal({
             </div>
           )}
 
+          {/* Image Preview */}
+          {trade.image_data && (
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Chart Image
+              </label>
+              <div className="flex justify-center">
+                <img
+                  src={trade.image_data}
+                  alt="Trade chart"
+                  className="max-w-full max-h-64 object-contain rounded border border-slate-600 cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => {
+                    // Open image in full screen
+                    const newWindow = window.open();
+                    if (newWindow) {
+                      newWindow.document.write(`
+                        <html>
+                          <head><title>Trade Chart - ${trade.symbol}</title></head>
+                          <body style="margin:0;background:#000;display:flex;justify-content:center;align-items:center;">
+                            <img src="${trade.image_data}" style="max-width:100%;max-height:100%;object-fit:contain;" />
+                          </body>
+                        </html>
+                      `);
+                    }
+                  }}
+                  title="Click to view full size"
+                />
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Symbol */}
             <div>

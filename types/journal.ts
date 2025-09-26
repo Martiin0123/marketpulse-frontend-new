@@ -47,6 +47,8 @@ export interface TradeEntry {
   exit_date?: string;
   notes?: string;
   balance?: number;
+  image_url?: string;
+  image_data?: string;
   created_at: string;
   updated_at: string;
 }
