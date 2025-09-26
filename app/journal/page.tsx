@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import { Plus } from '@phosphor-icons/react';
 import AccountSelector from '@/components/ui/Journal/AccountSelector';
 import StatsCard from '@/components/ui/Journal/StatsCard';
 import TradeCalendar from '@/components/ui/Journal/TradeCalendar';
@@ -331,9 +332,10 @@ export default function JournalPage() {
           <div className="flex items-center space-x-4">
             <button
               onClick={() => setIsAddTradeModalOpen(true)}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+              className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
             >
-              📊 Add Trade
+              <Plus size={16} weight="bold" />
+              <span>Add Trade</span>
             </button>
             <AccountSelector
               accounts={accounts}
@@ -579,7 +581,8 @@ export default function JournalPage() {
         accounts={accounts.map((acc) => ({
           id: acc.id,
           name: acc.name,
-          currency: acc.currency
+          currency: acc.currency,
+          initial_balance: acc.initial_balance
         }))}
         onTradeAdded={handleTradeAdded}
       />

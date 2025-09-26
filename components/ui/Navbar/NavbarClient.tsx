@@ -18,7 +18,8 @@ import {
   DollarSign,
   FileText,
   Home,
-  Crown
+  Crown,
+  BookOpen
 } from 'lucide-react';
 
 export default function NavbarClient() {
@@ -106,6 +107,7 @@ export default function NavbarClient() {
 
   // Check if link is active
   const isActive = (path: string) => {
+    if (!pathname) return false;
     if (path === '/') return pathname === path;
     return pathname.startsWith(path);
   };
@@ -119,6 +121,12 @@ export default function NavbarClient() {
       label: 'Reports',
       icon: FileText,
       protected: false
+    },
+    {
+      href: '/journal',
+      label: 'Journal',
+      icon: BookOpen,
+      protected: true
     }
   ];
 

@@ -1,11 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  PlusIcon,
-  ViewColumnsIcon,
-  UserIcon
-} from '@heroicons/react/24/outline';
+import { ViewColumnsIcon, UserIcon } from '@heroicons/react/24/outline';
+import { Plus } from '@phosphor-icons/react';
 import type { TradingAccount } from '@/types/journal';
 import CreateAccountModal from './CreateAccountModal';
 
@@ -69,7 +66,7 @@ export default function AccountSelector({
           className="flex items-center justify-center w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
           title="Create New Account"
         >
-          <PlusIcon className="h-5 w-5" />
+          <Plus size={20} weight="bold" />
         </button>
       </div>
 

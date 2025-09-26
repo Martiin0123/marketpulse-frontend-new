@@ -221,25 +221,40 @@ export async function POST(request: NextRequest) {
       throw new Error('Failed to extract price information from chart labels');
     }
 
+    // Extract all values from the AI response
+    const symbol = extractText(analysis, 'Symbol');
+    const timeframe = extractText(analysis, 'Timeframe');
+    const date = extractText(analysis, 'Date');
+    const time = extractText(analysis, 'Time');
+    const direction = extractText(analysis, 'Direction');
+    const status = extractText(analysis, 'Status');
+    const maxRR = parseFloat(extractText(analysis, 'MaxRR')) || prices.rrAchieved;
+    const maxAdverse = extractText(analysis, 'MaxAdverse') || '0.5R';
+    const setup = extractText(analysis, 'Setup');
+    const context = extractText(analysis, 'Context');
+    
+    // Extract indicators from bullet points
+    const indicators = analysis.split('\n')
+      .filter(line => line.trim().startsWith('  •'))
+      .map(line => line.replace('  •', '').trim());
+
     const extractedData = {
-      symbol: 'NASDAQ 100 E-mini Futures',  // From chart title
-      timeframe: '1m',  // From chart timeframe selector
-      date: '2025-09-25',  // From chart timestamp
-      time: '20:28 UTC+2',  // From chart timestamp
-      direction: 'Short',  // Determined by entry vs stop loss
+      symbol: symbol || 'Unknown Symbol',
+      timeframe: timeframe || 'Unknown',
+      date: date || new Date().toISOString().split('T')[0], // Fallback to today
+      time: time || '00:00 UTC',
+      direction: direction || 'Unknown',
       entry: prices.entry,
       stopLoss: prices.stopLoss,
       slSize: prices.slSize,
       takeProfit: prices.takeProfit,
-      status: 'Closed',  // From "Closed" label
+      status: status || 'Unknown',
       rrAchieved: prices.rrAchieved,
-      maxRR: prices.rrAchieved,  // Same as achieved since trade is closed
-      maxAdverse: '0.5R',  // Default if not found
-      indicators: analysis.split('\n')
-        .filter(line => line.trim().startsWith('  •'))
-        .map(line => line.replace('  •', '').trim()),  // Extract bullet points
-      setup: 'Momentum breakout',
-      context: 'Downtrend'
+      maxRR: maxRR,
+      maxAdverse: maxAdverse,
+      indicators: indicators.length > 0 ? indicators : ['No indicators visible'],
+      setup: setup || 'Unknown setup',
+      context: context || 'Unknown context'
     };
 
     return NextResponse.json(extractedData);

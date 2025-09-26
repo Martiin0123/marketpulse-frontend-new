@@ -6,13 +6,19 @@ import {
   PhotoIcon,
   CloudArrowUpIcon
 } from '@heroicons/react/24/outline';
+import { Plus, PencilSimple } from '@phosphor-icons/react';
 import { createClient } from '@/utils/supabase/client';
 import type { TradeEntry } from '@/types/journal';
 
 interface ImageTradeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  accounts: Array<{ id: string; name: string; currency: string }>;
+  accounts: Array<{
+    id: string;
+    name: string;
+    currency: string;
+    initial_balance: number;
+  }>;
   onTradeAdded: (trade: TradeEntry) => void;
 }
 
@@ -50,6 +56,8 @@ export default function ImageTradeModal({
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedData, setEditedData] = useState<AnalyzedData | null>(null);
   const [manualData, setManualData] = useState({
     symbol: '',
     direction: 'long' as 'long' | 'short',
@@ -59,7 +67,9 @@ export default function ImageTradeModal({
     status: 'closed' as 'open' | 'closed',
     entryDate: '',
     entryTime: '',
-    notes: ''
+    notes: '',
+    pnlAmount: '',
+    balance: ''
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -105,20 +115,24 @@ export default function ImageTradeModal({
       : null;
     const size = parseFloat(manualData.size);
 
-    // Calculate P&L if trade is closed
+    // Use P&L amount from manual entry if provided, otherwise calculate from prices
     let pnlAmount = null;
-    if (manualData.status === 'closed' && exitPrice) {
+    if (manualData.pnlAmount) {
+      pnlAmount = parseFloat(manualData.pnlAmount);
+    } else if (manualData.status === 'closed' && exitPrice) {
       pnlAmount =
         manualData.direction === 'long'
           ? (exitPrice - entryPrice) * size
           : (entryPrice - exitPrice) * size;
     }
 
-    // Calculate R:R if we have both entry and exit prices
+    // Calculate R:R if we have both entry and exit prices, or use P&L amount
     const rr =
       entryPrice && exitPrice
         ? Math.abs(pnlAmount || 0) / Math.abs(entryPrice - exitPrice)
-        : null;
+        : pnlAmount && entryPrice
+          ? Math.abs(pnlAmount) / entryPrice
+          : null;
 
     const convertedData: AnalyzedData = {
       symbol: manualData.symbol,
@@ -147,6 +161,8 @@ export default function ImageTradeModal({
     setIsAnalyzing(false);
     setIsSaving(false);
     setAnalyzedData(null);
+    setEditedData(null);
+    setIsEditing(false);
     setError(null);
     setDragActive(false);
     setSelectedAccounts([]);
@@ -159,11 +175,71 @@ export default function ImageTradeModal({
       status: 'closed',
       entryDate: '',
       entryTime: '',
-      notes: ''
+      notes: '',
+      pnlAmount: '',
+      balance: ''
     });
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const handleEditToggle = () => {
+    if (!isEditing) {
+      setEditedData({ ...analyzedData! });
+    }
+    setIsEditing(!isEditing);
+  };
+
+  const handleEditChange = (
+    field: keyof AnalyzedData,
+    value: string | number | string[]
+  ) => {
+    if (editedData) {
+      setEditedData({
+        ...editedData,
+        [field]: value
+      });
+    }
+  };
+
+  const handleSaveEdit = () => {
+    if (editedData) {
+      setAnalyzedData(editedData);
+      setIsEditing(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditedData(null);
+    setIsEditing(false);
+  };
+
+  const handleManualDataChange = (field: string, value: string) => {
+    setManualData((prev) => {
+      const updated = { ...prev, [field]: value };
+
+      // Auto-calculate P&L or Balance when one changes
+      if (field === 'pnlAmount' && value && selectedAccounts.length > 0) {
+        // Get the first selected account's initial balance
+        const account = accounts.find((acc) => acc.id === selectedAccounts[0]);
+        if (account) {
+          const initialBalance = account.initial_balance || 0;
+          const pnl = parseFloat(value) || 0;
+          updated.balance = (initialBalance + pnl).toString();
+        }
+      } else if (field === 'balance' && value && selectedAccounts.length > 0) {
+        // Get the first selected account's initial balance
+        const account = accounts.find((acc) => acc.id === selectedAccounts[0]);
+        if (account) {
+          const initialBalance = account.initial_balance || 0;
+          const balance = parseFloat(value) || 0;
+          updated.pnlAmount = (balance - initialBalance).toString();
+        }
+      }
+
+      return updated;
+    });
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -697,6 +773,57 @@ export default function ImageTradeModal({
                     />
                   </div>
 
+                  {/* P&L and Balance Fields */}
+                  <div className="pt-4 border-t border-slate-600">
+                    <h4 className="text-md font-semibold text-white mb-3">
+                      P&L & Balance
+                    </h4>
+                    <p className="text-sm text-slate-400 mb-4">
+                      Enter either P&L amount or final balance (the other will
+                      be calculated automatically)
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          P&L Amount
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={manualData.pnlAmount}
+                          onChange={(e) =>
+                            handleManualDataChange('pnlAmount', e.target.value)
+                          }
+                          placeholder="e.g., 500.00"
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">
+                          Positive for profit, negative for loss
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          Final Balance
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={manualData.balance}
+                          onChange={(e) =>
+                            handleManualDataChange('balance', e.target.value)
+                          }
+                          placeholder="e.g., 10500.00"
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">
+                          Account balance after this trade
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Account Selection */}
                   <div className="pt-4 border-t border-slate-600">
                     <h4 className="text-md font-semibold text-white mb-3">
@@ -787,73 +914,274 @@ export default function ImageTradeModal({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <h4 className="text-md font-semibold text-white">
-                    Trade Details
-                  </h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-md font-semibold text-white">
+                      Trade Details
+                    </h4>
+                    <button
+                      onClick={handleEditToggle}
+                      className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-lg"
+                    >
+                      <PencilSimple size={16} weight="bold" />
+                      <span>{isEditing ? 'Cancel Edit' : 'Edit Details'}</span>
+                    </button>
+                  </div>
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-slate-400">Symbol:</span>
-                      <span className="text-white">{analyzedData.symbol}</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editedData?.symbol || ''}
+                          onChange={(e) =>
+                            handleEditChange('symbol', e.target.value)
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-white">
+                          {analyzedData.symbol}
+                        </span>
+                      )}
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Direction:</span>
-                      <span
-                        className={`font-medium ${
-                          analyzedData.direction === 'Long'
-                            ? 'text-green-400'
-                            : 'text-red-400'
-                        }`}
-                      >
-                        {analyzedData.direction}
-                      </span>
+                      {isEditing ? (
+                        <select
+                          value={editedData?.direction || ''}
+                          onChange={(e) =>
+                            handleEditChange('direction', e.target.value)
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        >
+                          <option value="Long">Long</option>
+                          <option value="Short">Short</option>
+                        </select>
+                      ) : (
+                        <span
+                          className={`font-medium ${
+                            analyzedData.direction === 'Long'
+                              ? 'text-green-400'
+                              : 'text-red-400'
+                          }`}
+                        >
+                          {analyzedData.direction}
+                        </span>
+                      )}
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Status:</span>
-                      <span
-                        className={`font-medium ${
-                          analyzedData.status === 'Closed'
-                            ? 'text-blue-400'
-                            : 'text-orange-400'
-                        }`}
-                      >
-                        {analyzedData.status}
-                      </span>
+                      {isEditing ? (
+                        <select
+                          value={editedData?.status || ''}
+                          onChange={(e) =>
+                            handleEditChange('status', e.target.value)
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        >
+                          <option value="Open">Open</option>
+                          <option value="Closed">Closed</option>
+                        </select>
+                      ) : (
+                        <span
+                          className={`font-medium ${
+                            analyzedData.status === 'Closed'
+                              ? 'text-blue-400'
+                              : 'text-orange-400'
+                          }`}
+                        >
+                          {analyzedData.status}
+                        </span>
+                      )}
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Entry Price:</span>
-                      <span className="text-white">{analyzedData.entry}</span>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          step="0.00001"
+                          value={editedData?.entry || ''}
+                          onChange={(e) =>
+                            handleEditChange(
+                              'entry',
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-white">{analyzedData.entry}</span>
+                      )}
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Exit Price:</span>
-                      <span className="text-green-400">
-                        {analyzedData.takeProfit || 'N/A'}
-                      </span>
+                      <span className="text-slate-400">Stop Loss:</span>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          step="0.00001"
+                          value={editedData?.stopLoss || ''}
+                          onChange={(e) =>
+                            handleEditChange(
+                              'stopLoss',
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-red-400">
+                          {analyzedData.stopLoss}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Take Profit:</span>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          step="0.00001"
+                          value={editedData?.takeProfit || ''}
+                          onChange={(e) =>
+                            handleEditChange(
+                              'takeProfit',
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-green-400">
+                          {analyzedData.takeProfit || 'N/A'}
+                        </span>
+                      )}
                     </div>
                   </div>
+                  {isEditing && (
+                    <div className="flex space-x-2 pt-2">
+                      <button
+                        onClick={handleSaveEdit}
+                        className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded transition-colors"
+                      >
+                        Save Changes
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        className="px-3 py-1 bg-slate-600 hover:bg-slate-700 text-white text-sm rounded transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">
                   <h4 className="text-md font-semibold text-white">
-                    Additional Info
+                    Performance
                   </h4>
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Size:</span>
-                      <span className="text-white">{analyzedData.slSize}</span>
+                      <span className="text-slate-400">R:R Achieved:</span>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editedData?.rrAchieved || ''}
+                          onChange={(e) =>
+                            handleEditChange(
+                              'rrAchieved',
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-white">
+                          {analyzedData.rrAchieved}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Max R:R:</span>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editedData?.maxRR || ''}
+                          onChange={(e) =>
+                            handleEditChange(
+                              'maxRR',
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-white">{analyzedData.maxRR}</span>
+                      )}
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Max Adverse:</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editedData?.maxAdverse || ''}
+                          onChange={(e) =>
+                            handleEditChange('maxAdverse', e.target.value)
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-orange-400">
+                          {analyzedData.maxAdverse}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Timeframe:</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editedData?.timeframe || ''}
+                          onChange={(e) =>
+                            handleEditChange('timeframe', e.target.value)
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-white">
+                          {analyzedData.timeframe}
+                        </span>
+                      )}
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Date:</span>
-                      <span className="text-white">{analyzedData.date}</span>
+                      {isEditing ? (
+                        <input
+                          type="date"
+                          value={editedData?.date || ''}
+                          onChange={(e) =>
+                            handleEditChange('date', e.target.value)
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-white">{analyzedData.date}</span>
+                      )}
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Time:</span>
-                      <span className="text-white">{analyzedData.time}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">R:R:</span>
-                      <span className="text-white">
-                        {analyzedData.rrAchieved}
-                      </span>
+                      {isEditing ? (
+                        <input
+                          type="time"
+                          value={editedData?.time || ''}
+                          onChange={(e) =>
+                            handleEditChange('time', e.target.value)
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-white">{analyzedData.time}</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -861,9 +1189,21 @@ export default function ImageTradeModal({
 
               <div className="space-y-4">
                 <h4 className="text-md font-semibold text-white">Notes</h4>
-                <p className="text-white bg-slate-800 p-3 rounded-lg">
-                  {analyzedData.context}
-                </p>
+                {isEditing ? (
+                  <textarea
+                    value={editedData?.context || ''}
+                    onChange={(e) =>
+                      handleEditChange('context', e.target.value)
+                    }
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    rows={4}
+                    placeholder="Enter trade notes..."
+                  />
+                ) : (
+                  <p className="text-white bg-slate-800 p-3 rounded-lg">
+                    {analyzedData.context}
+                  </p>
+                )}
               </div>
 
               {/* Account Selection */}
@@ -953,55 +1293,164 @@ export default function ImageTradeModal({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <h4 className="text-md font-semibold text-white">
-                    Trade Details
-                  </h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-md font-semibold text-white">
+                      Trade Details
+                    </h4>
+                    <button
+                      onClick={handleEditToggle}
+                      className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-lg"
+                    >
+                      <PencilSimple size={16} weight="bold" />
+                      <span>{isEditing ? 'Cancel Edit' : 'Edit Details'}</span>
+                    </button>
+                  </div>
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-slate-400">Symbol:</span>
-                      <span className="text-white">{analyzedData.symbol}</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editedData?.symbol || ''}
+                          onChange={(e) =>
+                            handleEditChange('symbol', e.target.value)
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-white">
+                          {analyzedData.symbol}
+                        </span>
+                      )}
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Direction:</span>
-                      <span
-                        className={`font-medium ${
-                          analyzedData.direction === 'Long'
-                            ? 'text-green-400'
-                            : 'text-red-400'
-                        }`}
-                      >
-                        {analyzedData.direction}
-                      </span>
+                      {isEditing ? (
+                        <select
+                          value={editedData?.direction || ''}
+                          onChange={(e) =>
+                            handleEditChange('direction', e.target.value)
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        >
+                          <option value="Long">Long</option>
+                          <option value="Short">Short</option>
+                        </select>
+                      ) : (
+                        <span
+                          className={`font-medium ${
+                            analyzedData.direction === 'Long'
+                              ? 'text-green-400'
+                              : 'text-red-400'
+                          }`}
+                        >
+                          {analyzedData.direction}
+                        </span>
+                      )}
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Status:</span>
-                      <span
-                        className={`font-medium ${
-                          analyzedData.status === 'Closed'
-                            ? 'text-blue-400'
-                            : 'text-orange-400'
-                        }`}
-                      >
-                        {analyzedData.status}
-                      </span>
+                      {isEditing ? (
+                        <select
+                          value={editedData?.status || ''}
+                          onChange={(e) =>
+                            handleEditChange('status', e.target.value)
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        >
+                          <option value="Open">Open</option>
+                          <option value="Closed">Closed</option>
+                        </select>
+                      ) : (
+                        <span
+                          className={`font-medium ${
+                            analyzedData.status === 'Closed'
+                              ? 'text-blue-400'
+                              : 'text-orange-400'
+                          }`}
+                        >
+                          {analyzedData.status}
+                        </span>
+                      )}
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Entry Price:</span>
-                      <span className="text-white">{analyzedData.entry}</span>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          step="0.00001"
+                          value={editedData?.entry || ''}
+                          onChange={(e) =>
+                            handleEditChange(
+                              'entry',
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-white">{analyzedData.entry}</span>
+                      )}
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Stop Loss:</span>
-                      <span className="text-red-400">
-                        {analyzedData.stopLoss}
-                      </span>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          step="0.00001"
+                          value={editedData?.stopLoss || ''}
+                          onChange={(e) =>
+                            handleEditChange(
+                              'stopLoss',
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-red-400">
+                          {analyzedData.stopLoss}
+                        </span>
+                      )}
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Take Profit:</span>
-                      <span className="text-green-400">
-                        {analyzedData.takeProfit}
-                      </span>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          step="0.00001"
+                          value={editedData?.takeProfit || ''}
+                          onChange={(e) =>
+                            handleEditChange(
+                              'takeProfit',
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-green-400">
+                          {analyzedData.takeProfit}
+                        </span>
+                      )}
                     </div>
                   </div>
+                  {isEditing && (
+                    <div className="flex space-x-2 pt-2">
+                      <button
+                        onClick={handleSaveEdit}
+                        className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded transition-colors"
+                      >
+                        Save Changes
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        className="px-3 py-1 bg-slate-600 hover:bg-slate-700 text-white text-sm rounded transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">
@@ -1011,33 +1460,107 @@ export default function ImageTradeModal({
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-slate-400">R:R Achieved:</span>
-                      <span className="text-white">
-                        {analyzedData.rrAchieved}
-                      </span>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editedData?.rrAchieved || ''}
+                          onChange={(e) =>
+                            handleEditChange(
+                              'rrAchieved',
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-white">
+                          {analyzedData.rrAchieved}
+                        </span>
+                      )}
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Max R:R:</span>
-                      <span className="text-white">{analyzedData.maxRR}</span>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editedData?.maxRR || ''}
+                          onChange={(e) =>
+                            handleEditChange(
+                              'maxRR',
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-white">{analyzedData.maxRR}</span>
+                      )}
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Max Adverse:</span>
-                      <span className="text-orange-400">
-                        {analyzedData.maxAdverse}
-                      </span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editedData?.maxAdverse || ''}
+                          onChange={(e) =>
+                            handleEditChange('maxAdverse', e.target.value)
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-orange-400">
+                          {analyzedData.maxAdverse}
+                        </span>
+                      )}
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Timeframe:</span>
-                      <span className="text-white">
-                        {analyzedData.timeframe}
-                      </span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editedData?.timeframe || ''}
+                          onChange={(e) =>
+                            handleEditChange('timeframe', e.target.value)
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-white">
+                          {analyzedData.timeframe}
+                        </span>
+                      )}
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Date:</span>
-                      <span className="text-white">{analyzedData.date}</span>
+                      {isEditing ? (
+                        <input
+                          type="date"
+                          value={editedData?.date || ''}
+                          onChange={(e) =>
+                            handleEditChange('date', e.target.value)
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-white">{analyzedData.date}</span>
+                      )}
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Time:</span>
-                      <span className="text-white">{analyzedData.time}</span>
+                      {isEditing ? (
+                        <input
+                          type="time"
+                          value={editedData?.time || ''}
+                          onChange={(e) =>
+                            handleEditChange('time', e.target.value)
+                          }
+                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                        />
+                      ) : (
+                        <span className="text-white">{analyzedData.time}</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1048,18 +1571,55 @@ export default function ImageTradeModal({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <span className="text-slate-400">Setup:</span>
-                    <p className="text-white">{analyzedData.setup}</p>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editedData?.setup || ''}
+                        onChange={(e) =>
+                          handleEditChange('setup', e.target.value)
+                        }
+                        className="w-full mt-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                      />
+                    ) : (
+                      <p className="text-white">{analyzedData.setup}</p>
+                    )}
                   </div>
                   <div>
                     <span className="text-slate-400">Context:</span>
-                    <p className="text-white">{analyzedData.context}</p>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editedData?.context || ''}
+                        onChange={(e) =>
+                          handleEditChange('context', e.target.value)
+                        }
+                        className="w-full mt-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                      />
+                    ) : (
+                      <p className="text-white">{analyzedData.context}</p>
+                    )}
                   </div>
                 </div>
                 <div>
                   <span className="text-slate-400">Indicators:</span>
-                  <p className="text-white">
-                    {analyzedData.indicators.join(', ')}
-                  </p>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editedData?.indicators?.join(', ') || ''}
+                      onChange={(e) =>
+                        handleEditChange(
+                          'indicators',
+                          e.target.value.split(',').map((s) => s.trim())
+                        )
+                      }
+                      className="w-full mt-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                      placeholder="Enter indicators separated by commas"
+                    />
+                  ) : (
+                    <p className="text-white">
+                      {analyzedData.indicators.join(', ')}
+                    </p>
+                  )}
                 </div>
               </div>
 
