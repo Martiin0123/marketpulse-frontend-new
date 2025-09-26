@@ -87,11 +87,15 @@ export default function TradeCalendar({
           const dayData = dailyMap.get(tradeDate)!;
           dayData.trades += 1;
 
-          if (trade.pnl !== null) {
-            dayData.pnl += trade.pnl;
-            if (trade.pnl > 0) {
+          if (
+            trade.pnl_amount !== null &&
+            trade.pnl_amount !== undefined &&
+            !isNaN(trade.pnl_amount)
+          ) {
+            dayData.pnl += trade.pnl_amount;
+            if (trade.pnl_amount > 0) {
               dayData.wins += 1;
-            } else if (trade.pnl < 0) {
+            } else if (trade.pnl_amount < 0) {
               dayData.losses += 1;
             }
           }
@@ -144,6 +148,9 @@ export default function TradeCalendar({
   };
 
   const formatPnl = (pnl: number) => {
+    if (isNaN(pnl) || pnl === null || pnl === undefined) {
+      return '$0';
+    }
     const sign = pnl >= 0 ? '+' : '';
     return `${sign}$${Math.abs(pnl).toLocaleString()}`;
   };

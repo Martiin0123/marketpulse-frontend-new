@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { Plus } from '@phosphor-icons/react';
+import { Plus, Gear } from '@phosphor-icons/react';
 import AccountSelector from '@/components/ui/Journal/AccountSelector';
 import StatsCard from '@/components/ui/Journal/StatsCard';
 import TradeCalendar from '@/components/ui/Journal/TradeCalendar';
@@ -12,6 +12,7 @@ import ImageTradeModal from '@/components/ui/Journal/ImageTradeModal';
 import BalanceChart from '@/components/ui/Journal/BalanceChart';
 import EnhancedMetrics from '@/components/ui/Journal/EnhancedMetrics';
 import PrimeScopeScore from '@/components/ui/Journal/PrimeScopeScore';
+import SettingsModal from '@/components/ui/Journal/SettingsModal';
 import type {
   TradingAccount,
   AccountStats,
@@ -29,6 +30,7 @@ export default function JournalPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddTradeModalOpen, setIsAddTradeModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   const supabase = createClient();
 
@@ -337,6 +339,14 @@ export default function JournalPage() {
               <Plus size={16} weight="bold" />
               <span>Add Trade</span>
             </button>
+            <button
+              onClick={() => setIsSettingsModalOpen(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors"
+              title="Tag Settings"
+            >
+              <Gear size={16} weight="bold" />
+              <span>Settings</span>
+            </button>
             <AccountSelector
               accounts={accounts}
               selectedAccount={selectedAccount}
@@ -585,6 +595,11 @@ export default function JournalPage() {
           initial_balance: acc.initial_balance
         }))}
         onTradeAdded={handleTradeAdded}
+      />
+
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
       />
     </div>
   );

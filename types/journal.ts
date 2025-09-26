@@ -39,7 +39,6 @@ export interface TradeEntry {
   side: 'long' | 'short';
   entry_price: number;
   exit_price: number;
-  quantity: number;
   pnl_percentage: number;
   pnl_amount: number;
   rr: number;
@@ -47,6 +46,7 @@ export interface TradeEntry {
   entry_date: string;
   exit_date?: string;
   notes?: string;
+  balance?: number;
   created_at: string;
   updated_at: string;
 }

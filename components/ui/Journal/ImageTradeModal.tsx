@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   XMarkIcon,
   PhotoIcon,
@@ -39,6 +39,9 @@ interface AnalyzedData {
   indicators: string[];
   setup: string;
   context: string;
+  pnlAmount: number;
+  balance: number;
+  risk: number;
 }
 
 export default function ImageTradeModal({
@@ -69,11 +72,107 @@ export default function ImageTradeModal({
     entryTime: '',
     notes: '',
     pnlAmount: '',
-    balance: ''
+    balance: '',
+    risk: ''
   });
+  const [calculatedBalance, setCalculatedBalance] = useState<number | null>(
+    null
+  );
+  const [availableTags, setAvailableTags] = useState<
+    Array<{ id: string; name: string; color: string }>
+  >([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const supabase = createClient();
+
+  // Fetch tags when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchAvailableTags();
+    }
+  }, [isOpen]);
+
+  // Function to fetch available tags
+  const fetchAvailableTags = async () => {
+    try {
+      const {
+        data: { user }
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('tags')
+        .select('id, name, color')
+        .eq('user_id', user.id)
+        .order('name');
+
+      if (error) {
+        console.error('Error fetching tags:', error);
+        return;
+      }
+
+      setAvailableTags(data || []);
+    } catch (error) {
+      console.error('Error fetching tags:', error);
+    }
+  };
+
+  // Function to get the most recent trade balance for an account
+  const getMostRecentBalance = async (accountId: string) => {
+    try {
+      const {
+        data: { user }
+      } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const { data: trades, error } = await supabase
+        .from('trade_entries')
+        .select('balance, created_at')
+        .eq('account_id', accountId)
+        .eq('user_id', user.id)
+        .not('balance', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('Error fetching recent balance:', error);
+        return null;
+      }
+
+      return trades && trades.length > 0 ? trades[0].balance : null;
+    } catch (error) {
+      console.error('Error getting recent balance:', error);
+      return null;
+    }
+  };
+
+  // Function to calculate balance based on most recent trade or initial balance
+  const calculateBalance = async (accountId: string, pnlAmount: number) => {
+    const mostRecentBalance = await getMostRecentBalance(accountId);
+    const account = accounts.find((acc) => acc.id === accountId);
+
+    if (mostRecentBalance !== null) {
+      return mostRecentBalance + pnlAmount;
+    } else if (account) {
+      return account.initial_balance + pnlAmount;
+    }
+
+    return pnlAmount; // Fallback
+  };
+
+  // Function to calculate P&L based on most recent trade balance
+  const calculatePnL = async (accountId: string, balance: number) => {
+    const mostRecentBalance = await getMostRecentBalance(accountId);
+    const account = accounts.find((acc) => acc.id === accountId);
+
+    if (mostRecentBalance !== null) {
+      return balance - mostRecentBalance;
+    } else if (account) {
+      return balance - account.initial_balance;
+    }
+
+    return balance; // Fallback
+  };
 
   const handleAccountToggle = (accountId: string) => {
     setSelectedAccounts((prev) =>
@@ -91,7 +190,7 @@ export default function ImageTradeModal({
     setSelectedAccounts([]);
   };
 
-  const handleManualSubmit = () => {
+  const handleManualSubmit = async () => {
     // Validate required fields
     if (
       !manualData.symbol ||
@@ -150,10 +249,70 @@ export default function ImageTradeModal({
       maxAdverse: 'N/A',
       indicators: ['Manual Entry'],
       setup: 'Manual Entry',
-      context: manualData.notes || 'Manually entered trade'
+      context: manualData.notes || 'Manually entered trade',
+      pnlAmount: pnlAmount || 0,
+      balance: manualData.balance
+        ? parseFloat(manualData.balance)
+        : pnlAmount
+          ? await calculateBalance(selectedAccounts[0], pnlAmount)
+          : 0,
+      risk: pnlAmount && rr && rr > 0 ? Math.abs(pnlAmount) / rr : 0
     };
 
     setAnalyzedData(convertedData);
+  };
+
+  const handleAnalyzedDataChange = async (
+    field: keyof AnalyzedData,
+    value: any
+  ) => {
+    setAnalyzedData((prev) => {
+      if (!prev) return null;
+
+      const updated = { ...prev, [field]: value };
+
+      // Auto-calculate P&L or balance based on what's provided
+      if (field === 'pnlAmount' && typeof value === 'number') {
+        // For multiple accounts, we'll use the first selected account for now
+        const selectedAccount = accounts.find((acc) =>
+          selectedAccounts.includes(acc.id)
+        );
+        if (selectedAccount) {
+          // Calculate balance based on most recent trade or initial balance
+          calculateBalance(selectedAccount.id, value).then((balance) => {
+            setCalculatedBalance(balance);
+            setAnalyzedData((prev) => (prev ? { ...prev, balance } : null));
+          });
+        }
+        // Auto-calculate risk: P&L / R:R
+        if (updated.rrAchieved && updated.rrAchieved > 0) {
+          updated.risk = Math.abs(value) / updated.rrAchieved;
+        }
+      } else if (field === 'balance' && typeof value === 'number') {
+        // When balance is manually entered, calculate P&L based on most recent balance
+        const selectedAccount = accounts.find((acc) =>
+          selectedAccounts.includes(acc.id)
+        );
+        if (selectedAccount) {
+          calculatePnL(selectedAccount.id, value).then((pnl) => {
+            setAnalyzedData((prev) =>
+              prev ? { ...prev, pnlAmount: pnl } : null
+            );
+          });
+        }
+        // Auto-calculate risk: P&L / R:R
+        if (updated.rrAchieved && updated.rrAchieved > 0) {
+          updated.risk = Math.abs(updated.pnlAmount) / updated.rrAchieved;
+        }
+      } else if (field === 'rrAchieved' && typeof value === 'number') {
+        // Auto-calculate risk: P&L / R:R
+        if (updated.pnlAmount && value > 0) {
+          updated.risk = Math.abs(updated.pnlAmount) / value;
+        }
+      }
+
+      return updated;
+    });
   };
 
   const resetModal = () => {
@@ -177,7 +336,8 @@ export default function ImageTradeModal({
       entryTime: '',
       notes: '',
       pnlAmount: '',
-      balance: ''
+      balance: '',
+      risk: ''
     });
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -377,23 +537,35 @@ export default function ImageTradeModal({
       const entryDateTime = parseDateTime(analyzedData.date, analyzedData.time);
 
       // Create trade entries for all selected accounts
-      const tradeEntries = selectedAccounts.map((accountId) => ({
-        account_id: accountId,
-        user_id: user.id,
-        symbol: analyzedData.symbol,
-        direction: analyzedData.direction.toLowerCase(),
-        entry_date: entryDateTime,
-        exit_date:
-          analyzedData.status === 'Closed' ? new Date().toISOString() : null,
-        entry_price: entryPrice,
-        exit_price: exitPrice,
-        size: 1.0, // Default size, could be made configurable
-        pnl: pnlAmount,
-        pnl_percentage: pnlPercentage,
-        rr: rr,
-        status: analyzedData.status.toLowerCase(),
-        notes: `Setup: ${analyzedData.setup}\nContext: ${analyzedData.context}\nIndicators: ${analyzedData.indicators.join(', ')}`
-      }));
+      const tradeEntries = await Promise.all(
+        selectedAccounts.map(async (accountId) => {
+          const account = accounts.find((acc) => acc.id === accountId);
+          const calculatedBalance =
+            analyzedData.balance ||
+            (pnlAmount ? await calculateBalance(accountId, pnlAmount) : null);
+
+          return {
+            account_id: accountId,
+            user_id: user.id,
+            symbol: analyzedData.symbol,
+            side: analyzedData.direction.toLowerCase(),
+            entry_price: entryPrice,
+            exit_price: exitPrice,
+            pnl_percentage: pnlPercentage,
+            pnl_amount: pnlAmount,
+            rr: rr,
+            size: 1.0, // Default size for AI analyzed trades
+            status: analyzedData.status.toLowerCase(),
+            entry_date: entryDateTime,
+            exit_date:
+              analyzedData.status === 'Closed'
+                ? new Date().toISOString()
+                : null,
+            notes: analyzedData.context || '',
+            balance: calculatedBalance
+          };
+        })
+      );
 
       const { data, error: insertError } = await supabase
         .from('trade_entries' as any)
@@ -783,7 +955,7 @@ export default function ImageTradeModal({
                       be calculated automatically)
                     </p>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">
                           P&L Amount
@@ -819,6 +991,30 @@ export default function ImageTradeModal({
                         />
                         <p className="text-xs text-slate-500 mt-1">
                           Account balance after this trade
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          Risk Amount
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm">
+                            $
+                          </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={manualData.risk}
+                            onChange={(e) =>
+                              handleManualDataChange('risk', e.target.value)
+                            }
+                            placeholder="e.g., 100.00"
+                            className="w-full pl-8 pr-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Risk amount for this trade
                         </p>
                       </div>
                     </div>
@@ -1281,367 +1477,501 @@ export default function ImageTradeModal({
 
           {inputMethod === 'image' && analyzedData && (
             <div className="space-y-6">
-              <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-green-400 mb-2">
-                  ✓ Chart Analysis Complete
-                </h3>
-                <p className="text-slate-300">
+              <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/40 rounded-xl p-6 shadow-lg">
+                <div className="flex items-center space-x-3 mb-3">
+                  <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">✓</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-green-400">
+                    Chart Analysis Complete
+                  </h3>
+                </div>
+                <p className="text-slate-200 text-sm">
                   AI has successfully extracted trade information from your
                   chart.
+                  <span className="text-green-300 font-medium">
+                    {' '}
+                    You can edit any field below.
+                  </span>
                 </p>
+              </div>
+
+              {/* P&L Highlight Section - Editable */}
+              <div className="bg-gradient-to-r from-blue-900/30 to-indigo-900/30 border border-blue-500/40 rounded-xl p-6 shadow-lg">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-lg font-bold text-blue-400">
+                    Trade Performance
+                  </h4>
+                  <div
+                    className={`px-4 py-2 rounded-full text-sm font-medium ${
+                      analyzedData.pnlAmount && analyzedData.pnlAmount > 0
+                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                        : analyzedData.pnlAmount && analyzedData.pnlAmount < 0
+                          ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                          : 'bg-slate-500/20 text-slate-400 border border-slate-500/30'
+                    }`}
+                  >
+                    {analyzedData.pnlAmount && analyzedData.pnlAmount > 0
+                      ? 'PROFIT'
+                      : analyzedData.pnlAmount && analyzedData.pnlAmount < 0
+                        ? 'LOSS'
+                        : 'BREAKEVEN'}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div>
+                    <label className="block text-slate-400 text-sm mb-2">
+                      P&L Amount
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={analyzedData.pnlAmount || ''}
+                      onChange={(e) =>
+                        handleAnalyzedDataChange(
+                          'pnlAmount',
+                          e.target.value === ''
+                            ? 0
+                            : parseFloat(e.target.value) || 0
+                        )
+                      }
+                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-sm mb-2">
+                      Account Balance
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={analyzedData.balance || ''}
+                      onChange={(e) =>
+                        handleAnalyzedDataChange(
+                          'balance',
+                          e.target.value === ''
+                            ? 0
+                            : parseFloat(e.target.value) || 0
+                        )
+                      }
+                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-sm mb-2">
+                      R:R Achieved
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={analyzedData.rrAchieved || ''}
+                      onChange={(e) =>
+                        setAnalyzedData((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                rrAchieved:
+                                  e.target.value === ''
+                                    ? 0
+                                    : parseFloat(e.target.value) || 0
+                              }
+                            : null
+                        )
+                      }
+                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-sm mb-2">
+                      Risk Amount
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-xl font-bold">
+                        $
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={
+                          analyzedData.risk ? analyzedData.risk.toFixed(2) : ''
+                        }
+                        onChange={(e) =>
+                          setAnalyzedData((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  risk: parseFloat(e.target.value) || 0
+                                }
+                              : null
+                          )
+                        }
+                        className="w-full pl-8 pr-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Auto-calculated: P&L ÷ R:R
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-md font-semibold text-white">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <h4 className="text-lg font-semibold text-white">
                       Trade Details
                     </h4>
-                    <button
-                      onClick={handleEditToggle}
-                      className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-lg"
-                    >
-                      <PencilSimple size={16} weight="bold" />
-                      <span>{isEditing ? 'Cancel Edit' : 'Edit Details'}</span>
-                    </button>
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Symbol:</span>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editedData?.symbol || ''}
-                          onChange={(e) =>
-                            handleEditChange('symbol', e.target.value)
-                          }
-                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                        />
-                      ) : (
-                        <span className="text-white">
-                          {analyzedData.symbol}
-                        </span>
-                      )}
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                        Symbol
+                      </label>
+                      <input
+                        type="text"
+                        value={analyzedData.symbol}
+                        onChange={(e) =>
+                          setAnalyzedData((prev) =>
+                            prev ? { ...prev, symbol: e.target.value } : null
+                          )
+                        }
+                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                      />
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Direction:</span>
-                      {isEditing ? (
-                        <select
-                          value={editedData?.direction || ''}
-                          onChange={(e) =>
-                            handleEditChange('direction', e.target.value)
-                          }
-                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                        >
-                          <option value="Long">Long</option>
-                          <option value="Short">Short</option>
-                        </select>
-                      ) : (
-                        <span
-                          className={`font-medium ${
-                            analyzedData.direction === 'Long'
-                              ? 'text-green-400'
-                              : 'text-red-400'
-                          }`}
-                        >
-                          {analyzedData.direction}
-                        </span>
-                      )}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                        Direction
+                      </label>
+                      <select
+                        value={analyzedData.direction}
+                        onChange={(e) =>
+                          setAnalyzedData((prev) =>
+                            prev ? { ...prev, direction: e.target.value } : null
+                          )
+                        }
+                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                      >
+                        <option value="Long">Long</option>
+                        <option value="Short">Short</option>
+                      </select>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Status:</span>
-                      {isEditing ? (
-                        <select
-                          value={editedData?.status || ''}
-                          onChange={(e) =>
-                            handleEditChange('status', e.target.value)
-                          }
-                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                        >
-                          <option value="Open">Open</option>
-                          <option value="Closed">Closed</option>
-                        </select>
-                      ) : (
-                        <span
-                          className={`font-medium ${
-                            analyzedData.status === 'Closed'
-                              ? 'text-blue-400'
-                              : 'text-orange-400'
-                          }`}
-                        >
-                          {analyzedData.status}
-                        </span>
-                      )}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                        Status
+                      </label>
+                      <select
+                        value={analyzedData.status}
+                        onChange={(e) =>
+                          setAnalyzedData((prev) =>
+                            prev ? { ...prev, status: e.target.value } : null
+                          )
+                        }
+                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                      >
+                        <option value="Open">Open</option>
+                        <option value="Closed">Closed</option>
+                      </select>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Entry Price:</span>
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          step="0.00001"
-                          value={editedData?.entry || ''}
-                          onChange={(e) =>
-                            handleEditChange(
-                              'entry',
-                              parseFloat(e.target.value) || 0
-                            )
-                          }
-                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                        />
-                      ) : (
-                        <span className="text-white">{analyzedData.entry}</span>
-                      )}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                        Entry Price
+                      </label>
+                      <input
+                        type="number"
+                        step="0.00001"
+                        value={analyzedData.entry}
+                        onChange={(e) =>
+                          setAnalyzedData((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  entry: parseFloat(e.target.value) || 0
+                                }
+                              : null
+                          )
+                        }
+                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                      />
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Stop Loss:</span>
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          step="0.00001"
-                          value={editedData?.stopLoss || ''}
-                          onChange={(e) =>
-                            handleEditChange(
-                              'stopLoss',
-                              parseFloat(e.target.value) || 0
-                            )
-                          }
-                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                        />
-                      ) : (
-                        <span className="text-red-400">
-                          {analyzedData.stopLoss}
-                        </span>
-                      )}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                        Stop Loss
+                      </label>
+                      <input
+                        type="number"
+                        step="0.00001"
+                        value={analyzedData.stopLoss}
+                        onChange={(e) =>
+                          setAnalyzedData((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  stopLoss: parseFloat(e.target.value) || 0
+                                }
+                              : null
+                          )
+                        }
+                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                      />
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Take Profit:</span>
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          step="0.00001"
-                          value={editedData?.takeProfit || ''}
-                          onChange={(e) =>
-                            handleEditChange(
-                              'takeProfit',
-                              parseFloat(e.target.value) || 0
-                            )
-                          }
-                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                        />
-                      ) : (
-                        <span className="text-green-400">
-                          {analyzedData.takeProfit}
-                        </span>
-                      )}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                        Take Profit
+                      </label>
+                      <input
+                        type="number"
+                        step="0.00001"
+                        value={analyzedData.takeProfit}
+                        onChange={(e) =>
+                          setAnalyzedData((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  takeProfit: parseFloat(e.target.value) || 0
+                                }
+                              : null
+                          )
+                        }
+                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                      />
                     </div>
                   </div>
-                  {isEditing && (
-                    <div className="flex space-x-2 pt-2">
-                      <button
-                        onClick={handleSaveEdit}
-                        className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded transition-colors"
-                      >
-                        Save Changes
-                      </button>
-                      <button
-                        onClick={handleCancelEdit}
-                        className="px-3 py-1 bg-slate-600 hover:bg-slate-700 text-white text-sm rounded transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  )}
                 </div>
 
                 <div className="space-y-4">
-                  <h4 className="text-md font-semibold text-white">
-                    Performance
-                  </h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">R:R Achieved:</span>
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={editedData?.rrAchieved || ''}
-                          onChange={(e) =>
-                            handleEditChange(
-                              'rrAchieved',
-                              parseFloat(e.target.value) || 0
-                            )
-                          }
-                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                        />
-                      ) : (
-                        <span className="text-white">
-                          {analyzedData.rrAchieved}
-                        </span>
-                      )}
+                  <div className="flex items-center space-x-2 mb-4">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                    <h4 className="text-lg font-semibold text-white">
+                      Performance Metrics
+                    </h4>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                        R:R Achieved
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={analyzedData.rrAchieved}
+                        onChange={(e) =>
+                          setAnalyzedData((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  rrAchieved: parseFloat(e.target.value) || 0
+                                }
+                              : null
+                          )
+                        }
+                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                      />
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Max R:R:</span>
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={editedData?.maxRR || ''}
-                          onChange={(e) =>
-                            handleEditChange(
-                              'maxRR',
-                              parseFloat(e.target.value) || 0
-                            )
-                          }
-                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                        />
-                      ) : (
-                        <span className="text-white">{analyzedData.maxRR}</span>
-                      )}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                        Max R:R
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={analyzedData.maxRR}
+                        onChange={(e) =>
+                          setAnalyzedData((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  maxRR: parseFloat(e.target.value) || 0
+                                }
+                              : null
+                          )
+                        }
+                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                      />
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Max Adverse:</span>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editedData?.maxAdverse || ''}
-                          onChange={(e) =>
-                            handleEditChange('maxAdverse', e.target.value)
-                          }
-                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                        />
-                      ) : (
-                        <span className="text-orange-400">
-                          {analyzedData.maxAdverse}
-                        </span>
-                      )}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                        Max Adverse
+                      </label>
+                      <input
+                        type="text"
+                        value={analyzedData.maxAdverse}
+                        onChange={(e) =>
+                          setAnalyzedData((prev) =>
+                            prev
+                              ? { ...prev, maxAdverse: e.target.value }
+                              : null
+                          )
+                        }
+                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                        placeholder="e.g., 0.5R"
+                      />
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Timeframe:</span>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editedData?.timeframe || ''}
-                          onChange={(e) =>
-                            handleEditChange('timeframe', e.target.value)
-                          }
-                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                        />
-                      ) : (
-                        <span className="text-white">
-                          {analyzedData.timeframe}
-                        </span>
-                      )}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                        Timeframe
+                      </label>
+                      <input
+                        type="text"
+                        value={analyzedData.timeframe}
+                        onChange={(e) =>
+                          setAnalyzedData((prev) =>
+                            prev ? { ...prev, timeframe: e.target.value } : null
+                          )
+                        }
+                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                      />
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Date:</span>
-                      {isEditing ? (
-                        <input
-                          type="date"
-                          value={editedData?.date || ''}
-                          onChange={(e) =>
-                            handleEditChange('date', e.target.value)
-                          }
-                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                        />
-                      ) : (
-                        <span className="text-white">{analyzedData.date}</span>
-                      )}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                        Date
+                      </label>
+                      <input
+                        type="date"
+                        value={analyzedData.date}
+                        onChange={(e) =>
+                          setAnalyzedData((prev) =>
+                            prev ? { ...prev, date: e.target.value } : null
+                          )
+                        }
+                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                      />
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Time:</span>
-                      {isEditing ? (
-                        <input
-                          type="time"
-                          value={editedData?.time || ''}
-                          onChange={(e) =>
-                            handleEditChange('time', e.target.value)
-                          }
-                          className="w-48 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                        />
-                      ) : (
-                        <span className="text-white">{analyzedData.time}</span>
-                      )}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                        Time
+                      </label>
+                      <input
+                        type="time"
+                        value={analyzedData.time}
+                        onChange={(e) =>
+                          setAnalyzedData((prev) =>
+                            prev ? { ...prev, time: e.target.value } : null
+                          )
+                        }
+                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                      />
                     </div>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-4">
-                <h4 className="text-md font-semibold text-white">Analysis</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-slate-400">Setup:</span>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={editedData?.setup || ''}
-                        onChange={(e) =>
-                          handleEditChange('setup', e.target.value)
-                        }
-                        className="w-full mt-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                      />
-                    ) : (
-                      <p className="text-white">{analyzedData.setup}</p>
-                    )}
-                  </div>
-                  <div>
-                    <span className="text-slate-400">Context:</span>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={editedData?.context || ''}
-                        onChange={(e) =>
-                          handleEditChange('context', e.target.value)
-                        }
-                        className="w-full mt-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                      />
-                    ) : (
-                      <p className="text-white">{analyzedData.context}</p>
-                    )}
-                  </div>
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                  <h4 className="text-lg font-semibold text-white">
+                    Notes & Tags
+                  </h4>
                 </div>
-                <div>
-                  <span className="text-slate-400">Indicators:</span>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={editedData?.indicators?.join(', ') || ''}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">
+                      Notes
+                    </label>
+                    <textarea
+                      value={analyzedData.context}
                       onChange={(e) =>
-                        handleEditChange(
-                          'indicators',
-                          e.target.value.split(',').map((s) => s.trim())
+                        setAnalyzedData((prev) =>
+                          prev ? { ...prev, context: e.target.value } : null
                         )
                       }
-                      className="w-full mt-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-white text-sm"
-                      placeholder="Enter indicators separated by commas"
+                      className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                      rows={3}
+                      placeholder="Enter your trade notes..."
                     />
-                  ) : (
-                    <p className="text-white">
-                      {analyzedData.indicators.join(', ')}
-                    </p>
-                  )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Tags
+                    </label>
+
+                    {/* Available Tags */}
+                    {availableTags.length > 0 && (
+                      <div className="mb-3">
+                        <p className="text-xs text-slate-400 mb-2">
+                          Click to add tags:
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {availableTags.map((tag) => (
+                            <button
+                              key={tag.id}
+                              type="button"
+                              onClick={() => {
+                                const currentTags =
+                                  analyzedData?.indicators || [];
+                                const isSelected = currentTags.includes(
+                                  tag.name
+                                );
+                                const newTags = isSelected
+                                  ? currentTags.filter((t) => t !== tag.name)
+                                  : [...currentTags, tag.name];
+
+                                setAnalyzedData((prev) =>
+                                  prev ? { ...prev, indicators: newTags } : null
+                                );
+                              }}
+                              className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 ${
+                                analyzedData?.indicators?.includes(tag.name)
+                                  ? `${tag.color} text-white shadow-lg`
+                                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                              }`}
+                            >
+                              {tag.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Manual Tag Input */}
+                    <input
+                      type="text"
+                      value={analyzedData?.indicators?.join(', ') || ''}
+                      onChange={(e) =>
+                        setAnalyzedData((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                indicators: e.target.value
+                                  .split(',')
+                                  .map((s) => s.trim())
+                              }
+                            : null
+                        )
+                      }
+                      className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                      placeholder="Or type tags separated by commas..."
+                    />
+                  </div>
                 </div>
               </div>
 
               {/* Account Selection */}
-              <div className="space-y-4 pt-4 border-t border-slate-600">
-                <h4 className="text-md font-semibold text-white">
-                  Select Accounts
-                </h4>
+              <div className="space-y-4 pt-6 border-t border-slate-600">
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-2 h-2 bg-cyan-500 rounded-full"></div>
+                  <h4 className="text-lg font-semibold text-white">
+                    Select Accounts
+                  </h4>
+                </div>
                 <p className="text-sm text-slate-400">
-                  Choose which accounts this trade should be logged to:
+                  Choose which accounts to save this trade to
                 </p>
 
                 <div className="flex space-x-2 mb-4">
                   <button
                     onClick={handleSelectAllAccounts}
-                    className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
                   >
                     Select All
                   </button>
                   <button
                     onClick={handleDeselectAllAccounts}
-                    className="px-3 py-1 text-xs bg-slate-600 hover:bg-slate-700 text-white rounded transition-colors"
+                    className="px-3 py-1 bg-slate-600 hover:bg-slate-700 text-white text-sm rounded transition-colors"
                   >
                     Deselect All
                   </button>
@@ -1649,25 +1979,34 @@ export default function ImageTradeModal({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {accounts.map((account) => (
-                    <label
+                    <div
                       key={account.id}
-                      className="flex items-center space-x-3 p-3 bg-slate-700 hover:bg-slate-600 rounded-lg cursor-pointer transition-colors"
+                      className={`p-4 border rounded-xl cursor-pointer transition-all duration-200 ${
+                        selectedAccounts.includes(account.id)
+                          ? 'border-blue-500 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 shadow-lg shadow-blue-500/20'
+                          : 'border-slate-600/50 hover:border-slate-500 hover:bg-slate-800/30'
+                      }`}
+                      onClick={() => handleAccountToggle(account.id)}
                     >
-                      <input
-                        type="checkbox"
-                        checked={selectedAccounts.includes(account.id)}
-                        onChange={() => handleAccountToggle(account.id)}
-                        className="w-4 h-4 text-blue-600 bg-slate-800 border-slate-600 rounded focus:ring-blue-500 focus:ring-2"
-                      />
-                      <div className="flex-1">
-                        <div className="text-white font-medium">
-                          {account.name}
+                      <div className="flex items-center space-x-3">
+                        <div className="flex-shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={selectedAccounts.includes(account.id)}
+                            onChange={() => handleAccountToggle(account.id)}
+                            className="w-4 h-4 text-blue-600 bg-slate-800 border-slate-600 rounded focus:ring-blue-500"
+                          />
                         </div>
-                        <div className="text-sm text-slate-400">
-                          {account.currency}
+                        <div className="flex-1">
+                          <div className="text-white font-medium">
+                            {account.name}
+                          </div>
+                          <div className="text-sm text-slate-400">
+                            {account.currency}
+                          </div>
                         </div>
                       </div>
-                    </label>
+                    </div>
                   ))}
                 </div>
 
@@ -1686,7 +2025,7 @@ export default function ImageTradeModal({
                   }}
                   className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
                 >
-                  Analyze Another
+                  Edit Details
                 </button>
                 <button
                   onClick={handleSaveTrade}

@@ -67,10 +67,14 @@ export async function POST(request: NextRequest) {
                 "- The active timeframe button is highlighted\n" +
                 "- Return exact text shown (e.g., '5m', '1h')\n\n" +
                 "DATE & TIME:\n" +
-                "- Look at the bottom scale where it lists all the times (e.g. 14:50, 15:30, etc.) and find a timestamp that is around the time of the trade (it can be rounded if you can not exactly see it), for date you can use the file name \n" +
-                "- Extract the exact date and time from this text\n" +
+                "- Look at the bottom horizontal time scale (e.g. 14:40, 14:50, 15:00, 15:10, 15:20, 15:30, etc.)\n" +
+                "- Find the time marker that corresponds to when the trade was executed (usually where the entry arrow/line is)\n" +
+                "- Use the EXACT time shown on the chart scale, not any other time references\n" +
+                "- IGNORE any timestamps in labels, tooltips, or other text - ONLY use the bottom time scale\n" +
+                "- For date, use the file name or chart title if visible, otherwise use current date\n" +
                 "- Format date as YYYY-MM-DD\n" +
-                "- Keep time exactly as shown with timezone\n\n" +
+                "- Format time as HH:MM (24-hour format, no timezone needed)\n" +
+                "- Example: If chart shows 15:30 on the time scale, use '15:30'\n\n" +
                 "PRICE LEVELS (CRITICAL - Follow these steps exactly):\n" +
                 "1. Find Entry Price:\n" +
                 "   - Look at the price scale on the right (grey box with white numbers)\n" +
@@ -89,8 +93,25 @@ export async function POST(request: NextRequest) {
                 "4. Verify Risk/Reward:\n" +
                 "   - Look for text 'Risk Reward Ratio: X.XX'\n" +
                 "   - Use this exact value\n\n" +
-                " 5. Max RR:\n" +
-                "   - Guess and look what the max RR the trade ran after Take Profit (since you have the rr of the trade already ) could be."+
+                "5. MAX R:R ANALYSIS (CRITICAL):\n" +
+                "   - Look for the ENTIRE price movement on the chart, not just the initial target box\n" +
+                "   - Find the FARTHEST point price moved in the PROFIT direction\n" +
+                "   - This often extends well beyond the initial green target box\n" +
+                "   - Use the price scale on the right to get exact price levels\n" +
+                "   - Calculate: (Max Price - Entry Price) / (Entry Price - Stop Loss Price) for LONG\n" +
+                "   - Calculate: (Entry Price - Min Price) / (Stop Loss Price - Entry Price) for SHORT\n" +
+                "   - Look for the absolute lowest/highest price on the entire chart in profit direction\n" +
+                "   - This gives you the TRUE maximum R:R the trade could have achieved\n\n" +
+                "6. MAX ADVERSE ANALYSIS (CRITICAL - AFTER 1R BREAKEVEN):\n" +
+                "   - This measures how much the trade ran AFTER reaching 1R (breakeven point)\n" +
+                "   - Find where price first reached 1R profit (breakeven point)\n" +
+                "   - Then find the furthest point price moved AGAINST you from that 1R point\n" +
+                "   - For LONG: 1R point = Entry + (Entry - Stop Loss), then find lowest point after that\n" +
+                "   - For SHORT: 1R point = Entry - (Stop Loss - Entry), then find highest point after that\n" +
+                "   - Calculate: (1R Point - Worst Point After 1R) / (Entry - Stop Loss) for LONG\n" +
+                "   - Calculate: (Worst Point After 1R - 1R Point) / (Stop Loss - Entry) for SHORT\n" +
+                "   - Express as 'X.XR' (e.g., '2.5R' means 2.5 times the risk after breakeven)\n" +
+                "   - This shows how much additional profit was given back after reaching breakeven\n\n" +
                 "IMPORTANT: List ALL price levels you see on the right scale!\n\n" +
                 "TRADE DIRECTION:\n" +
                 "- If Entry > Stop Loss = SHORT\n" +
@@ -104,6 +125,15 @@ export async function POST(request: NextRequest) {
                 "  • MA Ribbon\n" +
                 "  • VWAP\n" +
                 "- If none visible, return empty string\n\n" +
+                "VISUAL ANALYSIS FOR MAX R:R AND MAX ADVERSE:\n" +
+                "- Look at the ENTIRE chart movement, not just the initial target/stop boxes\n" +
+                "- Price often continues much further than the initial target\n" +
+                "- For MAX R:R: Find the absolute lowest/highest price on the entire chart in profit direction\n" +
+                "- For MAX ADVERSE: Find how much profit was given back AFTER reaching 1R (breakeven)\n" +
+                "- Use the price scale on the right to get exact price levels\n" +
+                "- Calculate ratios based on the risk amount (Entry - Stop Loss)\n" +
+                "- Example: Entry 24542.50, stop 24581.75 (39.25 risk), 1R point = 24503.25, if price went to 24420 then back to 24503.25, MaxAdverse = (24503.25 - 24420) / 39.25 = 2.12R\n" +
+                "- This shows how much additional profit was given back after breakeven\n\n" +
                 "SETUP & CONTEXT:\n" +
                 "- Look at price action around entry\n" +
                 "- Identify if breaking resistance/support\n" +
@@ -113,16 +143,16 @@ export async function POST(request: NextRequest) {
                 "Symbol: NASDAQ 100 E-mini Futures\n" +
                 "Timeframe: 1m\n" +
                 "Date: 2025-09-25\n" +
-                "Time: 20:28 UTC+2\n" +
+                "Time: 15:30\n" +
                 "Direction: Short\n" +
                 "Entry: 24542.50\n" +
                 "StopLoss: 24581.75\n" +
                 "SLSize: 39.25\n" +
                 "TakeProfit: 24464.25\n" +
                 "Status: Closed\n" +
-                "RR_Achieved: 2.0\n" +
-                "MaxRR: 2.0\n" +
-                "MaxAdverse: 0.5R\n" +
+                "RR_Achieved: 1.99\n" +
+                "MaxRR: 3.12\n" +
+                "MaxAdverse: 2.1R\n" +
                 "Indicators:\n" +
                 "  • Trading Sessions\n" +
                 "  • FVG/FVG\n" +
@@ -143,8 +173,8 @@ export async function POST(request: NextRequest) {
                 "TakeProfit: 1.0700\n" +
                 "Status: Closed\n" +
                 "RR_Achieved: 2\n" +
-                "MaxRR: 2\n" +
-                "MaxAdverse: 0.5R\n" +
+                "MaxRR: 2.8\n" +
+                "MaxAdverse: 1.5R\n" +
                 "Indicators: \n" +
                 "Setup: Double top\n" +
                 "Context: Range\n\n" +
@@ -192,6 +222,11 @@ export async function POST(request: NextRequest) {
       const takeProfit = parseFloat(text.match(/TakeProfit:\s*([\d.]+)/)?.[1] || '0');
       const slSize = parseFloat(text.match(/SLSize:\s*([\d.]+)/)?.[1] || '0');
       const rrAchieved = parseFloat(text.match(/RR_Achieved:\s*([\d.]+)/)?.[1] || '0');
+      const maxRR = parseFloat(text.match(/MaxRR:\s*([\d.]+)/)?.[1] || rrAchieved.toString());
+      
+      // Extract max adverse (handle both "0.5R" and "0.5" formats)
+      const maxAdverseMatch = text.match(/MaxAdverse:\s*([\d.]+)R?/);
+      const maxAdverse = maxAdverseMatch ? maxAdverseMatch[1] + 'R' : '0.5R';
 
       // Validate that we got all required values
       if (!entry || !stopLoss || !takeProfit || !slSize || !rrAchieved) {
@@ -205,7 +240,9 @@ export async function POST(request: NextRequest) {
         stopLoss,
         takeProfit,
         slSize,
-        rrAchieved
+        rrAchieved,
+        maxRR,
+        maxAdverse
       };
     };
 
@@ -228,8 +265,6 @@ export async function POST(request: NextRequest) {
     const time = extractText(analysis, 'Time');
     const direction = extractText(analysis, 'Direction');
     const status = extractText(analysis, 'Status');
-    const maxRR = parseFloat(extractText(analysis, 'MaxRR')) || prices.rrAchieved;
-    const maxAdverse = extractText(analysis, 'MaxAdverse') || '0.5R';
     const setup = extractText(analysis, 'Setup');
     const context = extractText(analysis, 'Context');
     
@@ -242,7 +277,7 @@ export async function POST(request: NextRequest) {
       symbol: symbol || 'Unknown Symbol',
       timeframe: timeframe || 'Unknown',
       date: date || new Date().toISOString().split('T')[0], // Fallback to today
-      time: time || '00:00 UTC',
+      time: time || '00:00',
       direction: direction || 'Unknown',
       entry: prices.entry,
       stopLoss: prices.stopLoss,
@@ -250,11 +285,14 @@ export async function POST(request: NextRequest) {
       takeProfit: prices.takeProfit,
       status: status || 'Unknown',
       rrAchieved: prices.rrAchieved,
-      maxRR: maxRR,
-      maxAdverse: maxAdverse,
-      indicators: indicators.length > 0 ? indicators : ['No indicators visible'],
-      setup: setup || 'Unknown setup',
-      context: context || 'Unknown context'
+      maxRR: prices.maxRR,
+      maxAdverse: prices.maxAdverse,
+      indicators: [], // No tags for AI analysis
+      setup: 'AI Analysis',
+      context: 'AI analyzed trade from chart image',
+      pnlAmount: 0,
+      balance: 0,
+      risk: 0
     };
 
     return NextResponse.json(extractedData);
