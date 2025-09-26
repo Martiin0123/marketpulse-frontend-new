@@ -6,6 +6,8 @@ import { Plus, Gear } from '@phosphor-icons/react';
 import AccountSelector from '@/components/ui/Journal/AccountSelector';
 import StatsCard from '@/components/ui/Journal/StatsCard';
 import TradeCalendar from '@/components/ui/Journal/TradeCalendar';
+import TradeList from '@/components/ui/Journal/TradeList';
+import EditTradeModal from '@/components/ui/Journal/EditTradeModal';
 import ViewSelector from '@/components/ui/Journal/ViewSelector';
 import AccountsOverview from '@/components/ui/Journal/AccountsOverview';
 import ImageTradeModal from '@/components/ui/Journal/ImageTradeModal';
@@ -27,10 +29,15 @@ export default function JournalPage() {
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [view, setView] = useState<'individual' | 'combined'>('combined');
+  const [displayMode, setDisplayMode] = useState<'calendar' | 'list'>(
+    'calendar'
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddTradeModalOpen, setIsAddTradeModalOpen] = useState(false);
+  const [isEditTradeModalOpen, setIsEditTradeModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [editingTrade, setEditingTrade] = useState<TradeEntry | null>(null);
 
   const supabase = createClient();
 
@@ -294,6 +301,64 @@ export default function JournalPage() {
     );
   };
 
+  const handleEditTrade = (trade: TradeEntry) => {
+    setEditingTrade(trade);
+    setIsEditTradeModalOpen(true);
+  };
+
+  const handleDeleteTrade = async (tradeId: string) => {
+    if (
+      !confirm(
+        'Are you sure you want to delete this trade? This action cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('trade_entries' as any)
+        .delete()
+        .eq('id', tradeId);
+
+      if (error) {
+        console.error('Error deleting trade:', error);
+        alert('Failed to delete trade');
+        return;
+      }
+
+      // Recalculate stats for all accounts since we don't know which account the trade belonged to
+      const updatedAccounts = await Promise.all(
+        accounts.map(async (account) => {
+          const stats = await calculateAccountStats(account.id);
+          return { ...account, stats };
+        })
+      );
+      setAccounts(updatedAccounts);
+    } catch (err) {
+      console.error('Error deleting trade:', err);
+      alert('Failed to delete trade');
+    }
+  };
+
+  const handleTradeUpdated = async (updatedTrade: TradeEntry) => {
+    console.log('Trade updated:', updatedTrade);
+
+    // Recalculate stats for the account that had the trade updated
+    const updatedStats = await calculateAccountStats(updatedTrade.account_id);
+
+    setAccounts((prev) =>
+      prev.map((account) =>
+        account.id === updatedTrade.account_id
+          ? { ...account, stats: updatedStats }
+          : account
+      )
+    );
+
+    setIsEditTradeModalOpen(false);
+    setEditingTrade(null);
+  };
+
   const selectedAccountData = selectedAccount
     ? accounts.find((a) => a.id === selectedAccount)
     : null;
@@ -395,11 +460,45 @@ export default function JournalPage() {
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">
-                  <TradeCalendar
-                    accountId={null}
-                    month={currentMonth}
-                    onMonthChange={setCurrentMonth}
-                  />
+                  {/* Display Mode Tabs */}
+                  <div className="flex items-center justify-center mb-6">
+                    <div className="bg-slate-800/50 rounded-lg p-1 border border-slate-700">
+                      <button
+                        onClick={() => setDisplayMode('calendar')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                          displayMode === 'calendar'
+                            ? 'bg-blue-600 text-white'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Calendar View
+                      </button>
+                      <button
+                        onClick={() => setDisplayMode('list')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                          displayMode === 'list'
+                            ? 'bg-blue-600 text-white'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Trade List
+                      </button>
+                    </div>
+                  </div>
+
+                  {displayMode === 'calendar' ? (
+                    <TradeCalendar
+                      accountId={null}
+                      month={currentMonth}
+                      onMonthChange={setCurrentMonth}
+                    />
+                  ) : (
+                    <TradeList
+                      accountId={null}
+                      onEditTrade={handleEditTrade}
+                      onDeleteTrade={handleDeleteTrade}
+                    />
+                  )}
                 </div>
                 <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
                   <h3 className="text-sm font-medium text-slate-300 mb-4">
@@ -482,11 +581,45 @@ export default function JournalPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
-                <TradeCalendar
-                  accountId={selectedAccount}
-                  month={currentMonth}
-                  onMonthChange={setCurrentMonth}
-                />
+                {/* Display Mode Tabs */}
+                <div className="flex items-center justify-center mb-6">
+                  <div className="bg-slate-800/50 rounded-lg p-1 border border-slate-700">
+                    <button
+                      onClick={() => setDisplayMode('calendar')}
+                      className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                        displayMode === 'calendar'
+                          ? 'bg-blue-600 text-white'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Calendar View
+                    </button>
+                    <button
+                      onClick={() => setDisplayMode('list')}
+                      className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                        displayMode === 'list'
+                          ? 'bg-blue-600 text-white'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Trade List
+                    </button>
+                  </div>
+                </div>
+
+                {displayMode === 'calendar' ? (
+                  <TradeCalendar
+                    accountId={selectedAccount}
+                    month={currentMonth}
+                    onMonthChange={setCurrentMonth}
+                  />
+                ) : (
+                  <TradeList
+                    accountId={selectedAccount}
+                    onEditTrade={handleEditTrade}
+                    onDeleteTrade={handleDeleteTrade}
+                  />
+                )}
               </div>
               <div className="space-y-6">
                 <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
@@ -600,6 +733,16 @@ export default function JournalPage() {
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
+      />
+
+      <EditTradeModal
+        isOpen={isEditTradeModalOpen}
+        onClose={() => {
+          setIsEditTradeModalOpen(false);
+          setEditingTrade(null);
+        }}
+        trade={editingTrade}
+        onTradeUpdated={handleTradeUpdated}
       />
     </div>
   );
