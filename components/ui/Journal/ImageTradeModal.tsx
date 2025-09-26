@@ -39,9 +39,7 @@ interface AnalyzedData {
   indicators: string[];
   setup: string;
   context: string;
-  pnlAmount: number;
-  balance: number;
-  risk: number;
+  pnlAmount: number | null;
 }
 
 export default function ImageTradeModal({
@@ -71,9 +69,7 @@ export default function ImageTradeModal({
     entryDate: '',
     entryTime: '',
     notes: '',
-    pnlAmount: '',
-    balance: '',
-    risk: ''
+    pnlAmount: ''
   });
   const [calculatedBalance, setCalculatedBalance] = useState<number | null>(
     null
@@ -91,8 +87,8 @@ export default function ImageTradeModal({
     return (
       value === 'Could not analyze' ||
       value === '' ||
-      value === 0 ||
-      value === '0'
+      value === null ||
+      value === undefined
     );
   };
 
@@ -239,7 +235,7 @@ export default function ImageTradeModal({
 
     // Use P&L amount from manual entry if provided, otherwise calculate from prices
     let pnlAmount = null;
-    if (manualData.pnlAmount) {
+    if (manualData.pnlAmount !== '') {
       pnlAmount = parseFloat(manualData.pnlAmount);
     } else if (manualData.status === 'closed' && exitPrice) {
       pnlAmount =
@@ -273,67 +269,17 @@ export default function ImageTradeModal({
       indicators: ['Manual Entry'],
       setup: 'Manual Entry',
       context: manualData.notes || 'Manually entered trade',
-      pnlAmount: pnlAmount || 0,
-      balance: manualData.balance
-        ? parseFloat(manualData.balance)
-        : pnlAmount
-          ? await calculateBalance(selectedAccounts[0], pnlAmount)
-          : 0,
-      risk: pnlAmount && rr && rr > 0 ? Math.abs(pnlAmount) / rr : 0
+      pnlAmount: pnlAmount
     };
 
     setAnalyzedData(convertedData);
   };
 
-  const handleAnalyzedDataChange = async (
-    field: keyof AnalyzedData,
-    value: any
-  ) => {
+  const handleAnalyzedDataChange = (field: keyof AnalyzedData, value: any) => {
     setAnalyzedData((prev) => {
       if (!prev) return null;
 
       const updated = { ...prev, [field]: value };
-
-      // Auto-calculate P&L or balance based on what's provided
-      if (field === 'pnlAmount' && typeof value === 'number') {
-        // For multiple accounts, we'll use the first selected account for now
-        const selectedAccount = accounts.find((acc) =>
-          selectedAccounts.includes(acc.id)
-        );
-        if (selectedAccount) {
-          // Calculate balance based on most recent trade or initial balance
-          calculateBalance(selectedAccount.id, value).then((balance) => {
-            setCalculatedBalance(balance);
-            setAnalyzedData((prev) => (prev ? { ...prev, balance } : null));
-          });
-        }
-        // Auto-calculate risk: P&L / R:R
-        if (updated.rrAchieved && updated.rrAchieved > 0) {
-          updated.risk = Math.abs(value) / updated.rrAchieved;
-        }
-      } else if (field === 'balance' && typeof value === 'number') {
-        // When balance is manually entered, calculate P&L based on most recent balance
-        const selectedAccount = accounts.find((acc) =>
-          selectedAccounts.includes(acc.id)
-        );
-        if (selectedAccount) {
-          calculatePnL(selectedAccount.id, value).then((pnl) => {
-            setAnalyzedData((prev) =>
-              prev ? { ...prev, pnlAmount: pnl } : null
-            );
-          });
-        }
-        // Auto-calculate risk: P&L / R:R
-        if (updated.rrAchieved && updated.rrAchieved > 0) {
-          updated.risk = Math.abs(updated.pnlAmount) / updated.rrAchieved;
-        }
-      } else if (field === 'rrAchieved' && typeof value === 'number') {
-        // Auto-calculate risk: P&L / R:R
-        if (updated.pnlAmount && value > 0) {
-          updated.risk = Math.abs(updated.pnlAmount) / value;
-        }
-      }
-
       return updated;
     });
   };
@@ -524,14 +470,10 @@ export default function ImageTradeModal({
       const entryPrice = analyzedData.entry;
       const exitPrice =
         analyzedData.status === 'Closed' ? analyzedData.takeProfit : null;
-      const pnlAmount =
-        analyzedData.status === 'Closed'
-          ? analyzedData.direction === 'Long'
-            ? analyzedData.takeProfit - analyzedData.entry
-            : analyzedData.entry - analyzedData.takeProfit
-          : null;
+      const pnlAmount = analyzedData.pnlAmount;
 
-      const pnlPercentage = pnlAmount ? (pnlAmount / entryPrice) * 100 : null;
+      const pnlPercentage =
+        pnlAmount !== null ? (pnlAmount / entryPrice) * 100 : null;
       const rr = analyzedData.rrAchieved;
 
       // Parse date and time safely
@@ -571,36 +513,30 @@ export default function ImageTradeModal({
       const entryDateTime = parseDateTime(analyzedData.date, analyzedData.time);
 
       // Create trade entries for all selected accounts
-      const tradeEntries = await Promise.all(
-        selectedAccounts.map(async (accountId) => {
-          const account = accounts.find((acc) => acc.id === accountId);
-          const calculatedBalance =
-            analyzedData.balance ||
-            (pnlAmount ? await calculateBalance(accountId, pnlAmount) : null);
+      const tradeEntries = selectedAccounts.map((accountId) => {
+        const account = accounts.find((acc) => acc.id === accountId);
 
-          return {
-            account_id: accountId,
-            user_id: user.id,
-            symbol: analyzedData.symbol,
-            side: analyzedData.direction.toLowerCase(),
-            entry_price: entryPrice,
-            exit_price: exitPrice,
-            pnl_percentage: pnlPercentage,
-            pnl_amount: pnlAmount,
-            rr: rr,
-            size: 1.0, // Default size for AI analyzed trades
-            status: analyzedData.status.toLowerCase(),
-            entry_date: entryDateTime,
-            exit_date:
-              analyzedData.status === 'Closed'
-                ? new Date().toISOString()
-                : null,
-            notes: analyzedData.context || '',
-            balance: calculatedBalance,
-            image_data: imageData // Store the base64 image data
-          };
-        })
-      );
+        const tradeEntry = {
+          account_id: accountId,
+          user_id: user.id,
+          symbol: analyzedData.symbol,
+          side: analyzedData.direction.toLowerCase(),
+          entry_price: entryPrice,
+          exit_price: exitPrice,
+          pnl_percentage: pnlPercentage,
+          pnl_amount: analyzedData.pnlAmount,
+          rr: rr,
+          size: 1.0, // Default size for AI analyzed trades
+          status: analyzedData.status.toLowerCase(),
+          entry_date: entryDateTime,
+          exit_date:
+            analyzedData.status === 'Closed' ? new Date().toISOString() : null,
+          notes: analyzedData.context || '',
+          image_data: imageData // Store the base64 image data
+        };
+
+        return tradeEntry;
+      });
 
       const { data, error: insertError } = await supabase
         .from('trade_entries' as any)
@@ -983,14 +919,13 @@ export default function ImageTradeModal({
                   {/* P&L and Balance Fields */}
                   <div className="pt-4 border-t border-slate-600">
                     <h4 className="text-md font-semibold text-white mb-3">
-                      P&L & Balance
+                      P&L Amount
                     </h4>
                     <p className="text-sm text-slate-400 mb-4">
-                      Enter either P&L amount or final balance (the other will
-                      be calculated automatically)
+                      Enter the profit or loss for this trade
                     </p>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">
                           P&L Amount
@@ -1006,50 +941,8 @@ export default function ImageTradeModal({
                           className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                         <p className="text-xs text-slate-500 mt-1">
-                          Positive for profit, negative for loss
-                        </p>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                          Final Balance
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={manualData.balance}
-                          onChange={(e) =>
-                            handleManualDataChange('balance', e.target.value)
-                          }
-                          placeholder="e.g., 10500.00"
-                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <p className="text-xs text-slate-500 mt-1">
-                          Account balance after this trade
-                        </p>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                          Risk Amount
-                        </label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm">
-                            $
-                          </span>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={manualData.risk}
-                            onChange={(e) =>
-                              handleManualDataChange('risk', e.target.value)
-                            }
-                            placeholder="e.g., 100.00"
-                            className="w-full pl-8 pr-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                        <p className="text-xs text-slate-500 mt-1">
-                          Risk amount for this trade
+                          Positive for profit, negative for loss, 0 for
+                          break-even
                         </p>
                       </div>
                     </div>
@@ -1539,21 +1432,25 @@ export default function ImageTradeModal({
                   </h4>
                   <div
                     className={`px-4 py-2 rounded-full text-sm font-medium ${
-                      analyzedData.pnlAmount && analyzedData.pnlAmount > 0
+                      analyzedData.pnlAmount !== null &&
+                      analyzedData.pnlAmount > 0
                         ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                        : analyzedData.pnlAmount && analyzedData.pnlAmount < 0
+                        : analyzedData.pnlAmount !== null &&
+                            analyzedData.pnlAmount < 0
                           ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                           : 'bg-slate-500/20 text-slate-400 border border-slate-500/30'
                     }`}
                   >
-                    {analyzedData.pnlAmount && analyzedData.pnlAmount > 0
+                    {analyzedData.pnlAmount !== null &&
+                    analyzedData.pnlAmount > 0
                       ? 'PROFIT'
-                      : analyzedData.pnlAmount && analyzedData.pnlAmount < 0
+                      : analyzedData.pnlAmount !== null &&
+                          analyzedData.pnlAmount < 0
                         ? 'LOSS'
                         : 'BREAKEVEN'}
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-slate-400 text-sm mb-2">
                       P&L Amount
@@ -1561,38 +1458,25 @@ export default function ImageTradeModal({
                     <input
                       type="number"
                       step="0.01"
-                      value={analyzedData.pnlAmount || ''}
+                      value={
+                        analyzedData.pnlAmount !== null
+                          ? analyzedData.pnlAmount
+                          : ''
+                      }
                       onChange={(e) =>
                         handleAnalyzedDataChange(
                           'pnlAmount',
                           e.target.value === ''
-                            ? 0
+                            ? null
                             : parseFloat(e.target.value) || 0
                         )
                       }
                       className="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
                       placeholder="0.00"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-slate-400 text-sm mb-2">
-                      Account Balance
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={analyzedData.balance || ''}
-                      onChange={(e) =>
-                        handleAnalyzedDataChange(
-                          'balance',
-                          e.target.value === ''
-                            ? 0
-                            : parseFloat(e.target.value) || 0
-                        )
-                      }
-                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
-                      placeholder="0.00"
-                    />
+                    <p className="text-xs text-slate-500 mt-1">
+                      Enter 0 for break-even trades
+                    </p>
                   </div>
                   <div>
                     <label className="block text-slate-400 text-sm mb-2">
@@ -1618,38 +1502,6 @@ export default function ImageTradeModal({
                       className="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
                       placeholder="0.00"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-slate-400 text-sm mb-2">
-                      Risk Amount
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-xl font-bold">
-                        $
-                      </span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={
-                          analyzedData.risk ? analyzedData.risk.toFixed(2) : ''
-                        }
-                        onChange={(e) =>
-                          setAnalyzedData((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  risk: parseFloat(e.target.value) || 0
-                                }
-                              : null
-                          )
-                        }
-                        className="w-full pl-8 pr-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Auto-calculated: P&L ÷ R:R
-                    </p>
                   </div>
                 </div>
               </div>

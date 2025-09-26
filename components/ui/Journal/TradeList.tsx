@@ -10,13 +10,15 @@ interface TradeListProps {
   onEditTrade: (trade: TradeEntry) => void;
   onDeleteTrade: (tradeId: string) => void;
   className?: string;
+  refreshKey?: number;
 }
 
 export default function TradeList({
   accountId,
   onEditTrade,
   onDeleteTrade,
-  className = ''
+  className = '',
+  refreshKey = 0
 }: TradeListProps) {
   const [trades, setTrades] = useState<TradeEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,7 +30,7 @@ export default function TradeList({
 
   useEffect(() => {
     fetchTrades();
-  }, [accountId]);
+  }, [accountId, refreshKey]);
 
   const fetchTrades = async () => {
     try {

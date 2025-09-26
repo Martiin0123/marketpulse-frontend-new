@@ -12,7 +12,6 @@ import ViewSelector from '@/components/ui/Journal/ViewSelector';
 import AccountsOverview from '@/components/ui/Journal/AccountsOverview';
 import ImageTradeModal from '@/components/ui/Journal/ImageTradeModal';
 import BalanceChart from '@/components/ui/Journal/BalanceChart';
-import EnhancedMetrics from '@/components/ui/Journal/EnhancedMetrics';
 import PrimeScopeScore from '@/components/ui/Journal/PrimeScopeScore';
 import SettingsModal from '@/components/ui/Journal/SettingsModal';
 import type {
@@ -38,6 +37,7 @@ export default function JournalPage() {
   const [isEditTradeModalOpen, setIsEditTradeModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [editingTrade, setEditingTrade] = useState<TradeEntry | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const supabase = createClient();
 
@@ -72,7 +72,12 @@ export default function JournalPage() {
 
       const closedTrades = (trades || []) as any[];
 
-      if (closedTrades.length === 0) {
+      // Filter out trades with null pnl_amount for stats calculation
+      const tradesWithPnL = closedTrades.filter(
+        (trade) => trade.pnl_amount !== null && trade.pnl_amount !== undefined
+      );
+
+      if (tradesWithPnL.length === 0) {
         return {
           totalTrades: 0,
           winRate: 0,
@@ -91,44 +96,46 @@ export default function JournalPage() {
       }
 
       // Calculate basic stats
-      const totalTrades = closedTrades.length;
-      const wins = closedTrades.filter((trade) => (trade.pnl || 0) > 0);
-      const losses = closedTrades.filter((trade) => (trade.pnl || 0) < 0);
+      const totalTrades = tradesWithPnL.length;
+      const wins = tradesWithPnL.filter((trade) => trade.pnl_amount > 0);
+      const losses = tradesWithPnL.filter((trade) => trade.pnl_amount < 0);
       const winRate = totalTrades > 0 ? (wins.length / totalTrades) * 100 : 0;
 
       // Calculate P&L stats
-      const totalPnL = closedTrades.reduce(
-        (sum, trade) => sum + (trade.pnl || 0),
+      const totalPnL = tradesWithPnL.reduce(
+        (sum, trade) => sum + trade.pnl_amount,
         0
       );
-      const bestTrade = Math.max(
-        ...closedTrades.map((trade) => trade.pnl || 0)
-      );
-      const worstTrade = Math.min(
-        ...closedTrades.map((trade) => trade.pnl || 0)
-      );
+      const bestTrade =
+        tradesWithPnL.length > 0
+          ? Math.max(...tradesWithPnL.map((trade) => trade.pnl_amount))
+          : 0;
+      const worstTrade =
+        tradesWithPnL.length > 0
+          ? Math.min(...tradesWithPnL.map((trade) => trade.pnl_amount))
+          : 0;
 
       // Calculate average win/loss
       const averageWin =
         wins.length > 0
-          ? wins.reduce((sum, trade) => sum + (trade.pnl || 0), 0) / wins.length
+          ? wins.reduce((sum, trade) => sum + trade.pnl_amount, 0) / wins.length
           : 0;
       const averageLoss =
         losses.length > 0
-          ? losses.reduce((sum, trade) => sum + (trade.pnl || 0), 0) /
+          ? losses.reduce((sum, trade) => sum + trade.pnl_amount, 0) /
             losses.length
           : 0;
 
       // Calculate profit factor
-      const totalWins = wins.reduce((sum, trade) => sum + (trade.pnl || 0), 0);
+      const totalWins = wins.reduce((sum, trade) => sum + trade.pnl_amount, 0);
       const totalLosses = Math.abs(
-        losses.reduce((sum, trade) => sum + (trade.pnl || 0), 0)
+        losses.reduce((sum, trade) => sum + trade.pnl_amount, 0)
       );
       const profitFactor =
         totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? 999 : 0;
 
       // Calculate R:R stats (using rr field if available, otherwise calculate from P&L)
-      const rrValues = closedTrades
+      const rrValues = tradesWithPnL
         .map((trade) => trade.rr || 0)
         .filter((rr) => rr !== 0);
       const averageRR =
@@ -143,15 +150,15 @@ export default function JournalPage() {
       let maxWinStreak = 0;
       let maxLoseStreak = 0;
 
-      for (const trade of closedTrades.sort(
+      for (const trade of tradesWithPnL.sort(
         (a, b) =>
           new Date(a.entry_date).getTime() - new Date(b.entry_date).getTime()
       )) {
-        if ((trade.pnl || 0) > 0) {
+        if (trade.pnl_amount > 0) {
           currentWinStreak++;
           currentLoseStreak = 0;
           maxWinStreak = Math.max(maxWinStreak, currentWinStreak);
-        } else if ((trade.pnl || 0) < 0) {
+        } else if (trade.pnl_amount < 0) {
           currentLoseStreak++;
           currentWinStreak = 0;
           maxLoseStreak = Math.max(maxLoseStreak, currentLoseStreak);
@@ -163,11 +170,11 @@ export default function JournalPage() {
       let peak = 0;
       let current = 0;
 
-      for (const trade of closedTrades.sort(
+      for (const trade of tradesWithPnL.sort(
         (a, b) =>
           new Date(a.entry_date).getTime() - new Date(b.entry_date).getTime()
       )) {
-        current += trade.pnl || 0;
+        current += trade.pnl_amount;
         if (current > peak) {
           peak = current;
         }
@@ -299,6 +306,9 @@ export default function JournalPage() {
           : account
       )
     );
+
+    // Trigger refresh of charts and calendar
+    setRefreshKey((prev) => prev + 1);
   };
 
   const handleEditTrade = (trade: TradeEntry) => {
@@ -354,6 +364,9 @@ export default function JournalPage() {
           : account
       )
     );
+
+    // Trigger refresh of charts and calendar
+    setRefreshKey((prev) => prev + 1);
 
     setIsEditTradeModalOpen(false);
     setEditingTrade(null);
@@ -425,17 +438,6 @@ export default function JournalPage() {
 
         {view === 'combined' || !selectedAccount ? (
           <>
-            {/* Enhanced Metrics for Combined View */}
-            <EnhancedMetrics
-              accountId={null}
-              currency={accounts.length > 0 ? accounts[0].currency : 'USD'}
-              initialBalance={accounts.reduce(
-                (sum, acc) => sum + acc.initial_balance,
-                0
-              )}
-              className="mb-8"
-            />
-
             <div className="space-y-6">
               <AccountsOverview
                 accounts={accounts}
@@ -454,246 +456,268 @@ export default function JournalPage() {
                     (sum, acc) => sum + acc.initial_balance,
                     0
                   )}
+                  refreshKey={refreshKey}
                 />
                 <PrimeScopeScore accountId={null} />
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2">
-                  {/* Display Mode Tabs */}
-                  <div className="flex items-center justify-center mb-6">
-                    <div className="bg-slate-800/50 rounded-lg p-1 border border-slate-700">
-                      <button
-                        onClick={() => setDisplayMode('calendar')}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                          displayMode === 'calendar'
-                            ? 'bg-blue-600 text-white'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        Calendar View
-                      </button>
-                      <button
-                        onClick={() => setDisplayMode('list')}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                          displayMode === 'list'
-                            ? 'bg-blue-600 text-white'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        Trade List
-                      </button>
+              {/* Comprehensive Metrics Section */}
+              <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700 mb-6">
+                <h3 className="text-lg font-semibold text-white mb-4">
+                  Trading Performance
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {/* Win Rate */}
+                  <div className="bg-slate-700/50 rounded-lg p-4">
+                    <div className="text-xs text-slate-400 mb-1">Win Rate</div>
+                    <div className="text-xl font-bold text-white">
+                      {accounts.reduce(
+                        (sum, acc) => sum + acc.stats.winRate,
+                        0
+                      ) / Math.max(accounts.length, 1)}
+                      %
                     </div>
                   </div>
 
-                  {displayMode === 'calendar' ? (
-                    <TradeCalendar
-                      accountId={null}
-                      month={currentMonth}
-                      onMonthChange={setCurrentMonth}
-                    />
-                  ) : (
-                    <TradeList
-                      accountId={null}
-                      onEditTrade={handleEditTrade}
-                      onDeleteTrade={handleDeleteTrade}
-                    />
-                  )}
-                </div>
-                <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
-                  <h3 className="text-sm font-medium text-slate-300 mb-4">
-                    Combined Performance
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-slate-400">
-                        Total Accounts
-                      </span>
-                      <span className="text-sm text-white">
-                        {accounts.length}
-                      </span>
+                  {/* Total Trades */}
+                  <div className="bg-slate-700/50 rounded-lg p-4">
+                    <div className="text-xs text-slate-400 mb-1">
+                      Total Trades
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-slate-400">
-                        Best Account
-                      </span>
-                      <span className="text-sm text-green-400">
-                        {accounts.length > 0
-                          ? accounts.reduce((best, acc) =>
-                              acc.stats.totalRR > best.stats.totalRR
-                                ? acc
-                                : best
-                            ).name
-                          : 'No accounts'}
-                      </span>
+                    <div className="text-xl font-bold text-white">
+                      {accounts.reduce(
+                        (sum, acc) => sum + acc.stats.totalTrades,
+                        0
+                      )}
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-slate-400">Average PF</span>
-                      <span className="text-sm text-white">
-                        {accounts.length > 0
-                          ? (
-                              accounts.reduce(
-                                (sum: number, acc) =>
-                                  sum + acc.stats.profitFactor,
-                                0
-                              ) / accounts.length
-                            ).toFixed(1)
-                          : '0.0'}
-                      </span>
+                  </div>
+
+                  {/* Profit Factor */}
+                  <div className="bg-slate-700/50 rounded-lg p-4">
+                    <div className="text-xs text-slate-400 mb-1">
+                      Profit Factor
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-slate-400">
-                        Max Drawdown
-                      </span>
-                      <span className="text-sm text-orange-400">
-                        {accounts.length > 0
-                          ? Math.max(
-                              ...accounts.map((acc) => acc.stats.maxDrawdown)
-                            )
-                          : 0}
-                        %
-                      </span>
+                    <div className="text-xl font-bold text-white">
+                      {accounts.reduce(
+                        (sum, acc) => sum + acc.stats.profitFactor,
+                        0
+                      ) / Math.max(accounts.length, 1)}
+                    </div>
+                  </div>
+
+                  {/* Max Drawdown */}
+                  <div className="bg-slate-700/50 rounded-lg p-4">
+                    <div className="text-xs text-slate-400 mb-1">
+                      Max Drawdown
+                    </div>
+                    <div className="text-xl font-bold text-orange-400">
+                      {Math.max(
+                        ...accounts.map((acc) => acc.stats.maxDrawdown)
+                      )}
+                      %
+                    </div>
+                  </div>
+
+                  {/* Sharpe Ratio */}
+                  <div className="bg-slate-700/50 rounded-lg p-4">
+                    <div className="text-xs text-slate-400 mb-1">
+                      Sharpe Ratio
+                    </div>
+                    <div className="text-xl font-bold text-white">
+                      {accounts.reduce(
+                        (sum, acc) => sum + acc.stats.totalPnL,
+                        0
+                      ) /
+                        Math.max(
+                          accounts.reduce(
+                            (sum, acc) => sum + acc.stats.maxDrawdown,
+                            0
+                          ),
+                          1
+                        )}
+                    </div>
+                  </div>
+
+                  {/* Best Trade */}
+                  <div className="bg-slate-700/50 rounded-lg p-4">
+                    <div className="text-xs text-slate-400 mb-1">
+                      Best Trade
+                    </div>
+                    <div className="text-xl font-bold text-green-400">
+                      {accounts.length > 0 ? accounts[0].currency : 'USD'}{' '}
+                      {Math.max(...accounts.map((acc) => acc.stats.bestTrade))}
                     </div>
                   </div>
                 </div>
               </div>
+
+              {/* Display Mode Tabs */}
+              <div className="flex items-center justify-center mb-6">
+                <div className="bg-slate-800/50 rounded-lg p-1 border border-slate-700">
+                  <button
+                    onClick={() => setDisplayMode('calendar')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      displayMode === 'calendar'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Calendar View
+                  </button>
+                  <button
+                    onClick={() => setDisplayMode('list')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      displayMode === 'list'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Trade List
+                  </button>
+                </div>
+              </div>
+
+              {/* Full Width Calendar/List */}
+              {displayMode === 'calendar' ? (
+                <TradeCalendar
+                  accountId={null}
+                  month={currentMonth}
+                  onMonthChange={setCurrentMonth}
+                  refreshKey={refreshKey}
+                />
+              ) : (
+                <TradeList
+                  accountId={null}
+                  onEditTrade={handleEditTrade}
+                  onDeleteTrade={handleDeleteTrade}
+                  refreshKey={refreshKey}
+                />
+              )}
             </div>
           </>
         ) : selectedAccountData ? (
           <>
-            {/* Enhanced Metrics for Individual Account */}
-            <EnhancedMetrics
-              accountId={selectedAccount}
-              currency={selectedAccountData.currency}
-              initialBalance={selectedAccountData.initial_balance}
-              className="mb-8"
-            />
-
             {/* Individual Account Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               <BalanceChart
                 accountId={selectedAccount}
                 currency={selectedAccountData.currency}
                 initialBalance={selectedAccountData.initial_balance}
+                refreshKey={refreshKey}
               />
               <PrimeScopeScore accountId={selectedAccount} />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                {/* Display Mode Tabs */}
-                <div className="flex items-center justify-center mb-6">
-                  <div className="bg-slate-800/50 rounded-lg p-1 border border-slate-700">
-                    <button
-                      onClick={() => setDisplayMode('calendar')}
-                      className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                        displayMode === 'calendar'
-                          ? 'bg-blue-600 text-white'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Calendar View
-                    </button>
-                    <button
-                      onClick={() => setDisplayMode('list')}
-                      className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                        displayMode === 'list'
-                          ? 'bg-blue-600 text-white'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Trade List
-                    </button>
+            {/* Comprehensive Metrics Section */}
+            <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700 mb-6">
+              <h3 className="text-lg font-semibold text-white mb-4">
+                Trading Performance
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {/* Win Rate */}
+                <div className="bg-slate-700/50 rounded-lg p-4">
+                  <div className="text-xs text-slate-400 mb-1">Win Rate</div>
+                  <div className="text-xl font-bold text-white">
+                    {selectedAccountData.stats.winRate.toFixed(1)}%
                   </div>
                 </div>
 
-                {displayMode === 'calendar' ? (
-                  <TradeCalendar
-                    accountId={selectedAccount}
-                    month={currentMonth}
-                    onMonthChange={setCurrentMonth}
-                  />
-                ) : (
-                  <TradeList
-                    accountId={selectedAccount}
-                    onEditTrade={handleEditTrade}
-                    onDeleteTrade={handleDeleteTrade}
-                  />
-                )}
-              </div>
-              <div className="space-y-6">
-                <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
-                  <h3 className="text-sm font-medium text-slate-300 mb-4">
-                    Additional Stats
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-slate-400">
-                        Total Trades
-                      </span>
-                      <span className="text-sm text-white">
-                        {selectedAccountData.stats.totalTrades}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-slate-400">Best Trade</span>
-                      <span className="text-sm text-green-400">
-                        {selectedAccountData.currency}{' '}
-                        {selectedAccountData.stats.bestTrade.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-slate-400">
-                        Worst Trade
-                      </span>
-                      <span className="text-sm text-red-400">
-                        {selectedAccountData.currency}{' '}
-                        {selectedAccountData.stats.worstTrade.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-slate-400">
-                        Average Win
-                      </span>
-                      <span className="text-sm text-green-400">
-                        {selectedAccountData.currency}{' '}
-                        {selectedAccountData.stats.averageWin.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-slate-400">
-                        Average Loss
-                      </span>
-                      <span className="text-sm text-red-400">
-                        {selectedAccountData.currency}{' '}
-                        {selectedAccountData.stats.averageLoss.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-slate-400">
-                        Max Drawdown
-                      </span>
-                      <span className="text-sm text-orange-400">
-                        {selectedAccountData.stats.maxDrawdown.toFixed(2)}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-slate-400">Win Streak</span>
-                      <span className="text-sm text-green-400">
-                        {selectedAccountData.stats.winStreak}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-slate-400">
-                        Lose Streak
-                      </span>
-                      <span className="text-sm text-red-400">
-                        {selectedAccountData.stats.loseStreak}
-                      </span>
-                    </div>
+                {/* Total Trades */}
+                <div className="bg-slate-700/50 rounded-lg p-4">
+                  <div className="text-xs text-slate-400 mb-1">
+                    Total Trades
+                  </div>
+                  <div className="text-xl font-bold text-white">
+                    {selectedAccountData.stats.totalTrades}
+                  </div>
+                </div>
+
+                {/* Profit Factor */}
+                <div className="bg-slate-700/50 rounded-lg p-4">
+                  <div className="text-xs text-slate-400 mb-1">
+                    Profit Factor
+                  </div>
+                  <div className="text-xl font-bold text-white">
+                    {selectedAccountData.stats.profitFactor.toFixed(2)}
+                  </div>
+                </div>
+
+                {/* Max Drawdown */}
+                <div className="bg-slate-700/50 rounded-lg p-4">
+                  <div className="text-xs text-slate-400 mb-1">
+                    Max Drawdown
+                  </div>
+                  <div className="text-xl font-bold text-orange-400">
+                    {selectedAccountData.stats.maxDrawdown.toFixed(2)}%
+                  </div>
+                </div>
+
+                {/* Sharpe Ratio */}
+                <div className="bg-slate-700/50 rounded-lg p-4">
+                  <div className="text-xs text-slate-400 mb-1">
+                    Sharpe Ratio
+                  </div>
+                  <div className="text-xl font-bold text-white">
+                    {(
+                      selectedAccountData.stats.totalPnL /
+                      Math.max(selectedAccountData.stats.maxDrawdown, 1)
+                    ).toFixed(2)}
+                  </div>
+                </div>
+
+                {/* Best Trade */}
+                <div className="bg-slate-700/50 rounded-lg p-4">
+                  <div className="text-xs text-slate-400 mb-1">Best Trade</div>
+                  <div className="text-xl font-bold text-green-400">
+                    {selectedAccountData.currency}{' '}
+                    {selectedAccountData.stats.bestTrade.toLocaleString()}
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="w-full">
+              {/* Display Mode Tabs */}
+              <div className="flex items-center justify-center mb-6">
+                <div className="bg-slate-800/50 rounded-lg p-1 border border-slate-700">
+                  <button
+                    onClick={() => setDisplayMode('calendar')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      displayMode === 'calendar'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Calendar View
+                  </button>
+                  <button
+                    onClick={() => setDisplayMode('list')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      displayMode === 'list'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Trade List
+                  </button>
+                </div>
+              </div>
+
+              {displayMode === 'calendar' ? (
+                <TradeCalendar
+                  accountId={selectedAccount}
+                  month={currentMonth}
+                  onMonthChange={setCurrentMonth}
+                  refreshKey={refreshKey}
+                />
+              ) : (
+                <TradeList
+                  accountId={selectedAccount}
+                  onEditTrade={handleEditTrade}
+                  onDeleteTrade={handleDeleteTrade}
+                  refreshKey={refreshKey}
+                />
+              )}
             </div>
           </>
         ) : (

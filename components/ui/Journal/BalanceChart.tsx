@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import { ChartBar, Rocket, Warning } from '@phosphor-icons/react';
 import type { TradeEntry } from '@/types/journal';
 
 interface BalanceChartProps {
@@ -9,6 +10,7 @@ interface BalanceChartProps {
   currency: string;
   initialBalance: number;
   className?: string;
+  refreshKey?: number;
 }
 
 interface BalancePoint {
@@ -21,7 +23,8 @@ export default function BalanceChart({
   accountId,
   currency,
   initialBalance,
-  className = ''
+  className = '',
+  refreshKey = 0
 }: BalanceChartProps) {
   const [balanceData, setBalanceData] = useState<BalancePoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,7 +76,7 @@ export default function BalanceChart({
           const date = new Date(trade.entry_date).toISOString().split('T')[0];
           const existing = balanceMap.get(date) || { pnl: 0, trades: 0 };
           balanceMap.set(date, {
-            pnl: existing.pnl + (trade.pnl || 0),
+            pnl: existing.pnl + (trade.pnl_amount || 0),
             trades: existing.trades + 1
           });
         });
@@ -118,7 +121,7 @@ export default function BalanceChart({
     };
 
     fetchBalanceData();
-  }, [accountId, initialBalance, supabase]);
+  }, [accountId, initialBalance, supabase, refreshKey]);
 
   if (isLoading) {
     return (
@@ -504,21 +507,21 @@ export default function BalanceChart({
             title: 'Total Trades',
             value: balanceData.reduce((sum, point) => sum + point.trades, 0),
             subtitle: '30 days',
-            icon: '📊',
+            icon: ChartBar,
             color: 'text-blue-400'
           },
           {
             title: 'Best Day',
             value: `${currency} ${Math.max(...balanceData.map((d) => d.balance - initialBalance)).toLocaleString()}`,
             subtitle: 'peak gain',
-            icon: '🚀',
+            icon: Rocket,
             color: 'text-green-400'
           },
           {
             title: 'Worst Day',
             value: `${currency} ${Math.min(...balanceData.map((d) => d.balance - initialBalance)).toLocaleString()}`,
             subtitle: 'max loss',
-            icon: '⚠️',
+            icon: Warning,
             color: 'text-red-400'
           }
         ].map((stat, index) => (
@@ -526,7 +529,9 @@ export default function BalanceChart({
             key={index}
             className="bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-xl p-5 text-center border border-slate-600/30 hover:border-slate-500/50 transition-all duration-300"
           >
-            <div className="text-2xl mb-2">{stat.icon}</div>
+            <div className="flex justify-center mb-2">
+              <stat.icon size={32} weight="fill" className={stat.color} />
+            </div>
             <div className="text-sm text-slate-400 mb-1">{stat.title}</div>
             <div className={`text-xl font-bold ${stat.color} mb-1`}>
               {stat.value}

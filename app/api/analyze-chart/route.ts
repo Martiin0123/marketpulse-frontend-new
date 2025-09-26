@@ -281,9 +281,7 @@ export async function POST(request: NextRequest) {
       indicators: [], // No tags for AI analysis
       setup: setup || 'Could not analyze',
       context: context || 'Could not analyze',
-      pnlAmount: 0,
-      balance: 0,
-      risk: 0
+      pnlAmount: null
     };
 
     return NextResponse.json(extractedData);

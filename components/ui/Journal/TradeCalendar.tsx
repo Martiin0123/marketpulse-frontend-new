@@ -9,6 +9,7 @@ interface TradeCalendarProps {
   accountId?: string | null;
   month: Date;
   onMonthChange: (month: Date) => void;
+  refreshKey?: number;
 }
 
 interface DailyTradeData {
@@ -22,7 +23,8 @@ interface DailyTradeData {
 export default function TradeCalendar({
   accountId,
   month,
-  onMonthChange
+  onMonthChange,
+  refreshKey = 0
 }: TradeCalendarProps) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [dailyData, setDailyData] = useState<DailyTradeData[]>([]);
@@ -111,7 +113,7 @@ export default function TradeCalendar({
     };
 
     fetchTradesForMonth();
-  }, [accountId, month, supabase]);
+  }, [accountId, month, supabase, refreshKey]);
 
   const monthNames = [
     'January',

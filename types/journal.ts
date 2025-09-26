@@ -4,6 +4,7 @@ export interface TradingAccount {
   name: string;
   currency: string;
   initial_balance: number;
+  fixed_risk: number;
   created_at: string;
   updated_at: string;
 }
