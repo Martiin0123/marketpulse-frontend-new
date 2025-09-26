@@ -41,6 +41,9 @@ export default function ImageTradeModal({
   accountId,
   onTradeAdded
 }: ImageTradeModalProps) {
+  const [inputMethod, setInputMethod] = useState<'image' | 'manual' | null>(
+    null
+  );
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [analyzedData, setAnalyzedData] = useState<AnalyzedData | null>(null);
@@ -49,6 +52,18 @@ export default function ImageTradeModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const supabase = createClient();
+
+  const resetModal = () => {
+    setInputMethod(null);
+    setIsAnalyzing(false);
+    setIsSaving(false);
+    setAnalyzedData(null);
+    setError(null);
+    setDragActive(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -150,20 +165,28 @@ export default function ImageTradeModal({
         try {
           // Try to parse the date and time
           let dateTimeStr = `${dateStr}T${timeStr}`;
-          
+
           // If time doesn't have timezone info, assume UTC
-          if (!timeStr.includes('+') && !timeStr.includes('Z') && !timeStr.includes('-')) {
+          if (
+            !timeStr.includes('+') &&
+            !timeStr.includes('Z') &&
+            !timeStr.includes('-')
+          ) {
             dateTimeStr += 'Z';
           }
-          
+
           const parsedDate = new Date(dateTimeStr);
-          
+
           // Check if the date is valid
           if (isNaN(parsedDate.getTime())) {
-            console.warn('Invalid date format, using current time:', dateStr, timeStr);
+            console.warn(
+              'Invalid date format, using current time:',
+              dateStr,
+              timeStr
+            );
             return new Date().toISOString();
           }
-          
+
           return parsedDate.toISOString();
         } catch (error) {
           console.warn('Date parsing error, using current time:', error);
@@ -222,11 +245,12 @@ export default function ImageTradeModal({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-slate-800 rounded-xl p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">
-            Add Trade from Chart Image
-          </h2>
+          <h2 className="text-lg font-semibold text-white">Add Trade</h2>
           <button
-            onClick={onClose}
+            onClick={() => {
+              resetModal();
+              onClose();
+            }}
             className="text-slate-400 hover:text-white transition-colors"
           >
             <XMarkIcon className="h-6 w-6" />
@@ -234,59 +258,164 @@ export default function ImageTradeModal({
         </div>
 
         <div className="space-y-6">
-          {!analyzedData && (
-            <div
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                dragActive
-                  ? 'border-blue-400 bg-blue-900/20'
-                  : 'border-slate-600 hover:border-slate-500'
-              }`}
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
-            >
-              {isAnalyzing ? (
-                <div className="space-y-4">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-                  <h3 className="text-lg font-semibold text-white">
-                    Analyzing Chart...
-                  </h3>
-                  <p className="text-slate-400">
-                    Our AI is extracting trade information from your chart
-                    image.
+          {!inputMethod && (
+            <div className="text-center space-y-4">
+              <h3 className="text-lg font-medium text-white mb-6">
+                How would you like to add your trade?
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                  onClick={() => setInputMethod('image')}
+                  className="flex flex-col items-center p-6 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+                >
+                  <PhotoIcon className="h-12 w-12 text-blue-400 mb-3" />
+                  <h4 className="text-lg font-medium text-white mb-2">
+                    Upload Chart Image
+                  </h4>
+                  <p className="text-slate-400 text-sm">
+                    AI will analyze your chart and extract trade details
                   </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <CloudArrowUpIcon className="h-16 w-16 text-slate-400 mx-auto" />
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-2">
-                      Upload Chart Screenshot
-                    </h3>
-                    <p className="text-slate-400 mb-4">
-                      Drag and drop your TradingView chart image here, or click
-                      to browse
-                    </p>
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-                    >
-                      Choose File
-                    </button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileInput}
-                      className="hidden"
+                </button>
+                <button
+                  onClick={() => setInputMethod('manual')}
+                  className="flex flex-col items-center p-6 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+                >
+                  <CloudArrowUpIcon className="h-12 w-12 text-green-400 mb-3" />
+                  <h4 className="text-lg font-medium text-white mb-2">
+                    Enter Manually
+                  </h4>
+                  <p className="text-slate-400 text-sm">
+                    Fill in trade details by hand
+                  </p>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {inputMethod === 'image' && !analyzedData && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <button
+                  onClick={() => setInputMethod(null)}
+                  className="flex items-center space-x-2 text-slate-400 hover:text-white transition-colors"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 19l-7-7 7-7"
                     />
+                  </svg>
+                  <span>Back</span>
+                </button>
+                <h3 className="text-lg font-medium text-white">
+                  Upload Chart Image
+                </h3>
+                <div></div>
+              </div>
+              <div
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                  dragActive
+                    ? 'border-blue-400 bg-blue-900/20'
+                    : 'border-slate-600 hover:border-slate-500'
+                }`}
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+              >
+                {isAnalyzing ? (
+                  <div className="space-y-4">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+                    <h3 className="text-lg font-semibold text-white">
+                      Analyzing Chart...
+                    </h3>
+                    <p className="text-slate-400">
+                      Our AI is extracting trade information from your chart
+                      image.
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500">
-                    Supported formats: PNG, JPEG, GIF, WebP
-                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    <CloudArrowUpIcon className="h-16 w-16 text-slate-400 mx-auto" />
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-2">
+                        Upload Chart Screenshot
+                      </h3>
+                      <p className="text-slate-400 mb-4">
+                        Drag and drop your TradingView chart image here, or
+                        click to browse
+                      </p>
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                      >
+                        Choose File
+                      </button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileInput}
+                        className="hidden"
+                      />
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Supported formats: PNG, JPEG, GIF, WebP
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {inputMethod === 'manual' && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <button
+                  onClick={() => setInputMethod(null)}
+                  className="flex items-center space-x-2 text-slate-400 hover:text-white transition-colors"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 19l-7-7 7-7"
+                    />
+                  </svg>
+                  <span>Back</span>
+                </button>
+                <h3 className="text-lg font-medium text-white">
+                  Enter Trade Details
+                </h3>
+                <div></div>
+              </div>
+              <div className="bg-slate-700 rounded-lg p-6">
+                <p className="text-slate-400 text-center mb-6">
+                  Manual entry form coming soon. For now, please use the image
+                  upload feature.
+                </p>
+                <div className="text-center">
+                  <button
+                    onClick={() => setInputMethod('image')}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  >
+                    Switch to Image Upload
+                  </button>
                 </div>
-              )}
+              </div>
             </div>
           )}
 

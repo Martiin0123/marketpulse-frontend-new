@@ -21,6 +21,7 @@ export interface AccountStats {
   maxDrawdown: number;
   winStreak: number;
   loseStreak: number;
+  totalPnL: number;
 }
 
 export interface DailyStats {
