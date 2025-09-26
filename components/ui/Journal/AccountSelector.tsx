@@ -30,11 +30,13 @@ export default function AccountSelector({
 
   return (
     <>
-      <div className="flex items-center space-x-4">
-        <div className="flex items-center space-x-2">
+      <div className="flex flex-col space-y-4">
+        {/* Account Switcher */}
+        <div className="flex flex-wrap gap-2">
+          {/* Combined View Button */}
           <button
             onClick={() => onViewChange('combined')}
-            className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               view === 'combined'
                 ? 'bg-blue-600 text-white'
                 : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
@@ -43,41 +45,37 @@ export default function AccountSelector({
             <ViewColumnsIcon className="h-4 w-4" />
             <span>Combined</span>
           </button>
-          <button
-            onClick={() => onViewChange('individual')}
-            className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              view === 'individual'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
-          >
-            <UserIcon className="h-4 w-4" />
-            <span>Individual</span>
-          </button>
+
+          {/* Individual Account Buttons */}
+          {accounts.map((account) => (
+            <button
+              key={account.id}
+              onClick={() => {
+                onViewChange('individual');
+                onAccountChange(account.id);
+              }}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                view === 'individual' && selectedAccount === account.id
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              }`}
+            >
+              <UserIcon className="h-4 w-4" />
+              <span>{account.name}</span>
+            </button>
+          ))}
         </div>
 
-        {view === 'individual' && (
-          <select
-            value={selectedAccount || ''}
-            onChange={(e) => onAccountChange(e.target.value || null)}
-            className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        {/* Create Account Button */}
+        <div className="flex justify-end">
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
           >
-            <option value="">Select Account</option>
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name} ({account.currency})
-              </option>
-            ))}
-          </select>
-        )}
-
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-        >
-          <PlusIcon className="h-4 w-4" />
-          <span>New Account</span>
-        </button>
+            <PlusIcon className="h-4 w-4" />
+            <span>New Account</span>
+          </button>
+        </div>
       </div>
 
       <CreateAccountModal

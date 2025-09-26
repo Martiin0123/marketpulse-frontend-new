@@ -7,7 +7,14 @@ import StatsCard from '@/components/ui/Journal/StatsCard';
 import TradeCalendar from '@/components/ui/Journal/TradeCalendar';
 import ViewSelector from '@/components/ui/Journal/ViewSelector';
 import AccountsOverview from '@/components/ui/Journal/AccountsOverview';
-import type { TradingAccount, AccountStats, DailyStats } from '@/types/journal';
+import ImageTradeModal from '@/components/ui/Journal/ImageTradeModal';
+import AIAnalyzeModal from '@/components/ui/Journal/AIAnalyzeModal';
+import type {
+  TradingAccount,
+  AccountStats,
+  DailyStats,
+  TradeEntry
+} from '@/types/journal';
 
 const mockDailyStats: DailyStats[] = [
   {
@@ -17,7 +24,6 @@ const mockDailyStats: DailyStats[] = [
     wins: 2,
     losses: 1
   }
-  // Add more daily stats...
 ];
 
 export default function JournalPage() {
@@ -29,6 +35,8 @@ export default function JournalPage() {
   const [view, setView] = useState<'individual' | 'combined'>('combined');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAddTradeModalOpen, setIsAddTradeModalOpen] = useState(false);
+  const [isAIAnalyzeModalOpen, setIsAIAnalyzeModalOpen] = useState(false);
 
   const supabase = createClient();
 
@@ -44,37 +52,40 @@ export default function JournalPage() {
           return;
         }
 
-        // For now, return empty array until the migration is run
-        // TODO: Uncomment when trading_accounts table is created
-        // const { data: accounts, error: accountsError } = await supabase
-        //   .from('trading_accounts')
-        //   .select('*')
-        //   .eq('user_id', user.id)
-        //   .order('created_at', { ascending: false });
+        // Enable Supabase integration
+        const { data: accounts, error: accountsError } = await supabase
+          .from('trading_accounts' as any)
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
 
-        // if (accountsError) throw accountsError;
-        const accounts: TradingAccount[] = [];
-
-        setAccounts(
-          (accounts || []).map((account: TradingAccount) => ({
-            ...account,
-            stats: {
-              totalTrades: 0,
-              winRate: 0,
-              averageRR: 0,
-              totalRR: 0,
-              bestTrade: 0,
-              worstTrade: 0,
-              profitFactor: 0,
-              averageWin: 0,
-              averageLoss: 0,
-              maxDrawdown: 0,
-              winStreak: 0,
-              loseStreak: 0
-            }
-          }))
-        );
+        if (accountsError) {
+          console.error('Error fetching accounts:', accountsError);
+          setError(`Database error: ${accountsError.message}`);
+          setAccounts([]);
+        } else {
+          setAccounts(
+            (accounts || []).map((account: any) => ({
+              ...account,
+              stats: {
+                totalTrades: 0,
+                winRate: 0,
+                averageRR: 0,
+                totalRR: 0,
+                bestTrade: 0,
+                worstTrade: 0,
+                profitFactor: 0,
+                averageWin: 0,
+                averageLoss: 0,
+                maxDrawdown: 0,
+                winStreak: 0,
+                loseStreak: 0
+              }
+            }))
+          );
+        }
       } catch (err) {
+        console.error('Error in fetchAccounts:', err);
         setError(
           err instanceof Error ? err.message : 'Failed to load accounts'
         );
@@ -88,26 +99,44 @@ export default function JournalPage() {
   }, [supabase]);
 
   const handleAccountCreated = (account: TradingAccount) => {
-    setAccounts((prev) => [
-      {
-        ...account,
-        stats: {
-          totalTrades: 0,
-          winRate: 0,
-          averageRR: 0,
-          totalRR: 0,
-          bestTrade: 0,
-          worstTrade: 0,
-          profitFactor: 0,
-          averageWin: 0,
-          averageLoss: 0,
-          maxDrawdown: 0,
-          winStreak: 0,
-          loseStreak: 0
-        }
-      },
-      ...prev
-    ]);
+    const newAccount = {
+      ...account,
+      stats: {
+        totalTrades: 0,
+        winRate: 0,
+        averageRR: 0,
+        totalRR: 0,
+        bestTrade: 0,
+        worstTrade: 0,
+        profitFactor: 0,
+        averageWin: 0,
+        averageLoss: 0,
+        maxDrawdown: 0,
+        winStreak: 0,
+        loseStreak: 0
+      }
+    };
+
+    setAccounts((prev) => [newAccount, ...prev]);
+
+    // Auto-select the new account if switching to individual view
+    if (view === 'individual') {
+      setSelectedAccount(account.id);
+    }
+  };
+
+  const handleViewChange = (newView: 'individual' | 'combined') => {
+    setView(newView);
+
+    // Clear selection when switching to combined view
+    if (newView === 'combined') {
+      setSelectedAccount(null);
+    }
+  };
+
+  const handleTradeAdded = (trade: TradeEntry) => {
+    // TODO: Update account stats based on new trade
+    console.log('Trade added:', trade);
   };
 
   const selectedAccountData = selectedAccount
@@ -133,6 +162,9 @@ export default function JournalPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <p className="text-red-400">Error: {error}</p>
+            <p className="text-slate-400 mt-2 text-sm">
+              Make sure the database migration has been run in Supabase.
+            </p>
           </div>
         </div>
       </div>
@@ -144,17 +176,35 @@ export default function JournalPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-2xl font-bold text-white">Trading Journal</h1>
-          <AccountSelector
-            accounts={accounts}
-            selectedAccount={selectedAccount}
-            onAccountChange={setSelectedAccount}
-            onAccountCreated={handleAccountCreated}
-            view={view}
-            onViewChange={setView}
-          />
+          <div className="flex items-center space-x-4">
+            {selectedAccount && (
+              <>
+                <button
+                  onClick={() => setIsAddTradeModalOpen(true)}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  📊 Add Trade from Image
+                </button>
+                <button
+                  onClick={() => setIsAIAnalyzeModalOpen(true)}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  🤖 AI Analyze
+                </button>
+              </>
+            )}
+            <AccountSelector
+              accounts={accounts}
+              selectedAccount={selectedAccount}
+              onAccountChange={setSelectedAccount}
+              onAccountCreated={handleAccountCreated}
+              view={view}
+              onViewChange={handleViewChange}
+            />
+          </div>
         </div>
 
-        {view === 'combined' ? (
+        {view === 'combined' || !selectedAccount ? (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <StatsCard
@@ -173,16 +223,20 @@ export default function JournalPage() {
                 trendValue="+3.2%"
               />
               <StatsCard
-                title="Total R"
-                value={accounts
-                  .reduce((sum: number, acc) => sum + acc.stats.totalRR, 0)
-                  .toFixed(1)}
+                title="Total Profit"
+                value={`${accounts.length > 0 ? accounts[0].currency : 'USD'} ${accounts
+                  .reduce(
+                    (sum: number, acc) =>
+                      sum + acc.stats.totalRR * acc.initial_balance * 0.01,
+                    0
+                  )
+                  .toLocaleString()}`}
                 trend="up"
                 trendValue="+15.5"
               />
               <StatsCard
                 title="Best Trade"
-                value={`${accounts.length > 0 ? Math.max(...accounts.map((acc) => acc.stats.bestTrade)) : 0}R`}
+                value={`${accounts.length > 0 ? accounts[0].currency : 'USD'} ${accounts.length > 0 ? Math.max(...accounts.map((acc) => acc.stats.bestTrade * acc.initial_balance * 0.01)).toLocaleString() : '0'}`}
                 trend="up"
                 trendValue="New High"
               />
@@ -281,14 +335,12 @@ export default function JournalPage() {
                 trendValue="+0.3"
               />
               <StatsCard
-                title="Total R"
-                value={`${selectedAccountData.stats.totalRR.toFixed(1)}R (${
-                  selectedAccountData.currency
-                } ${(
+                title="Total Profit"
+                value={`${selectedAccountData.currency} ${(
                   selectedAccountData.stats.totalRR *
                   selectedAccountData.initial_balance *
-                  (selectedAccountData.risk_per_trade / 100)
-                ).toLocaleString()})`}
+                  0.01
+                ).toLocaleString()}`}
                 trend="up"
                 trendValue="+12.5"
               />
@@ -325,14 +377,12 @@ export default function JournalPage() {
                     <div className="flex justify-between">
                       <span className="text-sm text-slate-400">Best Trade</span>
                       <span className="text-sm text-green-400">
-                        +{selectedAccountData.stats.bestTrade}R (
                         {selectedAccountData.currency}{' '}
                         {(
                           selectedAccountData.stats.bestTrade *
                           selectedAccountData.initial_balance *
-                          (selectedAccountData.risk_per_trade / 100)
+                          0.01
                         ).toLocaleString()}
-                        )
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -340,14 +390,12 @@ export default function JournalPage() {
                         Worst Trade
                       </span>
                       <span className="text-sm text-red-400">
-                        {selectedAccountData.stats.worstTrade}R (
                         {selectedAccountData.currency}{' '}
                         {(
                           selectedAccountData.stats.worstTrade *
                           selectedAccountData.initial_balance *
-                          (selectedAccountData.risk_per_trade / 100)
+                          0.01
                         ).toLocaleString()}
-                        )
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -355,14 +403,12 @@ export default function JournalPage() {
                         Average Win
                       </span>
                       <span className="text-sm text-green-400">
-                        +{selectedAccountData.stats.averageWin}R (
                         {selectedAccountData.currency}{' '}
                         {(
                           selectedAccountData.stats.averageWin *
                           selectedAccountData.initial_balance *
-                          (selectedAccountData.risk_per_trade / 100)
+                          0.01
                         ).toLocaleString()}
-                        )
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -370,14 +416,12 @@ export default function JournalPage() {
                         Average Loss
                       </span>
                       <span className="text-sm text-red-400">
-                        {selectedAccountData.stats.averageLoss}R (
                         {selectedAccountData.currency}{' '}
                         {(
                           selectedAccountData.stats.averageLoss *
                           selectedAccountData.initial_balance *
-                          (selectedAccountData.risk_per_trade / 100)
+                          0.01
                         ).toLocaleString()}
-                        )
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -415,10 +459,42 @@ export default function JournalPage() {
           </>
         ) : (
           <div className="text-center py-12">
-            <p className="text-slate-400">Select an account to view stats</p>
+            <p className="text-slate-400 mb-4">
+              {accounts.length === 0
+                ? 'No trading accounts found. Create your first account to get started.'
+                : 'Select an account to view individual stats'}
+            </p>
+            {accounts.length === 0 && (
+              <button
+                onClick={() => {
+                  /* This will be handled by the Create Account button */
+                }}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                Create Your First Account
+              </button>
+            )}
           </div>
         )}
       </div>
+
+      {/* Modals */}
+      {selectedAccount && (
+        <>
+          <ImageTradeModal
+            isOpen={isAddTradeModalOpen}
+            onClose={() => setIsAddTradeModalOpen(false)}
+            accountId={selectedAccount}
+            onTradeAdded={handleTradeAdded}
+          />
+          <AIAnalyzeModal
+            isOpen={isAIAnalyzeModalOpen}
+            onClose={() => setIsAIAnalyzeModalOpen(false)}
+            accountId={selectedAccount}
+            accountName={selectedAccountData?.name || 'Unknown Account'}
+          />
+        </>
+      )}
     </div>
   );
 }

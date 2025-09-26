@@ -19,8 +19,7 @@ export default function CreateAccountModal({
   const [formData, setFormData] = useState({
     name: '',
     currency: 'USD',
-    initial_balance: '',
-    risk_per_trade: '1'
+    initial_balance: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,42 +40,36 @@ export default function CreateAccountModal({
         throw new Error('Not authenticated');
       }
 
-      // For now, create a mock account until the migration is run
-      // TODO: Uncomment when trading_accounts table is created
-      // const { data, error: insertError } = await supabase
-      //   .from('trading_accounts')
-      //   .insert({
-      //     user_id: user.id,
-      //     name: formData.name,
-      //     currency: formData.currency,
-      //     initial_balance: parseFloat(formData.initial_balance),
-      //     risk_per_trade: parseFloat(formData.risk_per_trade)
-      //   })
-      //   .select()
-      //   .single();
+      // Save to Supabase
+      const { data, error: insertError } = await supabase
+        .from('trading_accounts' as any)
+        .insert({
+          user_id: user.id,
+          name: formData.name,
+          currency: formData.currency,
+          initial_balance: parseFloat(formData.initial_balance)
+        })
+        .select()
+        .single();
 
-      // if (insertError) throw insertError;
+      if (insertError) {
+        console.error('Supabase insert error:', insertError);
+        throw new Error(`Failed to create account: ${insertError.message}`);
+      }
 
-      const data: TradingAccount = {
-        id: crypto.randomUUID(),
-        user_id: user.id,
-        name: formData.name,
-        currency: formData.currency,
-        initial_balance: parseFloat(formData.initial_balance),
-        risk_per_trade: parseFloat(formData.risk_per_trade),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
+      if (!data) {
+        throw new Error('No data returned from database');
+      }
 
       onAccountCreated(data);
       setFormData({
         name: '',
         currency: 'USD',
-        initial_balance: '',
-        risk_per_trade: '1'
+        initial_balance: ''
       });
       onClose();
     } catch (err) {
+      console.error('Error creating account:', err);
       setError(err instanceof Error ? err.message : 'Failed to create account');
     } finally {
       setIsLoading(false);
@@ -112,7 +105,7 @@ export default function CreateAccountModal({
                 setFormData({ ...formData, name: e.target.value })
               }
               className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="e.g., Main Trading Account"
+              placeholder="e.g., Tradovate 1 Account"
               required
             />
           </div>
@@ -154,26 +147,11 @@ export default function CreateAccountModal({
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Risk Per Trade (%)
-            </label>
-            <input
-              type="number"
-              step="0.1"
-              min="0.1"
-              max="10"
-              value={formData.risk_per_trade}
-              onChange={(e) =>
-                setFormData({ ...formData, risk_per_trade: e.target.value })
-              }
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="1"
-              required
-            />
-          </div>
-
-          {error && <div className="text-red-400 text-sm">{error}</div>}
+          {error && (
+            <div className="text-red-400 text-sm bg-red-900/20 p-3 rounded-lg">
+              {error}
+            </div>
+          )}
 
           <div className="flex space-x-3 pt-4">
             <button

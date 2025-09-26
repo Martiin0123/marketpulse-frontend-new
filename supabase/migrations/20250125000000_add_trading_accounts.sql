@@ -5,7 +5,6 @@ CREATE TABLE IF NOT EXISTS trading_accounts (
   name TEXT NOT NULL,
   currency TEXT NOT NULL DEFAULT 'USD',
   initial_balance DECIMAL(15,2) NOT NULL,
-  risk_per_trade DECIMAL(5,2) NOT NULL DEFAULT 1.0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
