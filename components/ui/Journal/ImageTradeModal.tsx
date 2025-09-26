@@ -88,17 +88,23 @@ export default function ImageTradeModal({
 
   // Helper function to check if a value couldn't be analyzed
   const isUnanalyzed = (value: any): boolean => {
-    return value === 'Could not analyze' || value === '' || value === 0;
+    return (
+      value === 'Could not analyze' ||
+      value === '' ||
+      value === 0 ||
+      value === '0'
+    );
   };
 
   // Helper function to get input styling based on analysis status
   const getInputStyling = (value: any, isRequired: boolean = false) => {
-    const baseClasses = "w-full px-3 py-2 bg-slate-800/50 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500";
-    
+    const baseClasses =
+      'w-full px-3 py-2 bg-slate-800/50 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500';
+
     if (isUnanalyzed(value)) {
       return `${baseClasses} border-orange-500/50 bg-orange-900/20 text-orange-200 placeholder-orange-400`;
     }
-    
+
     return `${baseClasses} border-slate-600/50 text-white`;
   };
 
@@ -1661,7 +1667,9 @@ export default function ImageTradeModal({
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Symbol
                         {isUnanalyzed(analyzedData.symbol) && (
-                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please enter manually)</span>
+                          <span className="text-orange-400 text-xs ml-2">
+                            (Could not analyze - please enter manually)
+                          </span>
                         )}
                       </label>
                       <input
@@ -1673,14 +1681,20 @@ export default function ImageTradeModal({
                           )
                         }
                         className={getInputStyling(analyzedData.symbol)}
-                        placeholder={isUnanalyzed(analyzedData.symbol) ? "Enter symbol manually" : ""}
+                        placeholder={
+                          isUnanalyzed(analyzedData.symbol)
+                            ? 'Enter symbol manually'
+                            : ''
+                        }
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Direction
                         {isUnanalyzed(analyzedData.direction) && (
-                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please select manually)</span>
+                          <span className="text-orange-400 text-xs ml-2">
+                            (Could not analyze - please select manually)
+                          </span>
                         )}
                       </label>
                       <select
@@ -1692,7 +1706,9 @@ export default function ImageTradeModal({
                         }
                         className={getInputStyling(analyzedData.direction)}
                       >
-                        <option value="Could not analyze">Select Direction</option>
+                        <option value="Could not analyze">
+                          Select Direction
+                        </option>
                         <option value="Long">Long</option>
                         <option value="Short">Short</option>
                       </select>
@@ -1701,7 +1717,9 @@ export default function ImageTradeModal({
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Status
                         {isUnanalyzed(analyzedData.status) && (
-                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please select manually)</span>
+                          <span className="text-orange-400 text-xs ml-2">
+                            (Could not analyze - please select manually)
+                          </span>
                         )}
                       </label>
                       <select
@@ -1722,7 +1740,9 @@ export default function ImageTradeModal({
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Entry Price
                         {isUnanalyzed(analyzedData.entry) && (
-                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please enter manually)</span>
+                          <span className="text-orange-400 text-xs ml-2">
+                            (Could not analyze - please enter manually)
+                          </span>
                         )}
                       </label>
                       <input
@@ -1740,14 +1760,20 @@ export default function ImageTradeModal({
                           )
                         }
                         className={getInputStyling(analyzedData.entry)}
-                        placeholder={isUnanalyzed(analyzedData.entry) ? "Enter entry price manually" : ""}
+                        placeholder={
+                          isUnanalyzed(analyzedData.entry)
+                            ? 'Enter entry price manually'
+                            : ''
+                        }
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Stop Loss
                         {isUnanalyzed(analyzedData.stopLoss) && (
-                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please enter manually)</span>
+                          <span className="text-orange-400 text-xs ml-2">
+                            (Could not analyze - please enter manually)
+                          </span>
                         )}
                       </label>
                       <input
@@ -1765,14 +1791,20 @@ export default function ImageTradeModal({
                           )
                         }
                         className={getInputStyling(analyzedData.stopLoss)}
-                        placeholder={isUnanalyzed(analyzedData.stopLoss) ? "Enter stop loss manually" : ""}
+                        placeholder={
+                          isUnanalyzed(analyzedData.stopLoss)
+                            ? 'Enter stop loss manually'
+                            : ''
+                        }
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Take Profit
                         {isUnanalyzed(analyzedData.takeProfit) && (
-                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please enter manually)</span>
+                          <span className="text-orange-400 text-xs ml-2">
+                            (Could not analyze - please enter manually)
+                          </span>
                         )}
                       </label>
                       <input
@@ -1790,7 +1822,11 @@ export default function ImageTradeModal({
                           )
                         }
                         className={getInputStyling(analyzedData.takeProfit)}
-                        placeholder={isUnanalyzed(analyzedData.takeProfit) ? "Enter take profit manually" : ""}
+                        placeholder={
+                          isUnanalyzed(analyzedData.takeProfit)
+                            ? 'Enter take profit manually'
+                            : ''
+                        }
                       />
                     </div>
                   </div>
@@ -1808,7 +1844,9 @@ export default function ImageTradeModal({
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         R:R Achieved
                         {isUnanalyzed(analyzedData.rrAchieved) && (
-                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please enter manually)</span>
+                          <span className="text-orange-400 text-xs ml-2">
+                            (Could not analyze - please enter manually)
+                          </span>
                         )}
                       </label>
                       <input
@@ -1826,14 +1864,20 @@ export default function ImageTradeModal({
                           )
                         }
                         className={getInputStyling(analyzedData.rrAchieved)}
-                        placeholder={isUnanalyzed(analyzedData.rrAchieved) ? "Enter R:R achieved manually" : ""}
+                        placeholder={
+                          isUnanalyzed(analyzedData.rrAchieved)
+                            ? 'Enter R:R achieved manually'
+                            : ''
+                        }
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Max R:R
                         {isUnanalyzed(analyzedData.maxRR) && (
-                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please enter manually)</span>
+                          <span className="text-orange-400 text-xs ml-2">
+                            (Could not analyze - please enter manually)
+                          </span>
                         )}
                       </label>
                       <input
@@ -1851,14 +1895,20 @@ export default function ImageTradeModal({
                           )
                         }
                         className={getInputStyling(analyzedData.maxRR)}
-                        placeholder={isUnanalyzed(analyzedData.maxRR) ? "Enter max R:R manually" : ""}
+                        placeholder={
+                          isUnanalyzed(analyzedData.maxRR)
+                            ? 'Enter max R:R manually'
+                            : ''
+                        }
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Max Adverse
                         {isUnanalyzed(analyzedData.maxAdverse) && (
-                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please enter manually)</span>
+                          <span className="text-orange-400 text-xs ml-2">
+                            (Could not analyze - please enter manually)
+                          </span>
                         )}
                       </label>
                       <input
@@ -1872,14 +1922,20 @@ export default function ImageTradeModal({
                           )
                         }
                         className={getInputStyling(analyzedData.maxAdverse)}
-                        placeholder={isUnanalyzed(analyzedData.maxAdverse) ? "Enter max adverse manually (e.g., 0.5R)" : "e.g., 0.5R"}
+                        placeholder={
+                          isUnanalyzed(analyzedData.maxAdverse)
+                            ? 'Enter max adverse manually (e.g., 0.5R)'
+                            : 'e.g., 0.5R'
+                        }
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Timeframe
                         {isUnanalyzed(analyzedData.timeframe) && (
-                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please enter manually)</span>
+                          <span className="text-orange-400 text-xs ml-2">
+                            (Could not analyze - please enter manually)
+                          </span>
                         )}
                       </label>
                       <input
@@ -1891,14 +1947,20 @@ export default function ImageTradeModal({
                           )
                         }
                         className={getInputStyling(analyzedData.timeframe)}
-                        placeholder={isUnanalyzed(analyzedData.timeframe) ? "Enter timeframe manually (e.g., 1m, 5m, 1h)" : ""}
+                        placeholder={
+                          isUnanalyzed(analyzedData.timeframe)
+                            ? 'Enter timeframe manually (e.g., 1m, 5m, 1h)'
+                            : ''
+                        }
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Date
                         {isUnanalyzed(analyzedData.date) && (
-                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please select manually)</span>
+                          <span className="text-orange-400 text-xs ml-2">
+                            (Could not analyze - please select manually)
+                          </span>
                         )}
                       </label>
                       <input
@@ -1916,7 +1978,9 @@ export default function ImageTradeModal({
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Time
                         {isUnanalyzed(analyzedData.time) && (
-                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please select manually)</span>
+                          <span className="text-orange-400 text-xs ml-2">
+                            (Could not analyze - please select manually)
+                          </span>
                         )}
                       </label>
                       <input

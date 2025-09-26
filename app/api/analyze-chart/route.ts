@@ -226,23 +226,17 @@ export async function POST(request: NextRequest) {
       
       // Extract max adverse (handle both "0.5R" and "0.5" formats)
       const maxAdverseMatch = text.match(/MaxAdverse:\s*([\d.]+)R?/);
-      const maxAdverse = maxAdverseMatch ? maxAdverseMatch[1] + 'R' : '0.5R';
+      const maxAdverse = maxAdverseMatch ? maxAdverseMatch[1] + 'R' : 'Could not analyze';
 
-      // Validate that we got all required values
-      if (!entry || !stopLoss || !takeProfit || !slSize || !rrAchieved) {
-        console.error('Extracted values:', { entry, stopLoss, takeProfit, slSize, rrAchieved });
-        console.error('From text:', text);
-        throw new Error('Could not extract all required price values');
-      }
-
+      // Return values even if some are 0 or missing - let the UI handle it
       return {
-        entry,
-        stopLoss,
-        takeProfit,
-        slSize,
-        rrAchieved,
-        maxRR,
-        maxAdverse
+        entry: entry || 0,
+        stopLoss: stopLoss || 0,
+        takeProfit: takeProfit || 0,
+        slSize: slSize || 0,
+        rrAchieved: rrAchieved || 0,
+        maxRR: maxRR || 0,
+        maxAdverse: maxAdverse || 'Could not analyze'
       };
     };
 
@@ -254,9 +248,6 @@ export async function POST(request: NextRequest) {
 
     // Extract prices from text labels
     const prices = extractPrices(analysis);
-    if (!prices) {
-      throw new Error('Failed to extract price information from chart labels');
-    }
 
     // Extract all values from the AI response
     const symbol = extractText(analysis, 'Symbol');
