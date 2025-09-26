@@ -86,6 +86,22 @@ export default function ImageTradeModal({
 
   const supabase = createClient();
 
+  // Helper function to check if a value couldn't be analyzed
+  const isUnanalyzed = (value: any): boolean => {
+    return value === 'Could not analyze' || value === '' || value === 0;
+  };
+
+  // Helper function to get input styling based on analysis status
+  const getInputStyling = (value: any, isRequired: boolean = false) => {
+    const baseClasses = "w-full px-3 py-2 bg-slate-800/50 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500";
+    
+    if (isUnanalyzed(value)) {
+      return `${baseClasses} border-orange-500/50 bg-orange-900/20 text-orange-200 placeholder-orange-400`;
+    }
+    
+    return `${baseClasses} border-slate-600/50 text-white`;
+  };
+
   // Fetch tags when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -1644,6 +1660,9 @@ export default function ImageTradeModal({
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Symbol
+                        {isUnanalyzed(analyzedData.symbol) && (
+                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please enter manually)</span>
+                        )}
                       </label>
                       <input
                         type="text"
@@ -1653,12 +1672,16 @@ export default function ImageTradeModal({
                             prev ? { ...prev, symbol: e.target.value } : null
                           )
                         }
-                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                        className={getInputStyling(analyzedData.symbol)}
+                        placeholder={isUnanalyzed(analyzedData.symbol) ? "Enter symbol manually" : ""}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Direction
+                        {isUnanalyzed(analyzedData.direction) && (
+                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please select manually)</span>
+                        )}
                       </label>
                       <select
                         value={analyzedData.direction}
@@ -1667,8 +1690,9 @@ export default function ImageTradeModal({
                             prev ? { ...prev, direction: e.target.value } : null
                           )
                         }
-                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                        className={getInputStyling(analyzedData.direction)}
                       >
+                        <option value="Could not analyze">Select Direction</option>
                         <option value="Long">Long</option>
                         <option value="Short">Short</option>
                       </select>
@@ -1676,6 +1700,9 @@ export default function ImageTradeModal({
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Status
+                        {isUnanalyzed(analyzedData.status) && (
+                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please select manually)</span>
+                        )}
                       </label>
                       <select
                         value={analyzedData.status}
@@ -1684,8 +1711,9 @@ export default function ImageTradeModal({
                             prev ? { ...prev, status: e.target.value } : null
                           )
                         }
-                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                        className={getInputStyling(analyzedData.status)}
                       >
+                        <option value="Could not analyze">Select Status</option>
                         <option value="Open">Open</option>
                         <option value="Closed">Closed</option>
                       </select>
@@ -1693,6 +1721,9 @@ export default function ImageTradeModal({
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Entry Price
+                        {isUnanalyzed(analyzedData.entry) && (
+                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please enter manually)</span>
+                        )}
                       </label>
                       <input
                         type="number"
@@ -1708,12 +1739,16 @@ export default function ImageTradeModal({
                               : null
                           )
                         }
-                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                        className={getInputStyling(analyzedData.entry)}
+                        placeholder={isUnanalyzed(analyzedData.entry) ? "Enter entry price manually" : ""}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Stop Loss
+                        {isUnanalyzed(analyzedData.stopLoss) && (
+                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please enter manually)</span>
+                        )}
                       </label>
                       <input
                         type="number"
@@ -1729,12 +1764,16 @@ export default function ImageTradeModal({
                               : null
                           )
                         }
-                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                        className={getInputStyling(analyzedData.stopLoss)}
+                        placeholder={isUnanalyzed(analyzedData.stopLoss) ? "Enter stop loss manually" : ""}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Take Profit
+                        {isUnanalyzed(analyzedData.takeProfit) && (
+                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please enter manually)</span>
+                        )}
                       </label>
                       <input
                         type="number"
@@ -1750,7 +1789,8 @@ export default function ImageTradeModal({
                               : null
                           )
                         }
-                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                        className={getInputStyling(analyzedData.takeProfit)}
+                        placeholder={isUnanalyzed(analyzedData.takeProfit) ? "Enter take profit manually" : ""}
                       />
                     </div>
                   </div>
@@ -1767,6 +1807,9 @@ export default function ImageTradeModal({
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         R:R Achieved
+                        {isUnanalyzed(analyzedData.rrAchieved) && (
+                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please enter manually)</span>
+                        )}
                       </label>
                       <input
                         type="number"
@@ -1782,12 +1825,16 @@ export default function ImageTradeModal({
                               : null
                           )
                         }
-                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                        className={getInputStyling(analyzedData.rrAchieved)}
+                        placeholder={isUnanalyzed(analyzedData.rrAchieved) ? "Enter R:R achieved manually" : ""}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Max R:R
+                        {isUnanalyzed(analyzedData.maxRR) && (
+                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please enter manually)</span>
+                        )}
                       </label>
                       <input
                         type="number"
@@ -1803,12 +1850,16 @@ export default function ImageTradeModal({
                               : null
                           )
                         }
-                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                        className={getInputStyling(analyzedData.maxRR)}
+                        placeholder={isUnanalyzed(analyzedData.maxRR) ? "Enter max R:R manually" : ""}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Max Adverse
+                        {isUnanalyzed(analyzedData.maxAdverse) && (
+                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please enter manually)</span>
+                        )}
                       </label>
                       <input
                         type="text"
@@ -1820,13 +1871,16 @@ export default function ImageTradeModal({
                               : null
                           )
                         }
-                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
-                        placeholder="e.g., 0.5R"
+                        className={getInputStyling(analyzedData.maxAdverse)}
+                        placeholder={isUnanalyzed(analyzedData.maxAdverse) ? "Enter max adverse manually (e.g., 0.5R)" : "e.g., 0.5R"}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Timeframe
+                        {isUnanalyzed(analyzedData.timeframe) && (
+                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please enter manually)</span>
+                        )}
                       </label>
                       <input
                         type="text"
@@ -1836,12 +1890,16 @@ export default function ImageTradeModal({
                             prev ? { ...prev, timeframe: e.target.value } : null
                           )
                         }
-                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                        className={getInputStyling(analyzedData.timeframe)}
+                        placeholder={isUnanalyzed(analyzedData.timeframe) ? "Enter timeframe manually (e.g., 1m, 5m, 1h)" : ""}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Date
+                        {isUnanalyzed(analyzedData.date) && (
+                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please select manually)</span>
+                        )}
                       </label>
                       <input
                         type="date"
@@ -1851,12 +1909,15 @@ export default function ImageTradeModal({
                             prev ? { ...prev, date: e.target.value } : null
                           )
                         }
-                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                        className={getInputStyling(analyzedData.date)}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
                         Time
+                        {isUnanalyzed(analyzedData.time) && (
+                          <span className="text-orange-400 text-xs ml-2">(Could not analyze - please select manually)</span>
+                        )}
                       </label>
                       <input
                         type="time"
@@ -1866,7 +1927,7 @@ export default function ImageTradeModal({
                             prev ? { ...prev, time: e.target.value } : null
                           )
                         }
-                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
+                        className={getInputStyling(analyzedData.time)}
                       />
                     </div>
                   </div>

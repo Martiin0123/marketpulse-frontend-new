@@ -274,22 +274,22 @@ export async function POST(request: NextRequest) {
       .map(line => line.replace('  •', '').trim());
 
     const extractedData = {
-      symbol: symbol || 'Unknown Symbol',
-      timeframe: timeframe || 'Unknown',
-      date: date || new Date().toISOString().split('T')[0], // Fallback to today
-      time: time || '00:00',
-      direction: direction || 'Unknown',
-      entry: prices.entry,
-      stopLoss: prices.stopLoss,
-      slSize: prices.slSize,
-      takeProfit: prices.takeProfit,
-      status: status || 'Unknown',
-      rrAchieved: prices.rrAchieved,
-      maxRR: prices.maxRR,
-      maxAdverse: prices.maxAdverse,
+      symbol: symbol || 'Could not analyze',
+      timeframe: timeframe || 'Could not analyze',
+      date: date || 'Could not analyze',
+      time: time || 'Could not analyze',
+      direction: direction || 'Could not analyze',
+      entry: prices.entry || 0,
+      stopLoss: prices.stopLoss || 0,
+      slSize: prices.slSize || 0,
+      takeProfit: prices.takeProfit || 0,
+      status: status || 'Could not analyze',
+      rrAchieved: prices.rrAchieved || 0,
+      maxRR: prices.maxRR || 0,
+      maxAdverse: prices.maxAdverse || 'Could not analyze',
       indicators: [], // No tags for AI analysis
-      setup: 'AI Analysis',
-      context: 'AI analyzed trade from chart image',
+      setup: setup || 'Could not analyze',
+      context: context || 'Could not analyze',
       pnlAmount: 0,
       balance: 0,
       risk: 0
