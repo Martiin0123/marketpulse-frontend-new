@@ -8,6 +8,9 @@ import TradeCalendar from '@/components/ui/Journal/TradeCalendar';
 import ViewSelector from '@/components/ui/Journal/ViewSelector';
 import AccountsOverview from '@/components/ui/Journal/AccountsOverview';
 import ImageTradeModal from '@/components/ui/Journal/ImageTradeModal';
+import BalanceChart from '@/components/ui/Journal/BalanceChart';
+import EnhancedMetrics from '@/components/ui/Journal/EnhancedMetrics';
+import PrimeScopeScore from '@/components/ui/Journal/PrimeScopeScore';
 import type {
   TradingAccount,
   AccountStats,
@@ -28,7 +31,9 @@ export default function JournalPage() {
 
   const supabase = createClient();
 
-  const calculateAccountStats = async (accountId: string): Promise<AccountStats> => {
+  const calculateAccountStats = async (
+    accountId: string
+  ): Promise<AccountStats> => {
     try {
       const { data: trades, error } = await supabase
         .from('trade_entries' as any)
@@ -56,7 +61,7 @@ export default function JournalPage() {
       }
 
       const closedTrades = (trades || []) as any[];
-      
+
       if (closedTrades.length === 0) {
         return {
           totalTrades: 0,
@@ -77,27 +82,49 @@ export default function JournalPage() {
 
       // Calculate basic stats
       const totalTrades = closedTrades.length;
-      const wins = closedTrades.filter(trade => (trade.pnl || 0) > 0);
-      const losses = closedTrades.filter(trade => (trade.pnl || 0) < 0);
+      const wins = closedTrades.filter((trade) => (trade.pnl || 0) > 0);
+      const losses = closedTrades.filter((trade) => (trade.pnl || 0) < 0);
       const winRate = totalTrades > 0 ? (wins.length / totalTrades) * 100 : 0;
 
       // Calculate P&L stats
-      const totalPnL = closedTrades.reduce((sum, trade) => sum + (trade.pnl || 0), 0);
-      const bestTrade = Math.max(...closedTrades.map(trade => trade.pnl || 0));
-      const worstTrade = Math.min(...closedTrades.map(trade => trade.pnl || 0));
+      const totalPnL = closedTrades.reduce(
+        (sum, trade) => sum + (trade.pnl || 0),
+        0
+      );
+      const bestTrade = Math.max(
+        ...closedTrades.map((trade) => trade.pnl || 0)
+      );
+      const worstTrade = Math.min(
+        ...closedTrades.map((trade) => trade.pnl || 0)
+      );
 
       // Calculate average win/loss
-      const averageWin = wins.length > 0 ? wins.reduce((sum, trade) => sum + (trade.pnl || 0), 0) / wins.length : 0;
-      const averageLoss = losses.length > 0 ? losses.reduce((sum, trade) => sum + (trade.pnl || 0), 0) / losses.length : 0;
+      const averageWin =
+        wins.length > 0
+          ? wins.reduce((sum, trade) => sum + (trade.pnl || 0), 0) / wins.length
+          : 0;
+      const averageLoss =
+        losses.length > 0
+          ? losses.reduce((sum, trade) => sum + (trade.pnl || 0), 0) /
+            losses.length
+          : 0;
 
       // Calculate profit factor
       const totalWins = wins.reduce((sum, trade) => sum + (trade.pnl || 0), 0);
-      const totalLosses = Math.abs(losses.reduce((sum, trade) => sum + (trade.pnl || 0), 0));
-      const profitFactor = totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? 999 : 0;
+      const totalLosses = Math.abs(
+        losses.reduce((sum, trade) => sum + (trade.pnl || 0), 0)
+      );
+      const profitFactor =
+        totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? 999 : 0;
 
       // Calculate R:R stats (using rr field if available, otherwise calculate from P&L)
-      const rrValues = closedTrades.map(trade => trade.rr || 0).filter(rr => rr !== 0);
-      const averageRR = rrValues.length > 0 ? rrValues.reduce((sum, rr) => sum + rr, 0) / rrValues.length : 0;
+      const rrValues = closedTrades
+        .map((trade) => trade.rr || 0)
+        .filter((rr) => rr !== 0);
+      const averageRR =
+        rrValues.length > 0
+          ? rrValues.reduce((sum, rr) => sum + rr, 0) / rrValues.length
+          : 0;
       const totalRR = rrValues.reduce((sum, rr) => sum + rr, 0);
 
       // Calculate streaks
@@ -106,7 +133,10 @@ export default function JournalPage() {
       let maxWinStreak = 0;
       let maxLoseStreak = 0;
 
-      for (const trade of closedTrades.sort((a, b) => new Date(a.entry_date).getTime() - new Date(b.entry_date).getTime())) {
+      for (const trade of closedTrades.sort(
+        (a, b) =>
+          new Date(a.entry_date).getTime() - new Date(b.entry_date).getTime()
+      )) {
         if ((trade.pnl || 0) > 0) {
           currentWinStreak++;
           currentLoseStreak = 0;
@@ -123,8 +153,11 @@ export default function JournalPage() {
       let peak = 0;
       let current = 0;
 
-      for (const trade of closedTrades.sort((a, b) => new Date(a.entry_date).getTime() - new Date(b.entry_date).getTime())) {
-        current += (trade.pnl || 0);
+      for (const trade of closedTrades.sort(
+        (a, b) =>
+          new Date(a.entry_date).getTime() - new Date(b.entry_date).getTime()
+      )) {
+        current += trade.pnl || 0;
         if (current > peak) {
           peak = current;
         }
@@ -163,7 +196,8 @@ export default function JournalPage() {
         averageLoss: 0,
         maxDrawdown: 0,
         winStreak: 0,
-        loseStreak: 0
+        loseStreak: 0,
+        totalPnL: 0
       };
     }
   };
@@ -244,10 +278,10 @@ export default function JournalPage() {
 
   const handleTradeAdded = async (trade: TradeEntry) => {
     console.log('Trade added:', trade);
-    
+
     // Recalculate stats for the account that received the new trade
     const updatedStats = await calculateAccountStats(trade.account_id);
-    
+
     setAccounts((prev) =>
       prev.map((account) =>
         account.id === trade.account_id
@@ -295,14 +329,12 @@ export default function JournalPage() {
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-2xl font-bold text-white">Trading Journal</h1>
           <div className="flex items-center space-x-4">
-            {selectedAccount && (
-              <button
-                onClick={() => setIsAddTradeModalOpen(true)}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
-              >
-                📊 Add Trade
-              </button>
-            )}
+            <button
+              onClick={() => setIsAddTradeModalOpen(true)}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              📊 Add Trade
+            </button>
             <AccountSelector
               accounts={accounts}
               selectedAccount={selectedAccount}
@@ -316,40 +348,16 @@ export default function JournalPage() {
 
         {view === 'combined' || !selectedAccount ? (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <StatsCard
-                title="Total Trades"
-                value={accounts.reduce(
-                  (sum: number, acc) => sum + acc.stats.totalTrades,
-                  0
-                )}
-                trend="up"
-                trendValue="+23"
-              />
-              <StatsCard
-                title="Average Win Rate"
-                value={`${accounts.length > 0 ? (accounts.reduce((sum: number, acc) => sum + acc.stats.winRate, 0) / accounts.length).toFixed(1) : '0.0'}%`}
-                trend="up"
-                trendValue="+3.2%"
-              />
-              <StatsCard
-                title="Total Profit"
-                value={`${accounts.length > 0 ? accounts[0].currency : 'USD'} ${accounts
-                  .reduce(
-                    (sum: number, acc) => sum + acc.stats.totalPnL,
-                    0
-                  )
-                  .toLocaleString()}`}
-                trend="up"
-                trendValue="+15.5"
-              />
-              <StatsCard
-                title="Best Trade"
-                value={`${accounts.length > 0 ? accounts[0].currency : 'USD'} ${accounts.length > 0 ? Math.max(...accounts.map((acc) => acc.stats.bestTrade)).toLocaleString() : '0'}`}
-                trend="up"
-                trendValue="New High"
-              />
-            </div>
+            {/* Enhanced Metrics for Combined View */}
+            <EnhancedMetrics
+              accountId={null}
+              currency={accounts.length > 0 ? accounts[0].currency : 'USD'}
+              initialBalance={accounts.reduce(
+                (sum, acc) => sum + acc.initial_balance,
+                0
+              )}
+              className="mb-8"
+            />
 
             <div className="space-y-6">
               <AccountsOverview
@@ -360,10 +368,23 @@ export default function JournalPage() {
                 }}
               />
 
+              {/* Charts Row */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <BalanceChart
+                  accountId={null}
+                  currency={accounts.length > 0 ? accounts[0].currency : 'USD'}
+                  initialBalance={accounts.reduce(
+                    (sum, acc) => sum + acc.initial_balance,
+                    0
+                  )}
+                />
+                <PrimeScopeScore accountId={null} />
+              </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">
                   <TradeCalendar
-                    accountId={selectedAccount}
+                    accountId={null}
                     month={currentMonth}
                     onMonthChange={setCurrentMonth}
                   />
@@ -429,32 +450,22 @@ export default function JournalPage() {
           </>
         ) : selectedAccountData ? (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <StatsCard
-                title="Win Rate"
-                value={`${selectedAccountData.stats.winRate}%`}
-                trend="up"
-                trendValue="+5.2%"
+            {/* Enhanced Metrics for Individual Account */}
+            <EnhancedMetrics
+              accountId={selectedAccount}
+              currency={selectedAccountData.currency}
+              initialBalance={selectedAccountData.initial_balance}
+              className="mb-8"
+            />
+
+            {/* Individual Account Charts Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <BalanceChart
+                accountId={selectedAccount}
+                currency={selectedAccountData.currency}
+                initialBalance={selectedAccountData.initial_balance}
               />
-              <StatsCard
-                title="Average R:R"
-                value={selectedAccountData.stats.averageRR.toFixed(1)}
-                subtitle="per trade"
-                trend="up"
-                trendValue="+0.3"
-              />
-              <StatsCard
-                title="Total Profit"
-                value={`${selectedAccountData.currency} ${selectedAccountData.stats.totalPnL.toLocaleString()}`}
-                trend="up"
-                trendValue="+12.5"
-              />
-              <StatsCard
-                title="Profit Factor"
-                value={selectedAccountData.stats.profitFactor.toFixed(1)}
-                trend="up"
-                trendValue="+0.2"
-              />
+              <PrimeScopeScore accountId={selectedAccount} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -562,16 +573,16 @@ export default function JournalPage() {
       </div>
 
       {/* Modals */}
-      {selectedAccount && (
-        <>
-          <ImageTradeModal
-            isOpen={isAddTradeModalOpen}
-            onClose={() => setIsAddTradeModalOpen(false)}
-            accountId={selectedAccount}
-            onTradeAdded={handleTradeAdded}
-          />
-        </>
-      )}
+      <ImageTradeModal
+        isOpen={isAddTradeModalOpen}
+        onClose={() => setIsAddTradeModalOpen(false)}
+        accounts={accounts.map((acc) => ({
+          id: acc.id,
+          name: acc.name,
+          currency: acc.currency
+        }))}
+        onTradeAdded={handleTradeAdded}
+      />
     </div>
   );
 }

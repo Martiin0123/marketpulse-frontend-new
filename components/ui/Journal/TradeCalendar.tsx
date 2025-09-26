@@ -33,12 +33,6 @@ export default function TradeCalendar({
 
   useEffect(() => {
     const fetchTradesForMonth = async () => {
-      if (!accountId) {
-        setDailyData([]);
-        setIsLoading(false);
-        return;
-      }
-
       try {
         setIsLoading(true);
         setError(null);
@@ -52,13 +46,19 @@ export default function TradeCalendar({
         );
 
         // Fetch trades for the selected month
-        const { data: trades, error: tradesError } = await supabase
+        let query = supabase
           .from('trade_entries' as any)
           .select('*')
-          .eq('account_id', accountId)
           .gte('entry_date', startOfMonth.toISOString())
           .lte('entry_date', endOfMonth.toISOString())
           .order('entry_date', { ascending: true });
+
+        // If accountId is provided, filter by that account, otherwise get all trades
+        if (accountId) {
+          query = query.eq('account_id', accountId);
+        }
+
+        const { data: trades, error: tradesError } = await query;
 
         if (tradesError) {
           console.error('Error fetching trades:', tradesError);
