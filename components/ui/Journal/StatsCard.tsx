@@ -1,90 +1,56 @@
+'use client';
+
+import { ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/outline';
+
 interface StatsCardProps {
   title: string;
   value: string | number;
   subtitle?: string;
   trend?: 'up' | 'down' | 'neutral';
   trendValue?: string;
-  className?: string;
 }
 
 export default function StatsCard({
   title,
   value,
   subtitle,
-  trend,
-  trendValue,
-  className = ''
+  trend = 'neutral',
+  trendValue
 }: StatsCardProps) {
-  const trendColors = {
-    up: 'text-green-400',
-    down: 'text-red-400',
-    neutral: 'text-slate-400'
+  const getTrendIcon = () => {
+    if (trend === 'up')
+      return <ArrowUpIcon className="h-4 w-4 text-green-400" />;
+    if (trend === 'down')
+      return <ArrowDownIcon className="h-4 w-4 text-red-400" />;
+    return null;
   };
 
-  const trendIcons = {
-    up: (
-      <svg
-        className="w-4 h-4"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-        />
-      </svg>
-    ),
-    down: (
-      <svg
-        className="w-4 h-4"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"
-        />
-      </svg>
-    ),
-    neutral: (
-      <svg
-        className="w-4 h-4"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M5 12h14"
-        />
-      </svg>
-    )
+  const getTrendColor = () => {
+    if (trend === 'up') return 'text-green-400';
+    if (trend === 'down') return 'text-red-400';
+    return 'text-slate-400';
   };
 
   return (
-    <div
-      className={`bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6 ${className}`}
-    >
+    <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-slate-400">{title}</h3>
-        {trend && (
-          <div className={`flex items-center gap-1 ${trendColors[trend]}`}>
-            {trendIcons[trend]}
-            <span className="text-sm">{trendValue}</span>
+        <div>
+          <p className="text-sm font-medium text-slate-300">{title}</p>
+          <p className="text-2xl font-bold text-white mt-1">
+            {value}
+            {subtitle && (
+              <span className="text-sm font-normal text-slate-400 ml-1">
+                {subtitle}
+              </span>
+            )}
+          </p>
+        </div>
+        {trend !== 'neutral' && trendValue && (
+          <div className={`flex items-center space-x-1 ${getTrendColor()}`}>
+            {getTrendIcon()}
+            <span className="text-sm font-medium">{trendValue}</span>
           </div>
         )}
-      </div>
-      <div className="mt-2 flex items-baseline">
-        <p className="text-2xl font-semibold text-white">{value}</p>
-        {subtitle && <p className="ml-2 text-sm text-slate-400">{subtitle}</p>}
       </div>
     </div>
   );

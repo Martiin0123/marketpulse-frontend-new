@@ -1,12 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import {
+  PlusIcon,
+  ViewColumnsIcon,
+  UserIcon
+} from '@heroicons/react/24/outline';
 import type { TradingAccount } from '@/types/journal';
 import CreateAccountModal from './CreateAccountModal';
 
 interface AccountSelectorProps {
-  accounts: TradingAccount[];
+  accounts: (TradingAccount & { stats: any })[];
   selectedAccount: string | null;
   onAccountChange: (accountId: string | null) => void;
   onAccountCreated: (account: TradingAccount) => void;
@@ -22,74 +26,63 @@ export default function AccountSelector({
   view,
   onViewChange
 }: AccountSelectorProps) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const handleCreateAccount = () => {
-    setIsModalOpen(true);
-  };
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   return (
     <>
-      <div className="flex items-center">
-        <div className="flex rounded-lg bg-slate-800 p-0.5 overflow-x-auto">
+      <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2">
           <button
-            onClick={() => {
-              onViewChange('combined');
-              onAccountChange(null);
-            }}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+            onClick={() => onViewChange('combined')}
+            className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
               view === 'combined'
-                ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                : 'text-slate-400 hover:text-slate-300'
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
             }`}
           >
-            All Accounts
+            <ViewColumnsIcon className="h-4 w-4" />
+            <span>Combined</span>
           </button>
-          {accounts.map((account) => (
-            <button
-              key={account.id}
-              onClick={() => {
-                onViewChange('individual');
-                onAccountChange(account.id);
-              }}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
-                view === 'individual' && selectedAccount === account.id
-                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                  : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <span>{account.name}</span>
-                <span className="text-xs opacity-60">
-                  {account.currency} {account.initial_balance.toLocaleString()}
-                </span>
-              </div>
-            </button>
-          ))}
-        </div>
-        <button
-          onClick={handleCreateAccount}
-          className="ml-2 p-2 bg-green-500/20 hover:bg-green-500/30 rounded-lg border border-green-500/30 text-green-400"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+          <button
+            onClick={() => onViewChange('individual')}
+            className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              view === 'individual'
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
+            <UserIcon className="h-4 w-4" />
+            <span>Individual</span>
+          </button>
+        </div>
+
+        {view === 'individual' && (
+          <select
+            value={selectedAccount || ''}
+            onChange={(e) => onAccountChange(e.target.value || null)}
+            className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="">Select Account</option>
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.name} ({account.currency})
+              </option>
+            ))}
+          </select>
+        )}
+
+        <button
+          onClick={() => setIsCreateModalOpen(true)}
+          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+        >
+          <PlusIcon className="h-4 w-4" />
+          <span>New Account</span>
         </button>
       </div>
 
       <CreateAccountModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
         onAccountCreated={onAccountCreated}
       />
     </>
