@@ -522,37 +522,65 @@ export default function ImageTradeModal({
             timeStr === 'Could not analyze'
           ) {
             console.warn('Date/time could not be analyzed, using current time');
-            return new Date().toISOString();
+            // Format current time as local time instead of UTC
+            const now = new Date();
+            const nowYear = now.getFullYear();
+            const nowMonth = String(now.getMonth() + 1).padStart(2, '0');
+            const nowDay = String(now.getDate()).padStart(2, '0');
+            const nowHours = String(now.getHours()).padStart(2, '0');
+            const nowMinutes = String(now.getMinutes()).padStart(2, '0');
+            const nowSeconds = String(now.getSeconds()).padStart(2, '0');
+
+            return `${nowYear}-${nowMonth}-${nowDay} ${nowHours}:${nowMinutes}:${nowSeconds}+00`;
           }
 
-          // Try to parse the date and time
-          let dateTimeStr = `${dateStr}T${timeStr}`;
+          // Create a date object in local timezone to avoid timezone conversion issues
+          const [year, month, day] = dateStr.split('-').map(Number);
+          const [hours, minutes] = timeStr.split(':').map(Number);
 
-          // If time doesn't have timezone info, assume UTC
-          if (
-            !timeStr.includes('+') &&
-            !timeStr.includes('Z') &&
-            !timeStr.includes('-')
-          ) {
-            dateTimeStr += 'Z';
-          }
-
-          const parsedDate = new Date(dateTimeStr);
+          // Create date in local timezone
+          const localDate = new Date(year, month - 1, day, hours, minutes, 0);
 
           // Check if the date is valid
-          if (isNaN(parsedDate.getTime())) {
+          if (isNaN(localDate.getTime())) {
             console.warn(
               'Invalid date format, using current time:',
               dateStr,
               timeStr
             );
-            return new Date().toISOString();
+            // Format current time as local time instead of UTC
+            const now = new Date();
+            const nowYear = now.getFullYear();
+            const nowMonth = String(now.getMonth() + 1).padStart(2, '0');
+            const nowDay = String(now.getDate()).padStart(2, '0');
+            const nowHours = String(now.getHours()).padStart(2, '0');
+            const nowMinutes = String(now.getMinutes()).padStart(2, '0');
+            const nowSeconds = String(now.getSeconds()).padStart(2, '0');
+
+            return `${nowYear}-${nowMonth}-${nowDay} ${nowHours}:${nowMinutes}:${nowSeconds}+00`;
           }
 
-          return parsedDate.toISOString();
+          // Format as local time instead of UTC
+          const localYear = localDate.getFullYear();
+          const localMonth = String(localDate.getMonth() + 1).padStart(2, '0');
+          const localDay = String(localDate.getDate()).padStart(2, '0');
+          const localHours = String(localDate.getHours()).padStart(2, '0');
+          const localMinutes = String(localDate.getMinutes()).padStart(2, '0');
+          const localSeconds = String(localDate.getSeconds()).padStart(2, '0');
+
+          return `${localYear}-${localMonth}-${localDay} ${localHours}:${localMinutes}:${localSeconds}+00`;
         } catch (error) {
           console.warn('Date parsing error, using current time:', error);
-          return new Date().toISOString();
+          // Format current time as local time instead of UTC
+          const now = new Date();
+          const nowYear = now.getFullYear();
+          const nowMonth = String(now.getMonth() + 1).padStart(2, '0');
+          const nowDay = String(now.getDate()).padStart(2, '0');
+          const nowHours = String(now.getHours()).padStart(2, '0');
+          const nowMinutes = String(now.getMinutes()).padStart(2, '0');
+          const nowSeconds = String(now.getSeconds()).padStart(2, '0');
+
+          return `${nowYear}-${nowMonth}-${nowDay} ${nowHours}:${nowMinutes}:${nowSeconds}+00`;
         }
       };
 

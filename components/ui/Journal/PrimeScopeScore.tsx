@@ -10,10 +10,8 @@ interface PrimeScopeScoreProps {
 
 interface ScoreMetrics {
   profitFactor: number;
-  risk: number;
-  discipline: number;
-  resilience: number;
-  win: number;
+  sharpeRatio: number;
+  maxDrawdown: number;
   overallScore: number;
 }
 
@@ -57,10 +55,8 @@ export default function PrimeScopeScore({
         if (closedTrades.length === 0) {
           setMetrics({
             profitFactor: 0,
-            risk: 0,
-            discipline: 0,
-            resilience: 0,
-            win: 0,
+            sharpeRatio: 0,
+            maxDrawdown: 0,
             overallScore: 0
           });
           return;
@@ -74,7 +70,6 @@ export default function PrimeScopeScore({
         const totalTrades = closedTrades.length;
         const winTrades = wins.length;
         const lossTrades = losses.length;
-        const winRate = totalTrades > 0 ? (winTrades / totalTrades) * 100 : 0;
 
         const averageWin =
           wins.length > 0
@@ -92,25 +87,7 @@ export default function PrimeScopeScore({
         const profitFactor =
           totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? 999 : 0;
 
-        // Calculate streaks
-        let currentWinStreak = 0;
-        let currentLossStreak = 0;
-        let maxWinStreak = 0;
-        let maxLossStreak = 0;
-
-        for (const pnl of pnlValues) {
-          if (pnl > 0) {
-            currentWinStreak++;
-            currentLossStreak = 0;
-            maxWinStreak = Math.max(maxWinStreak, currentWinStreak);
-          } else if (pnl < 0) {
-            currentLossStreak++;
-            currentWinStreak = 0;
-            maxLossStreak = Math.max(maxLossStreak, currentLossStreak);
-          }
-        }
-
-        // Calculate drawdown
+        // Calculate Maximum Drawdown
         let maxDrawdown = 0;
         let peak = 0;
         let current = 0;
@@ -126,34 +103,44 @@ export default function PrimeScopeScore({
           }
         }
 
-        // Calculate PrimeScope Score metrics (0-100 scale)
-        const profitFactorScore = Math.min((profitFactor - 1) * 25, 100); // 1.0 = 0, 5.0 = 100
-        const riskScore = Math.max(
-          0,
-          100 - (maxDrawdown / Math.abs(peak || 1)) * 100
-        ); // Lower drawdown = higher score
-        const disciplineScore = Math.min(winRate * 1.2, 100); // Win rate with slight boost
-        const resilienceScore = Math.max(0, 100 - maxLossStreak * 10); // Lower loss streaks = higher score
-        const winScore = Math.min(
-          (averageWin / Math.max(averageLoss, 1)) * 30,
-          100
-        ); // Win/Loss ratio
+        // Calculate Sharpe Ratio (simplified - using P&L as returns)
+        const meanReturn =
+          pnlValues.reduce((sum, pnl) => sum + pnl, 0) / pnlValues.length;
+        const variance =
+          pnlValues.reduce(
+            (sum, pnl) => sum + Math.pow(pnl - meanReturn, 2),
+            0
+          ) / pnlValues.length;
+        const standardDeviation = Math.sqrt(variance);
+        const sharpeRatio =
+          standardDeviation > 0 ? meanReturn / standardDeviation : 0;
 
-        // Calculate overall score
+        // Calculate PrimeScope Score metrics (0-100 scale)
+        // Profit Factor: 1.0 = 0, 2.0 = 50, 3.0+ = 100
+        const profitFactorScore = Math.min(
+          Math.max((profitFactor - 1) * 50, 0),
+          100
+        );
+
+        // Sharpe Ratio: 0 = 0, 1.0 = 50, 2.0+ = 100
+        const sharpeRatioScore = Math.min(Math.max(sharpeRatio * 50, 0), 100);
+
+        // Max Drawdown: Lower is better, 0% = 100, 50%+ = 0
+        const maxDrawdownPercent = peak > 0 ? (maxDrawdown / peak) * 100 : 0;
+        const drawdownScore = Math.max(0, 100 - maxDrawdownPercent * 2);
+
+        // Calculate overall score with industry-standard weights
+        // Profit Factor: 40%, Sharpe Ratio: 35%, Max Drawdown: 25%
         const overallScore = Math.round(
-          profitFactorScore * 0.25 +
-            riskScore * 0.25 +
-            disciplineScore * 0.2 +
-            resilienceScore * 0.15 +
-            winScore * 0.15
+          profitFactorScore * 0.4 +
+            sharpeRatioScore * 0.35 +
+            drawdownScore * 0.25
         );
 
         setMetrics({
           profitFactor: Math.max(0, Math.min(100, profitFactorScore)),
-          risk: Math.max(0, Math.min(100, riskScore)),
-          discipline: Math.max(0, Math.min(100, disciplineScore)),
-          resilience: Math.max(0, Math.min(100, resilienceScore)),
-          win: Math.max(0, Math.min(100, winScore)),
+          sharpeRatio: Math.max(0, Math.min(100, sharpeRatioScore)),
+          maxDrawdown: Math.max(0, Math.min(100, drawdownScore)),
           overallScore: Math.max(0, Math.min(100, overallScore))
         });
       } catch (err) {
@@ -191,23 +178,74 @@ export default function PrimeScopeScore({
     );
   }
 
-  // Radar chart configuration
+  // Get score grade and color
+  const getScoreGrade = (score: number) => {
+    if (score >= 90)
+      return {
+        grade: 'A+',
+        color: 'text-emerald-400',
+        bgColor: 'bg-emerald-500/20'
+      };
+    if (score >= 80)
+      return {
+        grade: 'A',
+        color: 'text-emerald-400',
+        bgColor: 'bg-emerald-500/20'
+      };
+    if (score >= 70)
+      return {
+        grade: 'B+',
+        color: 'text-green-400',
+        bgColor: 'bg-green-500/20'
+      };
+    if (score >= 60)
+      return {
+        grade: 'B',
+        color: 'text-green-400',
+        bgColor: 'bg-green-500/20'
+      };
+    if (score >= 50)
+      return {
+        grade: 'C+',
+        color: 'text-yellow-400',
+        bgColor: 'bg-yellow-500/20'
+      };
+    if (score >= 40)
+      return {
+        grade: 'C',
+        color: 'text-yellow-400',
+        bgColor: 'bg-yellow-500/20'
+      };
+    if (score >= 30)
+      return {
+        grade: 'D+',
+        color: 'text-orange-400',
+        bgColor: 'bg-orange-500/20'
+      };
+    if (score >= 20)
+      return {
+        grade: 'D',
+        color: 'text-orange-400',
+        bgColor: 'bg-orange-500/20'
+      };
+    return { grade: 'F', color: 'text-red-400', bgColor: 'bg-red-500/20' };
+  };
+
+  const scoreGrade = getScoreGrade(metrics.overallScore);
+
+  // Radar chart configuration for 3 metrics
   const centerX = 120;
   const centerY = 120;
   const radius = 80;
   const metrics_labels = [
     'Profit Factor',
-    'Risk',
-    'Discipline',
-    'Resilience',
-    'Win'
+    'Risk-Adjusted Returns',
+    'Risk Management'
   ];
   const metrics_values = [
     metrics.profitFactor,
-    metrics.risk,
-    metrics.discipline,
-    metrics.resilience,
-    metrics.win
+    metrics.sharpeRatio,
+    metrics.maxDrawdown
   ];
 
   // Generate radar chart points
@@ -254,6 +292,11 @@ export default function PrimeScopeScore({
           <div className="w-4 h-4 bg-purple-500 rounded-full flex items-center justify-center">
             <span className="text-xs text-white font-bold">i</span>
           </div>
+        </div>
+        <div className={`px-3 py-1 rounded-full ${scoreGrade.bgColor}`}>
+          <span className={`text-sm font-bold ${scoreGrade.color}`}>
+            {scoreGrade.grade}
+          </span>
         </div>
       </div>
 
@@ -349,7 +392,7 @@ export default function PrimeScopeScore({
       </div>
 
       {/* Overall Score */}
-      <div className="text-center">
+      <div className="text-center mb-6">
         <h4 className="text-sm font-medium text-slate-300 mb-2">
           YOUR PRIMESCOPE SCORE
         </h4>
@@ -382,37 +425,101 @@ export default function PrimeScopeScore({
         </div>
       </div>
 
-      {/* Score breakdown */}
-      <div className="mt-6 grid grid-cols-2 gap-3 text-xs">
-        <div className="flex justify-between">
-          <span className="text-slate-400">Profit Factor</span>
-          <span className="text-white font-medium">
-            {metrics.profitFactor.toFixed(0)}
-          </span>
+      {/* Core Metrics */}
+      <div className="space-y-4">
+        <h4 className="text-sm font-semibold text-slate-300 mb-3">
+          Core Metrics
+        </h4>
+
+        {/* Profit Factor */}
+        <div className="bg-slate-700/30 rounded-lg p-4">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-medium text-slate-300">
+              Profit Factor
+            </span>
+            <span className="text-lg font-bold text-white">
+              {metrics.profitFactor.toFixed(0)}
+            </span>
+          </div>
+          <div className="w-full h-2 bg-slate-600 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-red-500 to-green-500 rounded-full transition-all duration-1000"
+              style={{ width: `${metrics.profitFactor}%` }}
+            />
+          </div>
+          <div className="text-xs text-slate-400 mt-1">
+            Measures profitability efficiency
+          </div>
         </div>
-        <div className="flex justify-between">
-          <span className="text-slate-400">Risk</span>
-          <span className="text-white font-medium">
-            {metrics.risk.toFixed(0)}
-          </span>
+
+        {/* Sharpe Ratio */}
+        <div className="bg-slate-700/30 rounded-lg p-4">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-medium text-slate-300">
+              Risk-Adjusted Returns
+            </span>
+            <span className="text-lg font-bold text-white">
+              {metrics.sharpeRatio.toFixed(0)}
+            </span>
+          </div>
+          <div className="w-full h-2 bg-slate-600 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-red-500 to-green-500 rounded-full transition-all duration-1000"
+              style={{ width: `${metrics.sharpeRatio}%` }}
+            />
+          </div>
+          <div className="text-xs text-slate-400 mt-1">
+            Returns per unit of risk taken
+          </div>
         </div>
-        <div className="flex justify-between">
-          <span className="text-slate-400">Discipline</span>
-          <span className="text-white font-medium">
-            {metrics.discipline.toFixed(0)}
-          </span>
+
+        {/* Max Drawdown */}
+        <div className="bg-slate-700/30 rounded-lg p-4">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-medium text-slate-300">
+              Risk Management
+            </span>
+            <span className="text-lg font-bold text-white">
+              {metrics.maxDrawdown.toFixed(0)}
+            </span>
+          </div>
+          <div className="w-full h-2 bg-slate-600 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-red-500 to-green-500 rounded-full transition-all duration-1000"
+              style={{ width: `${metrics.maxDrawdown}%` }}
+            />
+          </div>
+          <div className="text-xs text-slate-400 mt-1">
+            Drawdown control and risk management
+          </div>
         </div>
-        <div className="flex justify-between">
-          <span className="text-slate-400">Resilience</span>
-          <span className="text-white font-medium">
-            {metrics.resilience.toFixed(0)}
-          </span>
-        </div>
-        <div className="flex justify-between col-span-2">
-          <span className="text-slate-400">Win Ratio</span>
-          <span className="text-white font-medium">
-            {metrics.win.toFixed(0)}
-          </span>
+      </div>
+
+      {/* Performance Insights */}
+      <div className="mt-6 p-4 bg-slate-700/20 rounded-lg">
+        <h5 className="text-sm font-semibold text-slate-300 mb-2">
+          Performance Insights
+        </h5>
+        <div className="text-xs text-slate-400 space-y-1">
+          {metrics.overallScore >= 80 && (
+            <p>• Excellent trading performance with strong risk management</p>
+          )}
+          {metrics.overallScore >= 60 && metrics.overallScore < 80 && (
+            <p>
+              • Good performance with room for improvement in risk management
+            </p>
+          )}
+          {metrics.overallScore >= 40 && metrics.overallScore < 60 && (
+            <p>
+              • Average performance - focus on improving profit factor and risk
+              control
+            </p>
+          )}
+          {metrics.overallScore < 40 && (
+            <p>
+              • Needs improvement - focus on risk management and consistency
+            </p>
+          )}
         </div>
       </div>
     </div>

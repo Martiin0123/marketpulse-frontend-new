@@ -5,6 +5,7 @@ import { ViewColumnsIcon, UserIcon } from '@heroicons/react/24/outline';
 import { Plus } from '@phosphor-icons/react';
 import type { TradingAccount } from '@/types/journal';
 import CreateAccountModal from './CreateAccountModal';
+import ShareButton from './ShareButton';
 
 interface AccountSelectorProps {
   accounts: (TradingAccount & { stats: any })[];
@@ -59,6 +60,17 @@ export default function AccountSelector({
             <span>{account.name}</span>
           </button>
         ))}
+
+        {/* Share Button for selected account */}
+        {view === 'individual' && selectedAccount && (
+          <ShareButton
+            accountId={selectedAccount}
+            accountName={
+              accounts.find((acc) => acc.id === selectedAccount)?.name || ''
+            }
+            isPublic={true}
+          />
+        )}
 
         {/* Create Account Button - Just Plus Icon */}
         <button

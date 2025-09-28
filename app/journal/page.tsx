@@ -11,7 +11,7 @@ import EditTradeModal from '@/components/ui/Journal/EditTradeModal';
 import ViewSelector from '@/components/ui/Journal/ViewSelector';
 import AccountsOverview from '@/components/ui/Journal/AccountsOverview';
 import ImageTradeModal from '@/components/ui/Journal/ImageTradeModal';
-import BalanceChart from '@/components/ui/Journal/BalanceChart';
+import JournalBalanceChart from '@/components/ui/Journal/JournalBalanceChart';
 import PrimeScopeScore from '@/components/ui/Journal/PrimeScopeScore';
 import SettingsModal from '@/components/ui/Journal/SettingsModal';
 import type {
@@ -27,7 +27,7 @@ export default function JournalPage() {
   >([]);
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  
+
   // Debug month state
   console.log('Journal page - currentMonth:', {
     month: currentMonth.getMonth() + 1,
@@ -39,8 +39,11 @@ export default function JournalPage() {
   // Reset to current month if the month is in the future (likely a bug)
   useEffect(() => {
     const now = new Date();
-    if (currentMonth.getFullYear() > now.getFullYear() || 
-        (currentMonth.getFullYear() === now.getFullYear() && currentMonth.getMonth() > now.getMonth())) {
+    if (
+      currentMonth.getFullYear() > now.getFullYear() ||
+      (currentMonth.getFullYear() === now.getFullYear() &&
+        currentMonth.getMonth() > now.getMonth())
+    ) {
       console.log('Resetting calendar to current month due to future date');
       setCurrentMonth(new Date());
     }
@@ -465,9 +468,9 @@ export default function JournalPage() {
                 }}
               />
 
-              {/* Charts Row */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <BalanceChart
+              {/* Balance Chart - Full Width */}
+              <div className="mb-6">
+                <JournalBalanceChart
                   accountId={null}
                   currency={accounts.length > 0 ? accounts[0].currency : 'USD'}
                   initialBalance={accounts.reduce(
@@ -476,6 +479,10 @@ export default function JournalPage() {
                   )}
                   refreshKey={refreshKey}
                 />
+              </div>
+
+              {/* PrimeScope Score */}
+              <div className="mb-6">
                 <PrimeScopeScore accountId={null} />
               </div>
 
@@ -615,14 +622,18 @@ export default function JournalPage() {
           </>
         ) : selectedAccountData ? (
           <>
-            {/* Individual Account Charts Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              <BalanceChart
+            {/* Balance Chart - Full Width */}
+            <div className="mb-6">
+              <JournalBalanceChart
                 accountId={selectedAccount}
                 currency={selectedAccountData.currency}
                 initialBalance={selectedAccountData.initial_balance}
                 refreshKey={refreshKey}
               />
+            </div>
+
+            {/* PrimeScope Score */}
+            <div className="mb-6">
               <PrimeScopeScore accountId={selectedAccount} />
             </div>
 
