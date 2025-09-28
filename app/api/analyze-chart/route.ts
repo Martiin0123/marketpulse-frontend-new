@@ -267,8 +267,8 @@ export async function POST(request: NextRequest) {
     const extractedData = {
       symbol: symbol || 'Could not analyze',
       timeframe: timeframe || 'Could not analyze',
-      date: date || 'Could not analyze',
-      time: time || 'Could not analyze',
+      date: date || new Date().toISOString().split('T')[0], // Default to today if not found
+      time: time || new Date().toTimeString().slice(0, 5), // Default to current time if not found
       direction: direction || 'Could not analyze',
       entry: prices.entry || 0,
       stopLoss: prices.stopLoss || 0,

@@ -47,15 +47,40 @@ export default function TradeCalendar({
           0
         );
 
-        // Fetch trades for the selected month
+        // Also check if we should include yesterday's trades (in case of timezone issues)
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStart = new Date(
+          yesterday.getFullYear(),
+          yesterday.getMonth(),
+          yesterday.getDate()
+        );
+        const yesterdayEnd = new Date(
+          yesterday.getFullYear(),
+          yesterday.getMonth(),
+          yesterday.getDate() + 1
+        );
+
+        // Fetch trades for the selected month (with some buffer for timezone issues)
+        const bufferStart = new Date(startOfMonth);
+        bufferStart.setDate(bufferStart.getDate() - 1); // Include day before month start
+
+        const bufferEnd = new Date(endOfMonth);
+        bufferEnd.setDate(bufferEnd.getDate() + 1); // Include day after month end
+
         let query = supabase
           .from('trade_entries' as any)
           .select('*')
-          .gte('entry_date', startOfMonth.toISOString())
-          .lte('entry_date', endOfMonth.toISOString())
+          .gte('entry_date', bufferStart.toISOString())
+          .lte('entry_date', bufferEnd.toISOString())
           .order('entry_date', { ascending: true });
 
         // If accountId is provided, filter by that account, otherwise get all trades
+        console.log('Calendar - Account filtering:', {
+          accountId: accountId,
+          filteringByAccount: !!accountId
+        });
+
         if (accountId) {
           query = query.eq('account_id', accountId);
         }
@@ -68,6 +93,25 @@ export default function TradeCalendar({
           return;
         }
 
+        // Also fetch all trades to see what's in the database
+        const { data: allTrades } = await supabase
+          .from('trade_entries' as any)
+          .select('*')
+          .order('entry_date', { ascending: false })
+          .limit(10);
+
+        console.log('Calendar - All recent trades in database:', allTrades);
+
+        console.log('Calendar - Fetched trades:', trades);
+        console.log('Calendar - Date range:', {
+          startOfMonth: startOfMonth.toISOString(),
+          endOfMonth: endOfMonth.toISOString(),
+          bufferStart: bufferStart.toISOString(),
+          bufferEnd: bufferEnd.toISOString(),
+          currentMonth: month.getMonth() + 1,
+          currentYear: month.getFullYear()
+        });
+
         // Group trades by date and calculate daily stats
         const dailyMap = new Map<string, DailyTradeData>();
 
@@ -76,29 +120,46 @@ export default function TradeCalendar({
             .toISOString()
             .split('T')[0];
 
-          if (!dailyMap.has(tradeDate)) {
-            dailyMap.set(tradeDate, {
-              date: tradeDate,
-              trades: 0,
-              pnl: 0,
-              wins: 0,
-              losses: 0
-            });
-          }
+          // Check if trade date is within the current month for display
+          const tradeDateObj = new Date(trade.entry_date);
+          const isInCurrentMonth =
+            tradeDateObj >= startOfMonth && tradeDateObj <= endOfMonth;
 
-          const dayData = dailyMap.get(tradeDate)!;
-          dayData.trades += 1;
+          console.log('Calendar - Processing trade:', {
+            id: trade.id,
+            symbol: trade.symbol,
+            entry_date: trade.entry_date,
+            tradeDate: tradeDate,
+            pnl_amount: trade.pnl_amount,
+            isInCurrentMonth: isInCurrentMonth
+          });
 
-          if (
-            trade.pnl_amount !== null &&
-            trade.pnl_amount !== undefined &&
-            !isNaN(trade.pnl_amount)
-          ) {
-            dayData.pnl += trade.pnl_amount;
-            if (trade.pnl_amount > 0) {
-              dayData.wins += 1;
-            } else if (trade.pnl_amount < 0) {
-              dayData.losses += 1;
+          // Only process trades that are in the current month for display
+          if (isInCurrentMonth) {
+            if (!dailyMap.has(tradeDate)) {
+              dailyMap.set(tradeDate, {
+                date: tradeDate,
+                trades: 0,
+                pnl: 0,
+                wins: 0,
+                losses: 0
+              });
+            }
+
+            const dayData = dailyMap.get(tradeDate)!;
+            dayData.trades += 1;
+
+            if (
+              trade.pnl_amount !== null &&
+              trade.pnl_amount !== undefined &&
+              !isNaN(trade.pnl_amount)
+            ) {
+              dayData.pnl += trade.pnl_amount;
+              if (trade.pnl_amount > 0) {
+                dayData.wins += 1;
+              } else if (trade.pnl_amount < 0) {
+                dayData.losses += 1;
+              }
             }
           }
         });

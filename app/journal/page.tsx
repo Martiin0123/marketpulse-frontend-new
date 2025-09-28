@@ -27,6 +27,24 @@ export default function JournalPage() {
   >([]);
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  
+  // Debug month state
+  console.log('Journal page - currentMonth:', {
+    month: currentMonth.getMonth() + 1,
+    year: currentMonth.getFullYear(),
+    date: currentMonth.getDate(),
+    isoString: currentMonth.toISOString()
+  });
+
+  // Reset to current month if the month is in the future (likely a bug)
+  useEffect(() => {
+    const now = new Date();
+    if (currentMonth.getFullYear() > now.getFullYear() || 
+        (currentMonth.getFullYear() === now.getFullYear() && currentMonth.getMonth() > now.getMonth())) {
+      console.log('Resetting calendar to current month due to future date');
+      setCurrentMonth(new Date());
+    }
+  }, [currentMonth]);
   const [view, setView] = useState<'individual' | 'combined'>('combined');
   const [displayMode, setDisplayMode] = useState<'calendar' | 'list'>(
     'calendar'
@@ -749,7 +767,8 @@ export default function JournalPage() {
           id: acc.id,
           name: acc.name,
           currency: acc.currency,
-          initial_balance: acc.initial_balance
+          initial_balance: acc.initial_balance,
+          fixed_risk: acc.fixed_risk
         }))}
         onTradeAdded={handleTradeAdded}
       />

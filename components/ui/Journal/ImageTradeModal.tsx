@@ -18,6 +18,7 @@ interface ImageTradeModalProps {
     name: string;
     currency: string;
     initial_balance: number;
+    fixed_risk: number;
   }>;
   onTradeAdded: (trade: TradeEntry) => void;
 }
@@ -66,10 +67,11 @@ export default function ImageTradeModal({
     exitPrice: '',
     size: '1',
     status: 'closed' as 'open' | 'closed',
-    entryDate: '',
-    entryTime: '',
+    entryDate: new Date().toISOString().split('T')[0], // Default to today
+    entryTime: new Date().toTimeString().slice(0, 5), // Default to current time
     notes: '',
-    pnlAmount: ''
+    pnlAmount: '',
+    rr: ''
   });
   const [calculatedBalance, setCalculatedBalance] = useState<number | null>(
     null
@@ -78,6 +80,7 @@ export default function ImageTradeModal({
     Array<{ id: string; name: string; color: string }>
   >([]);
   const [imageData, setImageData] = useState<string | null>(null);
+  const [isPnLManuallySet, setIsPnLManuallySet] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const supabase = createClient();
@@ -244,9 +247,10 @@ export default function ImageTradeModal({
           : (entryPrice - exitPrice) * size;
     }
 
-    // Calculate R:R if we have both entry and exit prices, or use P&L amount
-    const rr =
-      entryPrice && exitPrice
+    // Calculate R:R - use manual RR if provided, otherwise calculate from prices
+    const rr = manualData.rr
+      ? parseFloat(manualData.rr)
+      : entryPrice && exitPrice
         ? Math.abs(pnlAmount || 0) / Math.abs(entryPrice - exitPrice)
         : pnlAmount && entryPrice
           ? Math.abs(pnlAmount) / entryPrice
@@ -280,6 +284,32 @@ export default function ImageTradeModal({
       if (!prev) return null;
 
       const updated = { ...prev, [field]: value };
+
+      // Auto-calculate PnL when RR changes (but not when PnL has been manually set)
+      if (
+        field === 'rrAchieved' &&
+        value &&
+        selectedAccounts.length > 0 &&
+        !isPnLManuallySet
+      ) {
+        const rr = parseFloat(value);
+        if (!isNaN(rr) && rr > 0) {
+          // Get the first selected account's fixed risk
+          const account = accounts.find((acc) =>
+            selectedAccounts.includes(acc.id)
+          );
+          if (account && account.fixed_risk > 0) {
+            const calculatedPnL = account.fixed_risk * rr;
+            updated.pnlAmount = calculatedPnL;
+          }
+        }
+      }
+
+      // Track when PnL is manually set
+      if (field === 'pnlAmount') {
+        setIsPnLManuallySet(true);
+      }
+
       return updated;
     });
   };
@@ -294,6 +324,7 @@ export default function ImageTradeModal({
     setError(null);
     setDragActive(false);
     setSelectedAccounts([]);
+    setIsPnLManuallySet(false);
     setManualData({
       symbol: '',
       direction: 'long',
@@ -301,12 +332,11 @@ export default function ImageTradeModal({
       exitPrice: '',
       size: '1',
       status: 'closed',
-      entryDate: '',
-      entryTime: '',
+      entryDate: new Date().toISOString().split('T')[0], // Default to today
+      entryTime: new Date().toTimeString().slice(0, 5), // Default to current time
       notes: '',
       pnlAmount: '',
-      balance: '',
-      risk: ''
+      rr: ''
     });
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -348,22 +378,28 @@ export default function ImageTradeModal({
     setManualData((prev) => {
       const updated = { ...prev, [field]: value };
 
-      // Auto-calculate P&L or Balance when one changes
-      if (field === 'pnlAmount' && value && selectedAccounts.length > 0) {
-        // Get the first selected account's initial balance
+      // Auto-calculate P&L when RR changes
+      if (field === 'rr' && value && selectedAccounts.length > 0) {
+        const rr = parseFloat(value);
+        if (!isNaN(rr) && rr > 0) {
+          // Get the first selected account's fixed risk
+          const account = accounts.find((acc) =>
+            selectedAccounts.includes(acc.id)
+          );
+          if (account && account.fixed_risk > 0) {
+            const calculatedPnL = account.fixed_risk * rr;
+            updated.pnlAmount = calculatedPnL.toString();
+          }
+        }
+      }
+      // Auto-calculate P&L when PnL amount changes
+      else if (field === 'pnlAmount' && value && selectedAccounts.length > 0) {
+        // Update calculated balance for display
         const account = accounts.find((acc) => acc.id === selectedAccounts[0]);
         if (account) {
           const initialBalance = account.initial_balance || 0;
           const pnl = parseFloat(value) || 0;
-          updated.balance = (initialBalance + pnl).toString();
-        }
-      } else if (field === 'balance' && value && selectedAccounts.length > 0) {
-        // Get the first selected account's initial balance
-        const account = accounts.find((acc) => acc.id === selectedAccounts[0]);
-        if (account) {
-          const initialBalance = account.initial_balance || 0;
-          const balance = parseFloat(value) || 0;
-          updated.pnlAmount = (balance - initialBalance).toString();
+          setCalculatedBalance(initialBalance + pnl);
         }
       }
 
@@ -401,6 +437,7 @@ export default function ImageTradeModal({
     setIsAnalyzing(true);
     setError(null);
     setAnalyzedData(null);
+    setIsPnLManuallySet(false);
 
     try {
       // Validate file type
@@ -479,6 +516,15 @@ export default function ImageTradeModal({
       // Parse date and time safely
       const parseDateTime = (dateStr: string, timeStr: string): string => {
         try {
+          // Handle "Could not analyze" case
+          if (
+            dateStr === 'Could not analyze' ||
+            timeStr === 'Could not analyze'
+          ) {
+            console.warn('Date/time could not be analyzed, using current time');
+            return new Date().toISOString();
+          }
+
           // Try to parse the date and time
           let dateTimeStr = `${dateStr}T${timeStr}`;
 
@@ -511,6 +557,14 @@ export default function ImageTradeModal({
       };
 
       const entryDateTime = parseDateTime(analyzedData.date, analyzedData.time);
+
+      console.log('Trade saving - Date info:', {
+        originalDate: analyzedData.date,
+        originalTime: analyzedData.time,
+        parsedDateTime: entryDateTime,
+        localDate: new Date().toISOString(),
+        timezoneOffset: new Date().getTimezoneOffset()
+      });
 
       // Create trade entries for all selected accounts
       const tradeEntries = selectedAccounts.map((accountId) => {
@@ -551,6 +605,8 @@ export default function ImageTradeModal({
       if (!data || data.length === 0) {
         throw new Error('No data returned from database');
       }
+
+      console.log('Trade saved successfully:', data);
 
       // Call onTradeAdded for each created trade
       data.forEach((trade: any) => {
@@ -925,7 +981,7 @@ export default function ImageTradeModal({
                       Enter the profit or loss for this trade
                     </p>
 
-                    <div className="grid grid-cols-1 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">
                           P&L Amount
@@ -943,6 +999,35 @@ export default function ImageTradeModal({
                         <p className="text-xs text-slate-500 mt-1">
                           Positive for profit, negative for loss, 0 for
                           break-even
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          Risk-to-Reward (RR)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={manualData.rr}
+                          onChange={(e) =>
+                            handleManualDataChange('rr', e.target.value)
+                          }
+                          placeholder="e.g., 2.0"
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">
+                          Auto-calculates P&L based on account risk
+                          {selectedAccounts.length > 0 && (
+                            <span className="block text-blue-400 mt-1">
+                              Account risk:{' '}
+                              {accounts.find((acc) =>
+                                selectedAccounts.includes(acc.id)
+                              )?.fixed_risk || 0}{' '}
+                              {accounts.find((acc) =>
+                                selectedAccounts.includes(acc.id)
+                              )?.currency || 'USD'}
+                            </span>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -1476,6 +1561,22 @@ export default function ImageTradeModal({
                     />
                     <p className="text-xs text-slate-500 mt-1">
                       Enter 0 for break-even trades
+                      {selectedAccounts.length > 0 &&
+                        analyzedData.rrAchieved > 0 &&
+                        !isPnLManuallySet && (
+                          <span className="block text-blue-400 mt-1">
+                            Auto-calculated from RR: {analyzedData.rrAchieved} ×{' '}
+                            {accounts.find((acc) =>
+                              selectedAccounts.includes(acc.id)
+                            )?.fixed_risk || 0}{' '}
+                            = {analyzedData.pnlAmount}
+                          </span>
+                        )}
+                      {isPnLManuallySet && (
+                        <span className="block text-orange-400 mt-1">
+                          P&L manually set - auto-calculation disabled
+                        </span>
+                      )}
                     </p>
                   </div>
                   <div>
@@ -1487,16 +1588,11 @@ export default function ImageTradeModal({
                       step="0.01"
                       value={analyzedData.rrAchieved || ''}
                       onChange={(e) =>
-                        setAnalyzedData((prev) =>
-                          prev
-                            ? {
-                                ...prev,
-                                rrAchieved:
-                                  e.target.value === ''
-                                    ? 0
-                                    : parseFloat(e.target.value) || 0
-                              }
-                            : null
+                        handleAnalyzedDataChange(
+                          'rrAchieved',
+                          e.target.value === ''
+                            ? 0
+                            : parseFloat(e.target.value) || 0
                         )
                       }
                       className="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-500"
@@ -1706,13 +1802,9 @@ export default function ImageTradeModal({
                         step="0.01"
                         value={analyzedData.rrAchieved}
                         onChange={(e) =>
-                          setAnalyzedData((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  rrAchieved: parseFloat(e.target.value) || 0
-                                }
-                              : null
+                          handleAnalyzedDataChange(
+                            'rrAchieved',
+                            parseFloat(e.target.value) || 0
                           )
                         }
                         className={getInputStyling(analyzedData.rrAchieved)}
@@ -1722,6 +1814,15 @@ export default function ImageTradeModal({
                             : ''
                         }
                       />
+                      <p className="text-xs text-slate-500 mt-1">
+                        {selectedAccounts.length > 0 ? (
+                          <span className="text-blue-400">
+                            Auto-calculates P&L based on account risk
+                          </span>
+                        ) : (
+                          'Enter the risk-to-reward ratio achieved'
+                        )}
+                      </p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">
