@@ -258,11 +258,8 @@ export default function SignalCalendar({
                 }
               });
 
-              // Calculate average gain for the week (total gain / total signals)
-              weekData.averageGain =
-                weekData.signals > 0
-                  ? weekData.totalGain / weekData.signals
-                  : 0;
+              // Use total gain directly (no division needed)
+              weekData.averageGain = weekData.totalGain;
 
               weeklyData.push(weekData);
             }
@@ -496,7 +493,7 @@ export default function SignalCalendar({
                           isSelected
                             ? 'border-blue-400 bg-blue-500/20 shadow-lg shadow-blue-500/25'
                             : dayStats
-                              ? getPerformanceColor(dayStats.averageGain)
+                              ? getPerformanceColor(dayStats.totalGain)
                               : isCurrentMonth
                                 ? 'bg-slate-700/30 border-slate-600/50 hover:border-slate-500/70 hover:bg-slate-600/40'
                                 : 'opacity-50 text-slate-500 bg-slate-800/10 border-slate-700/30'
@@ -522,12 +519,12 @@ export default function SignalCalendar({
                               </div>
                               <div
                                 className={`font-medium ${
-                                  dayStats.averageGain >= 0
+                                  dayStats.totalGain >= 0
                                     ? 'text-emerald-400'
                                     : 'text-red-400'
                                 }`}
                               >
-                                {formatPercentage(dayStats.averageGain)}
+                                {formatPercentage(dayStats.totalGain)}
                               </div>
                             </div>
                           </div>
@@ -612,14 +609,12 @@ export default function SignalCalendar({
                 <div className="text-center p-3 bg-slate-600/30 rounded-lg">
                   <div
                     className={`text-2xl font-bold mb-1 ${
-                      stats.averageGain >= 0
-                        ? 'text-emerald-400'
-                        : 'text-red-400'
+                      stats.totalGain >= 0 ? 'text-emerald-400' : 'text-red-400'
                     }`}
                   >
-                    {formatPercentage(stats.averageGain)}
+                    {formatPercentage(stats.totalGain)}
                   </div>
-                  <div className="text-xs text-slate-400">Avg Gain</div>
+                  <div className="text-xs text-slate-400">Total Gain</div>
                 </div>
                 <div className="text-center p-3 bg-slate-600/30 rounded-lg">
                   <div className="text-2xl font-bold text-emerald-400 mb-1">
