@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server';
 import { getUser, getSubscription } from '@/utils/supabase/queries';
 import { calculateTradingStats } from '@/utils/stats';
 import ChatWidget from '@/components/ui/ChatWidget/ChatWidget';
+import SignalCalendarWrapper from '@/components/ui/Journal/SignalCalendarWrapper';
 import {
   BarChart3,
   TrendingUp,
@@ -600,6 +601,24 @@ export default async function PerformanceReports() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Signal Performance Calendar */}
+        <div className="mb-12">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="p-2 bg-purple-500/20 rounded-lg">
+              <Calendar className="w-6 h-6 text-purple-400" />
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold text-white">
+                Signal Performance Calendar
+              </h3>
+              <p className="text-slate-400 text-sm">
+                Daily signal performance and P&L tracking
+              </p>
+            </div>
+          </div>
+          <SignalCalendarWrapper />
         </div>
 
         {/* Trade Statistics */}
