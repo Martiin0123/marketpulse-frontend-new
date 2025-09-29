@@ -258,7 +258,7 @@ export default function SignalCalendar({
                 }
               });
 
-              // Calculate average gain for the week
+              // Calculate average gain for the week (total gain / total signals)
               weekData.averageGain =
                 weekData.signals > 0
                   ? weekData.totalGain / weekData.signals
@@ -551,12 +551,12 @@ export default function SignalCalendar({
                         </div>
                         <div
                           className={`text-xs font-medium ${
-                            weekData.averageGain >= 0
+                            weekData.totalGain >= 0
                               ? 'text-emerald-400'
                               : 'text-red-400'
                           }`}
                         >
-                          {formatPercentage(weekData.averageGain)}
+                          {formatPercentage(weekData.totalGain)}
                         </div>
                       </>
                     ) : (
