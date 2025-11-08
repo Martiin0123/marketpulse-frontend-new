@@ -58,13 +58,13 @@ export default function JournalSidebar({
   onSectionChange
 }: JournalSidebarProps) {
   return (
-    <div className="fixed left-6 top-20 bottom-6 w-64 bg-slate-800/95 backdrop-blur-lg border border-slate-700/50 rounded-2xl shadow-2xl flex flex-col z-40">
+    <div className="fixed left-8 top-24 w-64 bg-slate-800/95 backdrop-blur-lg border border-slate-700/50 rounded-2xl shadow-2xl flex flex-col z-40">
       <div className="p-6 border-b border-slate-700/50">
         <h2 className="text-xl font-bold text-white">Trading Journal</h2>
         <p className="text-xs text-slate-400 mt-1">Manage your trades</p>
       </div>
 
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+      <nav className="p-4 space-y-2">
         {sections.map((section) => {
           const Icon =
             currentSection === section.id ? section.iconSolid : section.icon;
@@ -86,13 +86,6 @@ export default function JournalSidebar({
           );
         })}
       </nav>
-
-      <div className="p-4 border-t border-slate-700/50">
-        <div className="text-xs text-slate-400 text-center">
-          <p className="font-medium">TradeZella-like</p>
-          <p className="mt-1 text-slate-500">Trading Journal</p>
-        </div>
-      </div>
     </div>
   );
 }

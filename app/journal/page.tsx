@@ -551,7 +551,7 @@ export default function JournalPage() {
       />
 
       {/* Main Content */}
-      <div className="ml-[calc(16rem+3rem)] mr-6 flex flex-col min-h-screen">
+      <div className="ml-[calc(16rem+4rem)] mr-8 flex flex-col min-h-screen">
         {/* Top Bar */}
         <div className="sticky top-20 z-30 bg-slate-800/95 backdrop-blur-lg border border-slate-700/50 rounded-2xl shadow-xl px-6 py-4 mt-6 mb-6">
           <div className="flex items-center justify-between">
