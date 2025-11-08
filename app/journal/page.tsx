@@ -13,6 +13,11 @@ import AccountsOverview from '@/components/ui/Journal/AccountsOverview';
 import ImageTradeModal from '@/components/ui/Journal/ImageTradeModal';
 import JournalBalanceChart from '@/components/ui/Journal/JournalBalanceChart';
 import SettingsModal from '@/components/ui/Journal/SettingsModal';
+import PerformanceAnalysis from '@/components/ui/Journal/PerformanceAnalysis';
+import SymbolPerformance from '@/components/ui/Journal/SymbolPerformance';
+import CSVImportExport from '@/components/ui/Journal/CSVImportExport';
+import JournalSidebar from '@/components/ui/Journal/JournalSidebar';
+import JournalSettings from '@/components/ui/Journal/JournalSettings';
 import type {
   TradingAccount,
   AccountStats,
@@ -49,13 +54,16 @@ export default function JournalPage() {
   }, [currentMonth]);
   const [view, setView] = useState<'individual' | 'combined'>('combined');
   const [displayMode, setDisplayMode] = useState<'calendar' | 'list'>('list');
+  const [currentSection, setCurrentSection] = useState<
+    'overview' | 'performance' | 'trades' | 'calendar' | 'settings'
+  >('overview');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddTradeModalOpen, setIsAddTradeModalOpen] = useState(false);
   const [isEditTradeModalOpen, setIsEditTradeModalOpen] = useState(false);
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [editingTrade, setEditingTrade] = useState<TradeEntry | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [searchDate, setSearchDate] = useState('');
 
   const supabase = createClient();
 
@@ -373,6 +381,47 @@ export default function JournalPage() {
     }
   };
 
+  const handleDeleteAccount = async (accountId: string) => {
+    const account = accounts.find((acc) => acc.id === accountId);
+    if (!account) return;
+
+    if (
+      !confirm(
+        `Are you sure you want to delete "${account.name}"? This will also delete all trades associated with this account. This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('trading_accounts' as any)
+        .delete()
+        .eq('id', accountId);
+
+      if (error) {
+        console.error('Error deleting account:', error);
+        alert('Failed to delete account');
+        return;
+      }
+
+      // Remove account from state
+      setAccounts((prev) => prev.filter((acc) => acc.id !== accountId));
+
+      // If the deleted account was selected, clear selection
+      if (selectedAccount === accountId) {
+        setSelectedAccount(null);
+        setView('combined');
+      }
+
+      // Trigger refresh
+      setRefreshKey((prev) => prev + 1);
+    } catch (err) {
+      console.error('Error deleting account:', err);
+      alert('Failed to delete account');
+    }
+  };
+
   const handleViewChange = (newView: 'individual' | 'combined') => {
     setView(newView);
 
@@ -494,541 +543,108 @@ export default function JournalPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
-          <h1 className="text-2xl font-bold text-white">Trading Journal</h1>
-          <div className="flex items-center flex-wrap gap-3">
-            {/* Primary Actions */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setIsAddTradeModalOpen(true)}
-                className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-green-600/20"
-              >
-                <Plus size={18} weight="bold" />
-                <span>Add Trade</span>
-              </button>
-              <button
-                onClick={() => setIsSettingsModalOpen(true)}
-                className="flex items-center justify-center w-10 h-10 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-                title="Settings"
-              >
-                <Gear size={18} weight="bold" />
-              </button>
-            </div>
+    <div className="min-h-screen bg-slate-900">
+      {/* Sidebar */}
+      <JournalSidebar
+        currentSection={currentSection}
+        onSectionChange={(section) => setCurrentSection(section as any)}
+      />
 
-            {/* Account Selector */}
-            <div className="flex items-center gap-2 pl-3 border-l border-slate-700">
+      {/* Main Content */}
+      <div className="ml-[calc(16rem+3rem)] mr-6 flex flex-col min-h-screen">
+        {/* Top Bar */}
+        <div className="sticky top-20 z-30 bg-slate-800/95 backdrop-blur-lg border border-slate-700/50 rounded-2xl shadow-xl px-6 py-4 mt-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4 flex-1">
               <AccountSelector
                 accounts={accounts}
                 selectedAccount={selectedAccount}
                 onAccountChange={setSelectedAccount}
                 onAccountCreated={handleAccountCreated}
+                onAccountDeleted={handleDeleteAccount}
                 view={view}
                 onViewChange={handleViewChange}
               />
             </div>
+            <div className="flex items-center gap-2">
+              {currentSection === 'trades' && (
+                <button
+                  onClick={() => setIsAddTradeModalOpen(true)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white rounded-xl text-sm font-medium transition-all shadow-lg shadow-green-600/20 hover:shadow-green-600/30"
+                >
+                  <Plus size={18} weight="bold" />
+                  <span>Add Trade</span>
+                </button>
+              )}
+              {currentSection === 'trades' && (
+                <CSVImportExport
+                  accountId={selectedAccount}
+                  accounts={accounts.map((acc) => ({
+                    id: acc.id,
+                    name: acc.name
+                  }))}
+                  onTradesImported={() => setRefreshKey((prev) => prev + 1)}
+                />
+              )}
+            </div>
           </div>
         </div>
 
-        {view === 'combined' || !selectedAccount ? (
-          <>
-            <div className="space-y-6">
-              <AccountsOverview
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-7xl">
+            {/* Section Content */}
+            {currentSection === 'overview' && (
+              <OverviewSection
                 accounts={accounts}
-                onSelectAccount={(id) => {
+                selectedAccount={selectedAccount}
+                selectedAccountData={selectedAccountData}
+                view={view}
+                refreshKey={refreshKey}
+                onAccountSelect={(id: string) => {
                   setSelectedAccount(id);
                   setView('individual');
                 }}
+                onDeleteAccount={handleDeleteAccount}
               />
+            )}
 
-              {/* Balance Chart - Full Width */}
-              <div className="mb-6">
-                <JournalBalanceChart
-                  accountId={null}
-                  currency={accounts.length > 0 ? accounts[0].currency : 'USD'}
-                  initialBalance={accounts.reduce(
-                    (sum, acc) => sum + acc.initial_balance,
-                    0
-                  )}
-                  refreshKey={refreshKey}
-                />
-              </div>
-
-              {/* Combined Stats Section */}
-              <div className="mb-6">
-                <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-                    {/* Total Trades */}
-                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-blue-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10">
-                      <div className="text-xs text-slate-400 mb-1">
-                        Total Trades
-                      </div>
-                      <div className="text-2xl font-bold text-white">
-                        {accounts.reduce(
-                          (sum, acc) => sum + acc.stats.totalTrades,
-                          0
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Win Rate */}
-                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-emerald-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10">
-                      <div className="text-xs text-slate-400 mb-1">
-                        Win Rate
-                      </div>
-                      <div className="text-2xl font-bold text-emerald-400">
-                        {Math.round(
-                          accounts.reduce(
-                            (sum, acc) => sum + acc.stats.winRate,
-                            0
-                          ) / Math.max(accounts.length, 1)
-                        )}
-                        %
-                      </div>
-                    </div>
-
-                    {/* Total RR */}
-                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-green-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-green-500/10">
-                      <div className="text-xs text-slate-400 mb-1">
-                        Total RR
-                      </div>
-                      <div className="text-2xl font-bold text-green-400">
-                        {accounts.reduce(
-                          (sum, acc) => sum + acc.stats.totalRR,
-                          0
-                        ) >= 0
-                          ? '+'
-                          : ''}
-                        {accounts
-                          .reduce((sum, acc) => sum + acc.stats.totalRR, 0)
-                          .toFixed(2)}
-                        R
-                      </div>
-                    </div>
-
-                    {/* Average RR */}
-                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-cyan-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/10">
-                      <div className="text-xs text-slate-400 mb-1">
-                        Average RR
-                      </div>
-                      <div className="text-2xl font-bold text-cyan-400">
-                        {accounts.reduce(
-                          (sum, acc) => sum + acc.stats.averageRR,
-                          0
-                        ) /
-                          Math.max(accounts.length, 1) >=
-                        0
-                          ? '+'
-                          : ''}
-                        {(
-                          accounts.reduce(
-                            (sum, acc) => sum + acc.stats.averageRR,
-                            0
-                          ) / Math.max(accounts.length, 1)
-                        ).toFixed(2)}
-                        R
-                      </div>
-                    </div>
-
-                    {/* Win Streak */}
-                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-purple-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10">
-                      <div className="text-xs text-slate-400 mb-1">
-                        Win Streak
-                      </div>
-                      <div className="text-2xl font-bold text-purple-400">
-                        {Math.max(
-                          ...accounts.map((acc) => acc.stats.winStreak)
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Loss Streak */}
-                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-red-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-red-500/10">
-                      <div className="text-xs text-slate-400 mb-1">
-                        Loss Streak
-                      </div>
-                      <div className="text-2xl font-bold text-red-400">
-                        {Math.max(
-                          ...accounts.map((acc) => acc.stats.loseStreak)
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Profit Factor */}
-                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-blue-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10">
-                      <div className="text-xs text-slate-400 mb-1">
-                        Profit Factor
-                      </div>
-                      <div className="text-2xl font-bold text-blue-400">
-                        {(
-                          accounts.reduce(
-                            (sum, acc) => sum + acc.stats.profitFactor,
-                            0
-                          ) / Math.max(accounts.length, 1)
-                        ).toFixed(2)}
-                      </div>
-                    </div>
-
-                    {/* Max Drawdown */}
-                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-orange-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/10">
-                      <div className="text-xs text-slate-400 mb-1">
-                        Max Drawdown
-                      </div>
-                      <div className="text-2xl font-bold text-orange-400">
-                        {Math.max(
-                          ...accounts.map((acc) => acc.stats.maxDrawdown)
-                        ) >= 0
-                          ? '+'
-                          : ''}
-                        {Math.max(
-                          ...accounts.map((acc) => acc.stats.maxDrawdown)
-                        ).toFixed(2)}
-                        R
-                      </div>
-                    </div>
-
-                    {/* Opportunity Cost */}
-                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-yellow-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-yellow-500/10">
-                      <div className="text-xs text-slate-400 mb-1">
-                        Opportunity Cost
-                      </div>
-                      <div className="text-2xl font-bold text-yellow-400">
-                        {accounts.reduce(
-                          (sum, acc) => sum + acc.stats.totalOpportunityCost,
-                          0
-                        ) >= 0
-                          ? '+'
-                          : ''}
-                        {accounts
-                          .reduce(
-                            (sum, acc) => sum + acc.stats.totalOpportunityCost,
-                            0
-                          )
-                          .toFixed(2)}
-                        R
-                      </div>
-                    </div>
-
-                    {/* Expected Value */}
-                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-cyan-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/10">
-                      <div className="text-xs text-slate-400 mb-1">
-                        Expected Value
-                      </div>
-                      <div className="text-2xl font-bold text-cyan-400">
-                        {accounts.reduce(
-                          (sum, acc) => sum + acc.stats.expectedValue,
-                          0
-                        ) /
-                          Math.max(accounts.length, 1) >=
-                        0
-                          ? '+'
-                          : ''}
-                        {(
-                          accounts.reduce(
-                            (sum, acc) => sum + acc.stats.expectedValue,
-                            0
-                          ) / Math.max(accounts.length, 1)
-                        ).toFixed(2)}
-                        R
-                      </div>
-                    </div>
-
-                    {/* Sharpe Ratio */}
-                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-indigo-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/10">
-                      <div className="text-xs text-slate-400 mb-1">
-                        Sharpe Ratio
-                      </div>
-                      <div className="text-2xl font-bold text-indigo-400">
-                        {(
-                          accounts.reduce(
-                            (sum, acc) => sum + acc.stats.sharpeRatio,
-                            0
-                          ) / Math.max(accounts.length, 1)
-                        ).toFixed(2)}
-                      </div>
-                    </div>
-
-                    {/* Best TP RR */}
-                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-pink-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-pink-500/10">
-                      <div className="text-xs text-slate-400 mb-1">
-                        Best TP RR
-                      </div>
-                      <div className="text-2xl font-bold text-pink-400">
-                        {accounts.reduce(
-                          (sum, acc) => sum + acc.stats.bestTPRR,
-                          0
-                        ) /
-                          Math.max(accounts.length, 1) >=
-                        0
-                          ? '+'
-                          : ''}
-                        {(
-                          accounts.reduce(
-                            (sum, acc) => sum + acc.stats.bestTPRR,
-                            0
-                          ) / Math.max(accounts.length, 1)
-                        ).toFixed(2)}
-                        R
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Display Mode Tabs */}
-              <div className="flex items-center justify-center mb-6">
-                <div className="bg-slate-800/50 rounded-lg p-1 border border-slate-700">
-                  <button
-                    onClick={() => setDisplayMode('calendar')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                      displayMode === 'calendar'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    Calendar View
-                  </button>
-                  <button
-                    onClick={() => setDisplayMode('list')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                      displayMode === 'list'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    Trade List
-                  </button>
-                </div>
-              </div>
-
-              {/* Full Width Calendar/List */}
-              {displayMode === 'calendar' ? (
-                <TradeCalendar
-                  accountId={null}
-                  month={currentMonth}
-                  onMonthChange={setCurrentMonth}
-                  refreshKey={refreshKey}
-                />
-              ) : (
-                <TradeList
-                  accountId={null}
-                  onEditTrade={handleEditTrade}
-                  onDeleteTrade={handleDeleteTrade}
-                  refreshKey={refreshKey}
-                />
-              )}
-            </div>
-          </>
-        ) : selectedAccountData ? (
-          <>
-            {/* Balance Chart - Full Width */}
-            <div className="mb-6">
-              <JournalBalanceChart
+            {currentSection === 'performance' && (
+              <PerformanceSection
                 accountId={selectedAccount}
-                currency={selectedAccountData.currency}
-                initialBalance={selectedAccountData.initial_balance}
                 refreshKey={refreshKey}
               />
-            </div>
+            )}
 
-            {/* Combined Stats Section */}
-            <div className="mb-6">
-              <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-                  {/* Total Trades */}
-                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-blue-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10">
-                    <div className="text-xs text-slate-400 mb-1">
-                      Total Trades
-                    </div>
-                    <div className="text-2xl font-bold text-white">
-                      {selectedAccountData.stats.totalTrades}
-                    </div>
-                  </div>
+            {currentSection === 'trades' && (
+              <TradesSection
+                accountId={selectedAccount}
+                searchDate={searchDate}
+                onSearchDateChange={setSearchDate}
+                onEditTrade={handleEditTrade}
+                onDeleteTrade={handleDeleteTrade}
+                refreshKey={refreshKey}
+              />
+            )}
 
-                  {/* Win Rate */}
-                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-emerald-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10">
-                    <div className="text-xs text-slate-400 mb-1">Win Rate</div>
-                    <div className="text-2xl font-bold text-emerald-400">
-                      {Math.round(selectedAccountData.stats.winRate)}%
-                    </div>
-                  </div>
+            {currentSection === 'calendar' && (
+              <CalendarSection
+                accountId={selectedAccount}
+                currentMonth={currentMonth}
+                onMonthChange={setCurrentMonth}
+                refreshKey={refreshKey}
+              />
+            )}
 
-                  {/* Total RR */}
-                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-green-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-green-500/10">
-                    <div className="text-xs text-slate-400 mb-1">Total RR</div>
-                    <div className="text-2xl font-bold text-green-400">
-                      {selectedAccountData.stats.totalRR >= 0 ? '+' : ''}
-                      {selectedAccountData.stats.totalRR.toFixed(2)}R
-                    </div>
-                  </div>
-
-                  {/* Average RR */}
-                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-cyan-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/10">
-                    <div className="text-xs text-slate-400 mb-1">
-                      Average RR
-                    </div>
-                    <div className="text-2xl font-bold text-cyan-400">
-                      {selectedAccountData.stats.averageRR >= 0 ? '+' : ''}
-                      {selectedAccountData.stats.averageRR.toFixed(2)}R
-                    </div>
-                  </div>
-
-                  {/* Win Streak */}
-                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-purple-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10">
-                    <div className="text-xs text-slate-400 mb-1">
-                      Win Streak
-                    </div>
-                    <div className="text-2xl font-bold text-purple-400">
-                      {selectedAccountData.stats.winStreak}
-                    </div>
-                  </div>
-
-                  {/* Loss Streak */}
-                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-red-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-red-500/10">
-                    <div className="text-xs text-slate-400 mb-1">
-                      Loss Streak
-                    </div>
-                    <div className="text-2xl font-bold text-red-400">
-                      {selectedAccountData.stats.loseStreak}
-                    </div>
-                  </div>
-
-                  {/* Profit Factor */}
-                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-blue-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10">
-                    <div className="text-xs text-slate-400 mb-1">
-                      Profit Factor
-                    </div>
-                    <div className="text-2xl font-bold text-blue-400">
-                      {selectedAccountData.stats.profitFactor.toFixed(2)}
-                    </div>
-                  </div>
-
-                  {/* Max Drawdown */}
-                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-orange-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/10">
-                    <div className="text-xs text-slate-400 mb-1">
-                      Max Drawdown
-                    </div>
-                    <div className="text-2xl font-bold text-orange-400">
-                      {selectedAccountData.stats.maxDrawdown >= 0 ? '+' : ''}
-                      {selectedAccountData.stats.maxDrawdown.toFixed(2)}R
-                    </div>
-                  </div>
-
-                  {/* Opportunity Cost */}
-                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-yellow-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-yellow-500/10">
-                    <div className="text-xs text-slate-400 mb-1">
-                      Opportunity Cost
-                    </div>
-                    <div className="text-2xl font-bold text-yellow-400">
-                      {selectedAccountData.stats.totalOpportunityCost >= 0
-                        ? '+'
-                        : ''}
-                      {selectedAccountData.stats.totalOpportunityCost.toFixed(
-                        2
-                      )}
-                      R
-                    </div>
-                  </div>
-
-                  {/* Expected Value */}
-                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-cyan-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/10">
-                    <div className="text-xs text-slate-400 mb-1">
-                      Expected Value
-                    </div>
-                    <div className="text-2xl font-bold text-cyan-400">
-                      {selectedAccountData.stats.expectedValue >= 0 ? '+' : ''}
-                      {selectedAccountData.stats.expectedValue.toFixed(2)}R
-                    </div>
-                  </div>
-
-                  {/* Sharpe Ratio */}
-                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-indigo-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/10">
-                    <div className="text-xs text-slate-400 mb-1">
-                      Sharpe Ratio
-                    </div>
-                    <div className="text-2xl font-bold text-indigo-400">
-                      {selectedAccountData.stats.sharpeRatio.toFixed(2)}
-                    </div>
-                  </div>
-
-                  {/* Best TP RR */}
-                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-pink-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-pink-500/10">
-                    <div className="text-xs text-slate-400 mb-1">
-                      Best TP RR
-                    </div>
-                    <div className="text-2xl font-bold text-pink-400">
-                      {selectedAccountData.stats.bestTPRR >= 0 ? '+' : ''}
-                      {selectedAccountData.stats.bestTPRR.toFixed(2)}R
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="w-full">
-              {/* Display Mode Tabs */}
-              <div className="flex items-center justify-center mb-6">
-                <div className="bg-slate-800/50 rounded-lg p-1 border border-slate-700">
-                  <button
-                    onClick={() => setDisplayMode('calendar')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                      displayMode === 'calendar'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    Calendar View
-                  </button>
-                  <button
-                    onClick={() => setDisplayMode('list')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                      displayMode === 'list'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    Trade List
-                  </button>
-                </div>
-              </div>
-
-              {displayMode === 'calendar' ? (
-                <TradeCalendar
-                  accountId={selectedAccount}
-                  month={currentMonth}
-                  onMonthChange={setCurrentMonth}
-                  refreshKey={refreshKey}
-                />
-              ) : (
-                <TradeList
-                  accountId={selectedAccount}
-                  onEditTrade={handleEditTrade}
-                  onDeleteTrade={handleDeleteTrade}
-                  refreshKey={refreshKey}
-                />
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-slate-400 mb-4">
-              {accounts.length === 0
-                ? 'No trading accounts found. Create your first account to get started.'
-                : 'Select an account to view individual stats'}
-            </p>
-            {accounts.length === 0 && (
-              <button
-                onClick={() => {
-                  /* This will be handled by the Create Account button */
-                }}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-              >
-                Create Your First Account
-              </button>
+            {currentSection === 'settings' && (
+              <JournalSettings
+                accounts={accounts}
+                onAccountDeleted={handleDeleteAccount}
+                onAccountCreated={handleAccountCreated}
+              />
             )}
           </div>
-        )}
+        </div>
       </div>
 
       {/* Modals */}
@@ -1045,11 +661,6 @@ export default function JournalPage() {
         onTradeAdded={handleTradeAdded}
       />
 
-      <SettingsModal
-        isOpen={isSettingsModalOpen}
-        onClose={() => setIsSettingsModalOpen(false)}
-      />
-
       <EditTradeModal
         isOpen={isEditTradeModalOpen}
         onClose={() => {
@@ -1059,6 +670,256 @@ export default function JournalPage() {
         trade={editingTrade}
         onTradeUpdated={handleTradeUpdated}
       />
+    </div>
+  );
+}
+
+// Overview Section Component
+function OverviewSection({
+  accounts,
+  selectedAccount,
+  selectedAccountData,
+  view,
+  refreshKey,
+  onAccountSelect,
+  onDeleteAccount
+}: {
+  accounts: any[];
+  selectedAccount: string | null;
+  selectedAccountData: any;
+  view: string;
+  refreshKey: number;
+  onAccountSelect: (id: string) => void;
+  onDeleteAccount: (id: string) => void;
+}) {
+  return (
+    <div className="space-y-6">
+      <AccountsOverview
+        accounts={accounts}
+        onSelectAccount={onAccountSelect}
+        onDeleteAccount={onDeleteAccount}
+      />
+
+      <JournalBalanceChart
+        accountId={selectedAccount}
+        currency={
+          selectedAccountData?.currency || accounts[0]?.currency || 'USD'
+        }
+        initialBalance={
+          selectedAccountData?.initial_balance ||
+          accounts.reduce(
+            (sum: number, acc: any) => sum + acc.initial_balance,
+            0
+          )
+        }
+        refreshKey={refreshKey}
+      />
+
+      {/* Stats Grid */}
+      <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+          {selectedAccountData ? (
+            <>
+              <StatCard
+                label="Total Trades"
+                value={selectedAccountData.stats.totalTrades}
+                color="white"
+              />
+              <StatCard
+                label="Win Rate"
+                value={`${Math.round(selectedAccountData.stats.winRate)}%`}
+                color="emerald"
+              />
+              <StatCard
+                label="Total RR"
+                value={`${selectedAccountData.stats.totalRR >= 0 ? '+' : ''}${selectedAccountData.stats.totalRR.toFixed(2)}R`}
+                color="green"
+              />
+              <StatCard
+                label="Average RR"
+                value={`${selectedAccountData.stats.averageRR >= 0 ? '+' : ''}${selectedAccountData.stats.averageRR.toFixed(2)}R`}
+                color="cyan"
+              />
+              <StatCard
+                label="Win Streak"
+                value={selectedAccountData.stats.winStreak}
+                color="purple"
+              />
+              <StatCard
+                label="Loss Streak"
+                value={selectedAccountData.stats.loseStreak}
+                color="red"
+              />
+            </>
+          ) : (
+            <>
+              <StatCard
+                label="Total Trades"
+                value={accounts.reduce(
+                  (sum: number, acc: any) => sum + acc.stats.totalTrades,
+                  0
+                )}
+                color="white"
+              />
+              <StatCard
+                label="Win Rate"
+                value={`${Math.round(accounts.reduce((sum: number, acc: any) => sum + acc.stats.winRate, 0) / Math.max(accounts.length, 1))}%`}
+                color="emerald"
+              />
+              <StatCard
+                label="Total RR"
+                value={`${accounts.reduce((sum: number, acc: any) => sum + acc.stats.totalRR, 0) >= 0 ? '+' : ''}${accounts.reduce((sum: number, acc: any) => sum + acc.stats.totalRR, 0).toFixed(2)}R`}
+                color="green"
+              />
+              <StatCard
+                label="Average RR"
+                value={`${accounts.reduce((sum: number, acc: any) => sum + acc.stats.averageRR, 0) / Math.max(accounts.length, 1) >= 0 ? '+' : ''}${(accounts.reduce((sum: number, acc: any) => sum + acc.stats.averageRR, 0) / Math.max(accounts.length, 1)).toFixed(2)}R`}
+                color="cyan"
+              />
+              <StatCard
+                label="Win Streak"
+                value={Math.max(
+                  ...accounts.map((acc: any) => acc.stats.winStreak)
+                )}
+                color="purple"
+              />
+              <StatCard
+                label="Loss Streak"
+                value={Math.max(
+                  ...accounts.map((acc: any) => acc.stats.loseStreak)
+                )}
+                color="red"
+              />
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Performance Section Component
+function PerformanceSection({
+  accountId,
+  refreshKey
+}: {
+  accountId: string | null;
+  refreshKey: number;
+}) {
+  return (
+    <div className="space-y-6">
+      <PerformanceAnalysis accountId={accountId} refreshKey={refreshKey} />
+      <SymbolPerformance accountId={accountId} refreshKey={refreshKey} />
+    </div>
+  );
+}
+
+// Trades Section Component
+function TradesSection({
+  accountId,
+  searchDate,
+  onSearchDateChange,
+  onEditTrade,
+  onDeleteTrade,
+  refreshKey
+}: {
+  accountId: string | null;
+  searchDate: string;
+  onSearchDateChange: (date: string) => void;
+  onEditTrade: (trade: TradeEntry) => void;
+  onDeleteTrade: (id: string) => void;
+  refreshKey: number;
+}) {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-white">Trade List</h2>
+        <div className="flex items-center space-x-2">
+          <input
+            type="date"
+            value={searchDate}
+            onChange={(e) => onSearchDateChange(e.target.value)}
+            className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Search by date..."
+          />
+          {searchDate && (
+            <button
+              onClick={() => onSearchDateChange('')}
+              className="px-3 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg text-sm transition-colors"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
+      <TradeList
+        accountId={accountId}
+        onEditTrade={onEditTrade}
+        onDeleteTrade={onDeleteTrade}
+        refreshKey={refreshKey}
+        searchDate={searchDate}
+      />
+    </div>
+  );
+}
+
+// Calendar Section Component
+function CalendarSection({
+  accountId,
+  currentMonth,
+  onMonthChange,
+  refreshKey
+}: {
+  accountId: string | null;
+  currentMonth: Date;
+  onMonthChange: (month: Date) => void;
+  refreshKey: number;
+}) {
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-white">Trade Calendar</h2>
+      <TradeCalendar
+        accountId={accountId}
+        month={currentMonth}
+        onMonthChange={onMonthChange}
+        refreshKey={refreshKey}
+      />
+    </div>
+  );
+}
+
+// Stat Card Component
+function StatCard({
+  label,
+  value,
+  color
+}: {
+  label: string;
+  value: string | number;
+  color: string;
+}) {
+  const colorClasses: Record<string, string> = {
+    white: 'text-white',
+    emerald: 'text-emerald-400',
+    green: 'text-green-400',
+    cyan: 'text-cyan-400',
+    purple: 'text-purple-400',
+    red: 'text-red-400',
+    blue: 'text-blue-400',
+    orange: 'text-orange-400',
+    yellow: 'text-yellow-400',
+    indigo: 'text-indigo-400',
+    pink: 'text-pink-400'
+  };
+
+  return (
+    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-blue-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10">
+      <div className="text-xs text-slate-400 mb-1">{label}</div>
+      <div
+        className={`text-2xl font-bold ${colorClasses[color] || 'text-white'}`}
+      >
+        {value}
+      </div>
     </div>
   );
 }

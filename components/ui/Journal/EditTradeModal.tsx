@@ -27,16 +27,27 @@ export default function EditTradeModal({
     time: new Date().toTimeString().slice(0, 5),
     notes: '',
     imageUrl: '',
-    riskMultiplier: '1' as '0.5' | '1' | '2'
+    riskMultiplier: '1' as '0.5' | '1' | '2',
+    selectedTags: [] as string[]
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tags, setTags] = useState<
+    Array<{ id: string; name: string; color: string }>
+  >([]);
 
   const supabase = createClient();
 
   useEffect(() => {
+    if (isOpen) {
+      fetchTags();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
     if (trade && isOpen) {
       const entryDate = new Date(trade.entry_date);
+      fetchTradeTags(trade.id);
 
       setFormData({
         symbol: trade.symbol || '',
@@ -50,10 +61,52 @@ export default function EditTradeModal({
         riskMultiplier: (trade.risk_multiplier?.toString() || '1') as
           | '0.5'
           | '1'
-          | '2'
+          | '2',
+        selectedTags: []
       });
     }
   }, [trade, isOpen]);
+
+  const fetchTags = async () => {
+    try {
+      const {
+        data: { user }
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error: fetchError } = await supabase
+        .from('tags' as any)
+        .select('*')
+        .eq('user_id', user.id)
+        .order('name', { ascending: true });
+
+      if (!fetchError && data) {
+        setTags(
+          data as any as Array<{ id: string; name: string; color: string }>
+        );
+      }
+    } catch (err) {
+      console.error('Error fetching tags:', err);
+    }
+  };
+
+  const fetchTradeTags = async (tradeId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('trade_tags' as any)
+        .select('tag_id')
+        .eq('trade_id', tradeId);
+
+      if (!error && data) {
+        setFormData((prev) => ({
+          ...prev,
+          selectedTags: data.map((tt) => tt.tag_id)
+        }));
+      }
+    } catch (err) {
+      console.error('Error fetching trade tags:', err);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,6 +163,30 @@ export default function EditTradeModal({
 
       if (!data) {
         throw new Error('No data returned from database');
+      }
+
+      // Update tags
+      // First, delete existing tags
+      await supabase
+        .from('trade_tags' as any)
+        .delete()
+        .eq('trade_id', trade.id);
+
+      // Then, insert new tags if any are selected
+      if (formData.selectedTags.length > 0) {
+        const tagInserts = formData.selectedTags.map((tagId) => ({
+          trade_id: trade.id,
+          tag_id: tagId
+        }));
+
+        const { error: tagsError } = await supabase
+          .from('trade_tags' as any)
+          .insert(tagInserts);
+
+        if (tagsError) {
+          console.error('Error saving tags:', tagsError);
+          // Don't throw - trade is updated, tags are optional
+        }
       }
 
       onTradeUpdated(data as unknown as TradeEntry);
@@ -287,6 +364,39 @@ export default function EditTradeModal({
               placeholder="https://example.com/chart-image.png"
             />
           </div>
+
+          {/* Tags */}
+          {tags.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Tags (optional)
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => {
+                      const isSelected = formData.selectedTags.includes(tag.id);
+                      setFormData({
+                        ...formData,
+                        selectedTags: isSelected
+                          ? formData.selectedTags.filter((id) => id !== tag.id)
+                          : [...formData.selectedTags, tag.id]
+                      });
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      formData.selectedTags.includes(tag.id)
+                        ? `${tag.color} text-white shadow-lg`
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600 border border-slate-600'
+                    }`}
+                  >
+                    {tag.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Notes */}
           <div>

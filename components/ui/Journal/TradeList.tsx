@@ -11,6 +11,11 @@ interface TradeListProps {
   onDeleteTrade: (tradeId: string) => void;
   className?: string;
   refreshKey?: number;
+  searchDate?: string;
+}
+
+interface TradeWithTags extends TradeEntry {
+  tags?: Array<{ id: string; name: string; color: string }>;
 }
 
 export default function TradeList({
@@ -18,19 +23,67 @@ export default function TradeList({
   onEditTrade,
   onDeleteTrade,
   className = '',
-  refreshKey = 0
+  refreshKey = 0,
+  searchDate = ''
 }: TradeListProps) {
-  const [trades, setTrades] = useState<TradeEntry[]>([]);
+  const [trades, setTrades] = useState<TradeWithTags[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'date' | 'pnl' | 'symbol'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [symbolFilter, setSymbolFilter] = useState('');
+  const [directionFilter, setDirectionFilter] = useState<
+    'all' | 'long' | 'short'
+  >('all');
+  const [rrRange, setRrRange] = useState({ min: '', max: '' });
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [availableTags, setAvailableTags] = useState<
+    Array<{ id: string; name: string; color: string }>
+  >([]);
+  const [showFilters, setShowFilters] = useState(false);
 
   const supabase = createClient();
 
   useEffect(() => {
     fetchTrades();
-  }, [accountId, refreshKey]);
+  }, [
+    accountId,
+    refreshKey,
+    selectedTags,
+    symbolFilter,
+    directionFilter,
+    rrRange,
+    dateRange,
+    searchDate
+  ]);
+
+  useEffect(() => {
+    fetchTags();
+  }, []);
+
+  const fetchTags = async () => {
+    try {
+      const {
+        data: { user }
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error: fetchError } = await supabase
+        .from('tags' as any)
+        .select('*')
+        .eq('user_id', user.id)
+        .order('name', { ascending: true });
+
+      if (!fetchError && data) {
+        setAvailableTags(
+          data as any as Array<{ id: string; name: string; color: string }>
+        );
+      }
+    } catch (err) {
+      console.error('Error fetching tags:', err);
+    }
+  };
 
   const fetchTrades = async () => {
     try {
@@ -46,6 +99,31 @@ export default function TradeList({
         query = query.eq('account_id', accountId);
       }
 
+      // Apply filters
+      if (symbolFilter) {
+        query = query.ilike('symbol', `%${symbolFilter}%`);
+      }
+      if (directionFilter !== 'all') {
+        query = query.eq('side', directionFilter);
+      }
+      if (dateRange.start) {
+        query = query.gte('entry_date', dateRange.start);
+      }
+      if (dateRange.end) {
+        query = query.lte('entry_date', dateRange.end);
+      }
+
+      // Apply date search if provided
+      if (searchDate) {
+        const searchStart = new Date(searchDate);
+        searchStart.setHours(0, 0, 0, 0);
+        const searchEnd = new Date(searchDate);
+        searchEnd.setHours(23, 59, 59, 999);
+        query = query
+          .gte('entry_date', searchStart.toISOString())
+          .lte('entry_date', searchEnd.toISOString());
+      }
+
       const { data, error: fetchError } = await query;
 
       if (fetchError) {
@@ -54,7 +132,41 @@ export default function TradeList({
         return;
       }
 
-      setTrades(data || []);
+      // Fetch tags for each trade
+      const tradesWithTags = await Promise.all(
+        (data || []).map(async (trade: any) => {
+          const { data: tagData } = await supabase
+            .from('trade_tags' as any)
+            .select('tag_id, tags(id, name, color)')
+            .eq('trade_id', trade.id);
+
+          const tradeTags = tagData
+            ? (tagData as any[]).filter((tt) => tt.tags).map((tt) => tt.tags)
+            : [];
+
+          return { ...trade, tags: tradeTags };
+        })
+      );
+
+      // Filter by tags if selected
+      let filteredTrades = tradesWithTags;
+      if (selectedTags.length > 0) {
+        filteredTrades = tradesWithTags.filter((trade) =>
+          trade.tags?.some((tag) => selectedTags.includes(tag.id))
+        );
+      }
+
+      // Filter by RR range
+      if (rrRange.min || rrRange.max) {
+        filteredTrades = filteredTrades.filter((trade) => {
+          const rr = trade.rr || 0;
+          if (rrRange.min && rr < parseFloat(rrRange.min)) return false;
+          if (rrRange.max && rr > parseFloat(rrRange.max)) return false;
+          return true;
+        });
+      }
+
+      setTrades(filteredTrades);
     } catch (err) {
       console.error('Error fetching trades:', err);
       setError('Failed to load trades');
@@ -169,31 +281,194 @@ export default function TradeList({
     <div
       className={`bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-8 ${className}`}
     >
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-white">Trade History</h3>
-        <div className="flex items-center space-x-2">
-          <span className="text-sm text-slate-400">Sort by:</span>
-          <select
-            value={sortBy}
-            onChange={(e) =>
-              handleSort(e.target.value as 'date' | 'pnl' | 'symbol')
-            }
-            className="px-3 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm"
-          >
-            <option value="date">Date</option>
-            <option value="pnl">P&L</option>
-            <option value="symbol">Symbol</option>
-          </select>
-          <button
-            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-            className="p-1 hover:bg-slate-700 rounded transition-colors"
-            title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
-          >
-            <span className="text-slate-400 text-sm">
-              {sortOrder === 'asc' ? '↑' : '↓'}
-            </span>
-          </button>
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-white">Trade History</h3>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                showFilters
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              }`}
+            >
+              Filters
+            </button>
+            <span className="text-sm text-slate-400">Sort by:</span>
+            <select
+              value={sortBy}
+              onChange={(e) =>
+                handleSort(e.target.value as 'date' | 'pnl' | 'symbol')
+              }
+              className="px-3 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm"
+            >
+              <option value="date">Date</option>
+              <option value="pnl">RR</option>
+              <option value="symbol">Symbol</option>
+            </select>
+            <button
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              className="p-1 hover:bg-slate-700 rounded transition-colors"
+              title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
+            >
+              <span className="text-slate-400 text-sm">
+                {sortOrder === 'asc' ? '↑' : '↓'}
+              </span>
+            </button>
+          </div>
         </div>
+
+        {/* Advanced Filters */}
+        {showFilters && (
+          <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Symbol Filter */}
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">
+                  Symbol
+                </label>
+                <input
+                  type="text"
+                  value={symbolFilter}
+                  onChange={(e) => setSymbolFilter(e.target.value)}
+                  placeholder="Filter by symbol..."
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                />
+              </div>
+
+              {/* Direction Filter */}
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">
+                  Direction
+                </label>
+                <select
+                  value={directionFilter}
+                  onChange={(e) =>
+                    setDirectionFilter(
+                      e.target.value as 'all' | 'long' | 'short'
+                    )
+                  }
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                >
+                  <option value="all">All</option>
+                  <option value="long">Long</option>
+                  <option value="short">Short</option>
+                </select>
+              </div>
+
+              {/* Date Range */}
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={dateRange.start}
+                  onChange={(e) =>
+                    setDateRange({ ...dateRange, start: e.target.value })
+                  }
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  value={dateRange.end}
+                  onChange={(e) =>
+                    setDateRange({ ...dateRange, end: e.target.value })
+                  }
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                />
+              </div>
+
+              {/* RR Range */}
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">
+                  Min RR
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={rrRange.min}
+                  onChange={(e) =>
+                    setRrRange({ ...rrRange, min: e.target.value })
+                  }
+                  placeholder="Min RR"
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">
+                  Max RR
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={rrRange.max}
+                  onChange={(e) =>
+                    setRrRange({ ...rrRange, max: e.target.value })
+                  }
+                  placeholder="Max RR"
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-white text-sm"
+                />
+              </div>
+
+              {/* Tags Filter */}
+              {availableTags.length > 0 && (
+                <div className="md:col-span-2">
+                  <label className="block text-xs text-slate-400 mb-2">
+                    Tags
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableTags.map((tag) => (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => {
+                          const isSelected = selectedTags.includes(tag.id);
+                          setSelectedTags(
+                            isSelected
+                              ? selectedTags.filter((id) => id !== tag.id)
+                              : [...selectedTags, tag.id]
+                          );
+                        }}
+                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                          selectedTags.includes(tag.id)
+                            ? `${tag.color} text-white`
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-600'
+                        }`}
+                      >
+                        {tag.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Clear Filters */}
+              <div className="md:col-span-2 flex items-end">
+                <button
+                  onClick={() => {
+                    setSymbolFilter('');
+                    setDirectionFilter('all');
+                    setRrRange({ min: '', max: '' });
+                    setDateRange({ start: '', end: '' });
+                    setSelectedTags([]);
+                  }}
+                  className="px-4 py-1.5 bg-slate-600 hover:bg-slate-500 text-white rounded text-sm transition-colors"
+                >
+                  Clear Filters
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {trades.length === 0 ? (
@@ -299,6 +574,22 @@ export default function TradeList({
                     </div>
                   ) : null}
                 </div>
+
+                {/* Tags */}
+                {trade.tags && trade.tags.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-slate-600/50">
+                    <div className="flex flex-wrap gap-1.5">
+                      {trade.tags.map((tag) => (
+                        <span
+                          key={tag.id}
+                          className={`px-2 py-0.5 rounded text-xs font-medium ${tag.color} text-white`}
+                        >
+                          {tag.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex items-center space-x-2 ml-4">
