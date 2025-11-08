@@ -524,7 +524,8 @@ export default function SignalCalendar({
                                     : 'text-red-400'
                                 }`}
                               >
-                                {formatPercentage(dayStats.totalGain)}
+                                {dayStats.totalGain >= 0 ? '+' : ''}
+                                {dayStats.totalGain.toFixed(2)}R
                               </div>
                             </div>
                           </div>
@@ -553,7 +554,8 @@ export default function SignalCalendar({
                               : 'text-red-400'
                           }`}
                         >
-                          {formatPercentage(weekData.totalGain)}
+                          {weekData.totalGain >= 0 ? '+' : ''}
+                          {weekData.totalGain.toFixed(2)}R
                         </div>
                       </>
                     ) : (
@@ -612,9 +614,10 @@ export default function SignalCalendar({
                       stats.totalGain >= 0 ? 'text-emerald-400' : 'text-red-400'
                     }`}
                   >
-                    {formatPercentage(stats.totalGain)}
+                    {stats.totalGain >= 0 ? '+' : ''}
+                    {stats.totalGain.toFixed(2)}R
                   </div>
-                  <div className="text-xs text-slate-400">Total Gain</div>
+                  <div className="text-xs text-slate-400">Total RR</div>
                 </div>
                 <div className="text-center p-3 bg-slate-600/30 rounded-lg">
                   <div className="text-2xl font-bold text-emerald-400 mb-1">

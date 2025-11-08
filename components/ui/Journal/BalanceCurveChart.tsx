@@ -122,13 +122,12 @@ export default function BalanceCurveChart({
     };
   }, [data]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
+  const formatRR = (rr: number) => {
+    if (isNaN(rr) || rr === null || rr === undefined) {
+      return '0.00R';
+    }
+    const sign = rr >= 0 ? '+' : '';
+    return `${sign}${rr.toFixed(2)}R`;
   };
 
   if (!chartData) {
@@ -140,7 +139,7 @@ export default function BalanceCurveChart({
           </div>
           <p className="text-slate-400 font-medium">No data available</p>
           <p className="text-slate-500 text-sm mt-1">
-            Start trading to see your balance curve
+            Start trading to see your RR progression
           </p>
         </div>
       </div>
@@ -149,24 +148,6 @@ export default function BalanceCurveChart({
 
   return (
     <div className="w-full h-full relative bg-gradient-to-br from-slate-800/20 to-slate-900/20 rounded-2xl p-6">
-      {/* Chart Title */}
-      <div className="absolute top-4 left-6 z-10">
-        <h4 className="text-lg font-bold text-white mb-1">
-          Balance Progression
-        </h4>
-        <p className="text-slate-400 text-sm">Your trading journey over time</p>
-      </div>
-
-      {/* Current Value Display */}
-      {data.length > 0 && (
-        <div className="absolute top-4 right-6 z-10 text-right">
-          <div className="text-2xl font-bold text-white">
-            {formatCurrency(data[data.length - 1].balance)}
-          </div>
-          <div className="text-sm text-slate-400">Current Balance</div>
-        </div>
-      )}
-
       <svg
         width="100%"
         height="100%"
@@ -232,7 +213,7 @@ export default function BalanceCurveChart({
               className="text-xs fill-slate-500"
               fontSize="11"
             >
-              {formatCurrency(label.value)}
+              {formatRR(label.value)}
             </text>
           </g>
         ))}
@@ -288,7 +269,7 @@ export default function BalanceCurveChart({
                   setHoveredIndex(index);
                   onHover?.({
                     date: data[index].date.toISOString().split('T')[0],
-                    balance: point.balance,
+                    balance: point.balance, // This is actually RR now
                     trades: 1
                   });
                 }}
@@ -342,7 +323,7 @@ export default function BalanceCurveChart({
                     className="text-sm fill-white font-bold"
                     fontSize="12"
                   >
-                    {formatCurrency(point.balance)}
+                    {formatRR(point.balance)}
                   </text>
                   <text
                     x={point.x}
@@ -351,8 +332,7 @@ export default function BalanceCurveChart({
                     className={`text-xs font-medium ${point.pnl >= 0 ? 'fill-emerald-400' : 'fill-red-400'}`}
                     fontSize="10"
                   >
-                    {point.pnl >= 0 ? '+' : ''}
-                    {formatCurrency(point.pnl)}
+                    {formatRR(point.pnl)}
                   </text>
                   <text
                     x={point.x}

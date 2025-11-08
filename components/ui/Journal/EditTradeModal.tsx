@@ -20,17 +20,14 @@ export default function EditTradeModal({
 }: EditTradeModalProps) {
   const [formData, setFormData] = useState({
     symbol: '',
-    side: 'long' as 'long' | 'short',
-    entry_price: '',
-    exit_price: '',
-    pnl_amount: '',
+    direction: 'long' as 'long' | 'short',
     rr: '',
-    status: 'closed' as 'open' | 'closed',
-    entry_date: '',
-    entry_time: '',
-    exit_date: '',
-    exit_time: '',
-    notes: ''
+    maxAdverse: '',
+    date: new Date().toISOString().split('T')[0],
+    time: new Date().toTimeString().slice(0, 5),
+    notes: '',
+    imageUrl: '',
+    riskMultiplier: '1' as '0.5' | '1' | '2'
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,21 +37,20 @@ export default function EditTradeModal({
   useEffect(() => {
     if (trade && isOpen) {
       const entryDate = new Date(trade.entry_date);
-      const exitDate = trade.exit_date ? new Date(trade.exit_date) : null;
 
       setFormData({
         symbol: trade.symbol || '',
-        side: (trade.side?.toLowerCase() as 'long' | 'short') || 'long',
-        entry_price: trade.entry_price?.toString() || '',
-        exit_price: trade.exit_price?.toString() || '',
-        pnl_amount: trade.pnl_amount?.toString() || '',
+        direction: (trade.side?.toLowerCase() as 'long' | 'short') || 'long',
         rr: trade.rr?.toString() || '',
-        status: (trade.status?.toLowerCase() as 'open' | 'closed') || 'closed',
-        entry_date: entryDate.toISOString().slice(0, 10),
-        entry_time: entryDate.toTimeString().slice(0, 5),
-        exit_date: exitDate ? exitDate.toISOString().slice(0, 10) : '',
-        exit_time: exitDate ? exitDate.toTimeString().slice(0, 5) : '',
-        notes: trade.notes || ''
+        maxAdverse: trade.max_adverse?.toString() || '',
+        date: entryDate.toISOString().slice(0, 10),
+        time: entryDate.toTimeString().slice(0, 5),
+        notes: trade.notes || '',
+        imageUrl: trade.image_url || '',
+        riskMultiplier: (trade.risk_multiplier?.toString() || '1') as
+          | '0.5'
+          | '1'
+          | '2'
       });
     }
   }, [trade, isOpen]);
@@ -63,72 +59,45 @@ export default function EditTradeModal({
     e.preventDefault();
     if (!trade) return;
 
+    setIsLoading(true);
+    setError(null);
+
     try {
-      setIsLoading(true);
-      setError(null);
-
-      // Validate required fields
-      if (
-        !formData.symbol ||
-        !formData.entry_price ||
-        !formData.entry_date ||
-        !formData.entry_time
-      ) {
-        setError('Please fill in all required fields');
-        return;
+      const {
+        data: { user },
+        error: authError
+      } = await supabase.auth.getUser();
+      if (authError || !user) {
+        throw new Error('Not authenticated');
       }
 
-      const entryPrice = parseFloat(formData.entry_price);
-      const exitPrice = formData.exit_price
-        ? parseFloat(formData.exit_price)
-        : null;
-      const pnlAmount = formData.pnl_amount
-        ? parseFloat(formData.pnl_amount)
-        : null;
-      const rr = formData.rr ? parseFloat(formData.rr) : null;
-
-      // Create entry datetime
-      const entryDateTime = new Date(
-        `${formData.entry_date}T${formData.entry_time}`
-      ).toISOString();
-
-      // Create exit datetime if provided
-      let exitDateTime = null;
-      if (formData.exit_date && formData.exit_time) {
-        exitDateTime = new Date(
-          `${formData.exit_date}T${formData.exit_time}`
-        ).toISOString();
+      // Combine date and time into a single datetime string
+      const entryDateTime = new Date(`${formData.date}T${formData.time}`);
+      if (isNaN(entryDateTime.getTime())) {
+        throw new Error('Invalid date or time');
       }
 
-      // Calculate P&L if not provided but we have prices
-      let calculatedPnl = pnlAmount;
-      if (!calculatedPnl && exitPrice) {
-        calculatedPnl =
-          formData.side === 'long'
-            ? exitPrice - entryPrice
-            : entryPrice - exitPrice;
-      }
+      // Parse RR and max adverse
+      const rr = parseFloat(formData.rr);
+      const maxAdverse = parseFloat(formData.maxAdverse);
 
-      // Calculate R:R if not provided but we have P&L
-      let calculatedRr = rr;
-      if (!calculatedRr && calculatedPnl && entryPrice) {
-        calculatedRr = Math.abs(calculatedPnl) / entryPrice;
+      if (isNaN(rr)) {
+        throw new Error('RR made must be a valid number');
       }
 
       // Update trade in database
       const { data, error: updateError } = await supabase
         .from('trade_entries' as any)
         .update({
-          symbol: formData.symbol,
-          side: formData.side,
-          entry_price: entryPrice,
-          exit_price: exitPrice,
-          pnl_amount: calculatedPnl,
-          rr: calculatedRr,
-          status: formData.status,
-          entry_date: entryDateTime,
-          exit_date: exitDateTime,
-          notes: formData.notes || null
+          symbol: formData.symbol.toUpperCase(),
+          side: formData.direction,
+          entry_date: entryDateTime.toISOString(),
+          rr: rr,
+          max_adverse: isNaN(maxAdverse) ? null : maxAdverse,
+          risk_multiplier: parseFloat(formData.riskMultiplier),
+          status: 'closed', // All manually entered trades are closed
+          notes: formData.notes || null,
+          image_url: formData.imageUrl || null
         })
         .eq('id', trade.id)
         .select()
@@ -153,270 +122,208 @@ export default function EditTradeModal({
     }
   };
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
   if (!isOpen || !trade) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-slate-700">
-          <h2 className="text-xl font-semibold text-white">Edit Trade</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-slate-800 rounded-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-white">Edit Trade</h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+            className="text-slate-400 hover:text-white transition-colors"
           >
-            <XMarkIcon className="h-5 w-5 text-slate-400" />
+            <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {error && (
-            <div className="p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
-              <p className="text-red-400 text-sm">{error}</p>
-            </div>
-          )}
-
-          {/* Image Preview */}
-          {trade.image_data && (
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Chart Image
-              </label>
-              <div className="flex justify-center">
-                <img
-                  src={trade.image_data}
-                  alt="Trade chart"
-                  className="max-w-full max-h-64 object-contain rounded border border-slate-600 cursor-pointer hover:opacity-80 transition-opacity"
-                  onClick={() => {
-                    // Open image in full screen
-                    const newWindow = window.open();
-                    if (newWindow) {
-                      newWindow.document.write(`
-                        <html>
-                          <head><title>Trade Chart - ${trade.symbol}</title></head>
-                          <body style="margin:0;background:#000;display:flex;justify-content:center;align-items:center;">
-                            <img src="${trade.image_data}" style="max-width:100%;max-height:100%;object-fit:contain;" />
-                          </body>
-                        </html>
-                      `);
-                    }
-                  }}
-                  title="Click to view full size"
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Symbol */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Symbol *
+                Symbol
               </label>
               <input
                 type="text"
                 value={formData.symbol}
-                onChange={(e) => handleInputChange('symbol', e.target.value)}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g., BTCUSD, EURUSD"
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    symbol: e.target.value.toUpperCase()
+                  })
+                }
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="e.g., BTCUSDT, EURUSD"
                 required
               />
             </div>
 
-            {/* Side */}
+            {/* Direction */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Direction *
+                Direction
               </label>
               <select
-                value={formData.side}
-                onChange={(e) => handleInputChange('side', e.target.value)}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={formData.direction}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    direction: e.target.value as 'long' | 'short'
+                  })
+                }
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="long">Long</option>
                 <option value="short">Short</option>
               </select>
             </div>
+          </div>
 
-            {/* Entry Price */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* RR Made */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Entry Price *
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.entry_price}
-                onChange={(e) =>
-                  handleInputChange('entry_price', e.target.value)
-                }
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="0.00"
-                required
-              />
-            </div>
-
-            {/* Exit Price */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Exit Price
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.exit_price}
-                onChange={(e) =>
-                  handleInputChange('exit_price', e.target.value)
-                }
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="0.00"
-              />
-            </div>
-
-            {/* P&L Amount */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                P&L Amount
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.pnl_amount}
-                onChange={(e) =>
-                  handleInputChange('pnl_amount', e.target.value)
-                }
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="0.00"
-              />
-            </div>
-
-            {/* R:R */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Risk:Reward
+                RR Made
               </label>
               <input
                 type="number"
                 step="0.01"
                 value={formData.rr}
-                onChange={(e) => handleInputChange('rr', e.target.value)}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="0.00"
-              />
-            </div>
-
-            {/* Entry Date */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Entry Date *
-              </label>
-              <input
-                type="date"
-                value={formData.entry_date}
                 onChange={(e) =>
-                  handleInputChange('entry_date', e.target.value)
+                  setFormData({ ...formData, rr: e.target.value })
                 }
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="e.g., 2.5"
                 required
               />
             </div>
 
-            {/* Entry Time */}
+            {/* Max Adverse */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Entry Time *
+                Max Adverse (optional)
               </label>
               <input
-                type="time"
-                value={formData.entry_time}
+                type="number"
+                step="0.01"
+                value={formData.maxAdverse}
                 onChange={(e) =>
-                  handleInputChange('entry_time', e.target.value)
+                  setFormData({ ...formData, maxAdverse: e.target.value })
                 }
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="e.g., 0.5"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Date */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Date
+              </label>
+              <input
+                type="date"
+                value={formData.date}
+                onChange={(e) =>
+                  setFormData({ ...formData, date: e.target.value })
+                }
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
             </div>
 
-            {/* Exit Date */}
+            {/* Time */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Exit Date
-              </label>
-              <input
-                type="date"
-                value={formData.exit_date}
-                onChange={(e) => handleInputChange('exit_date', e.target.value)}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* Exit Time */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Exit Time
+                Time
               </label>
               <input
                 type="time"
-                value={formData.exit_time}
-                onChange={(e) => handleInputChange('exit_time', e.target.value)}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={formData.time}
+                onChange={(e) =>
+                  setFormData({ ...formData, time: e.target.value })
+                }
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
               />
             </div>
 
-            {/* Status */}
+            {/* Risk Multiplier */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Status
+                Risk Multiplier
               </label>
               <select
-                value={formData.status}
-                onChange={(e) => handleInputChange('status', e.target.value)}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={formData.riskMultiplier}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    riskMultiplier: e.target.value as '0.5' | '1' | '2'
+                  })
+                }
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="open">Open</option>
-                <option value="closed">Closed</option>
+                <option value="0.5">0.5x</option>
+                <option value="1">1x</option>
+                <option value="2">2x</option>
               </select>
             </div>
+          </div>
+
+          {/* Image URL */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Image URL (optional)
+            </label>
+            <input
+              type="url"
+              value={formData.imageUrl}
+              onChange={(e) =>
+                setFormData({ ...formData, imageUrl: e.target.value })
+              }
+              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="https://example.com/chart-image.png"
+            />
           </div>
 
           {/* Notes */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Notes
+              Notes (optional)
             </label>
             <textarea
               value={formData.notes}
-              onChange={(e) => handleInputChange('notes', e.target.value)}
+              onChange={(e) =>
+                setFormData({ ...formData, notes: e.target.value })
+              }
+              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               rows={3}
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Add any notes about this trade..."
+              placeholder="Trade notes, strategy, etc."
             />
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center justify-end space-x-3 pt-6 border-t border-slate-700">
+          {error && (
+            <div className="text-red-400 text-sm bg-red-900/20 p-3 rounded-lg">
+              {error}
+            </div>
+          )}
+
+          <div className="flex space-x-3 pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+              className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isLoading}
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white rounded-lg transition-colors flex items-center space-x-2"
+              className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg transition-colors"
             >
-              {isLoading && (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              )}
-              <span>{isLoading ? 'Updating...' : 'Update Trade'}</span>
+              {isLoading ? 'Updating...' : 'Update Trade'}
             </button>
           </div>
         </form>

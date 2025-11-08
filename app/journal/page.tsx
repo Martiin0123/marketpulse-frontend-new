@@ -12,7 +12,6 @@ import ViewSelector from '@/components/ui/Journal/ViewSelector';
 import AccountsOverview from '@/components/ui/Journal/AccountsOverview';
 import ImageTradeModal from '@/components/ui/Journal/ImageTradeModal';
 import JournalBalanceChart from '@/components/ui/Journal/JournalBalanceChart';
-import PrimeScopeScore from '@/components/ui/Journal/PrimeScopeScore';
 import SettingsModal from '@/components/ui/Journal/SettingsModal';
 import type {
   TradingAccount,
@@ -49,9 +48,7 @@ export default function JournalPage() {
     }
   }, [currentMonth]);
   const [view, setView] = useState<'individual' | 'combined'>('combined');
-  const [displayMode, setDisplayMode] = useState<'calendar' | 'list'>(
-    'calendar'
-  );
+  const [displayMode, setDisplayMode] = useState<'calendar' | 'list'>('list');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddTradeModalOpen, setIsAddTradeModalOpen] = useState(false);
@@ -87,18 +84,22 @@ export default function JournalPage() {
           maxDrawdown: 0,
           winStreak: 0,
           loseStreak: 0,
-          totalPnL: 0
+          totalPnL: 0,
+          totalOpportunityCost: 0,
+          expectedValue: 0,
+          sharpeRatio: 0,
+          bestTPRR: 0
         };
       }
 
       const closedTrades = (trades || []) as any[];
 
-      // Filter out trades with null pnl_amount for stats calculation
-      const tradesWithPnL = closedTrades.filter(
-        (trade) => trade.pnl_amount !== null && trade.pnl_amount !== undefined
+      // Filter out trades with null rr for stats calculation (using RR instead of PnL)
+      const tradesWithRR = closedTrades.filter(
+        (trade) => trade.rr !== null && trade.rr !== undefined
       );
 
-      if (tradesWithPnL.length === 0) {
+      if (tradesWithRR.length === 0) {
         return {
           totalTrades: 0,
           winRate: 0,
@@ -112,90 +113,87 @@ export default function JournalPage() {
           maxDrawdown: 0,
           winStreak: 0,
           loseStreak: 0,
-          totalPnL: 0
+          totalPnL: 0,
+          totalOpportunityCost: 0,
+          expectedValue: 0,
+          sharpeRatio: 0,
+          bestTPRR: 0
         };
       }
 
-      // Calculate basic stats
-      const totalTrades = tradesWithPnL.length;
-      const wins = tradesWithPnL.filter((trade) => trade.pnl_amount > 0);
-      const losses = tradesWithPnL.filter((trade) => trade.pnl_amount < 0);
+      // Calculate basic stats using RR
+      const totalTrades = tradesWithRR.length;
+      const wins = tradesWithRR.filter((trade) => trade.rr > 0);
+      const losses = tradesWithRR.filter((trade) => trade.rr < 0);
       const winRate = totalTrades > 0 ? (wins.length / totalTrades) * 100 : 0;
 
-      // Calculate P&L stats
-      const totalPnL = tradesWithPnL.reduce(
-        (sum, trade) => sum + trade.pnl_amount,
-        0
-      );
-      const bestTrade =
-        tradesWithPnL.length > 0
-          ? Math.max(...tradesWithPnL.map((trade) => trade.pnl_amount))
-          : 0;
-      const worstTrade =
-        tradesWithPnL.length > 0
-          ? Math.min(...tradesWithPnL.map((trade) => trade.pnl_amount))
-          : 0;
-
-      // Calculate average win/loss
-      const averageWin =
-        wins.length > 0
-          ? wins.reduce((sum, trade) => sum + trade.pnl_amount, 0) / wins.length
-          : 0;
-      const averageLoss =
-        losses.length > 0
-          ? losses.reduce((sum, trade) => sum + trade.pnl_amount, 0) /
-            losses.length
-          : 0;
-
-      // Calculate profit factor
-      const totalWins = wins.reduce((sum, trade) => sum + trade.pnl_amount, 0);
-      const totalLosses = Math.abs(
-        losses.reduce((sum, trade) => sum + trade.pnl_amount, 0)
-      );
-      const profitFactor =
-        totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? 999 : 0;
-
-      // Calculate R:R stats (using rr field if available, otherwise calculate from P&L)
-      const rrValues = tradesWithPnL
-        .map((trade) => trade.rr || 0)
-        .filter((rr) => rr !== 0);
+      // Calculate R:R stats
+      const rrValues = tradesWithRR.map((trade) => trade.rr || 0);
       const averageRR =
         rrValues.length > 0
           ? rrValues.reduce((sum, rr) => sum + rr, 0) / rrValues.length
           : 0;
       const totalRR = rrValues.reduce((sum, rr) => sum + rr, 0);
 
-      // Calculate streaks
+      // Best/worst trade based on RR
+      const bestTrade =
+        tradesWithRR.length > 0
+          ? Math.max(...tradesWithRR.map((trade) => trade.rr))
+          : 0;
+      const worstTrade =
+        tradesWithRR.length > 0
+          ? Math.min(...tradesWithRR.map((trade) => trade.rr))
+          : 0;
+
+      // Calculate average win/loss in RR
+      const averageWin =
+        wins.length > 0
+          ? wins.reduce((sum, trade) => sum + trade.rr, 0) / wins.length
+          : 0;
+      const averageLoss =
+        losses.length > 0
+          ? losses.reduce((sum, trade) => sum + trade.rr, 0) / losses.length
+          : 0;
+
+      // Calculate profit factor using RR
+      const totalWins = wins.reduce((sum, trade) => sum + trade.rr, 0);
+      const totalLosses = Math.abs(
+        losses.reduce((sum, trade) => sum + trade.rr, 0)
+      );
+      const profitFactor =
+        totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? 999 : 0;
+
+      // Calculate streaks using RR
       let currentWinStreak = 0;
       let currentLoseStreak = 0;
       let maxWinStreak = 0;
       let maxLoseStreak = 0;
 
-      for (const trade of tradesWithPnL.sort(
+      for (const trade of tradesWithRR.sort(
         (a, b) =>
           new Date(a.entry_date).getTime() - new Date(b.entry_date).getTime()
       )) {
-        if (trade.pnl_amount > 0) {
+        if (trade.rr > 0) {
           currentWinStreak++;
           currentLoseStreak = 0;
           maxWinStreak = Math.max(maxWinStreak, currentWinStreak);
-        } else if (trade.pnl_amount < 0) {
+        } else if (trade.rr < 0) {
           currentLoseStreak++;
           currentWinStreak = 0;
           maxLoseStreak = Math.max(maxLoseStreak, currentLoseStreak);
         }
       }
 
-      // Calculate max drawdown (simplified version)
+      // Calculate max drawdown using RR (cumulative RR)
       let maxDrawdown = 0;
       let peak = 0;
       let current = 0;
 
-      for (const trade of tradesWithPnL.sort(
+      for (const trade of tradesWithRR.sort(
         (a, b) =>
           new Date(a.entry_date).getTime() - new Date(b.entry_date).getTime()
       )) {
-        current += trade.pnl_amount;
+        current += trade.rr;
         if (current > peak) {
           peak = current;
         }
@@ -203,6 +201,68 @@ export default function JournalPage() {
         if (drawdown > maxDrawdown) {
           maxDrawdown = drawdown;
         }
+      }
+
+      // Total PnL is now totalRR (for backward compatibility)
+      const totalPnL = totalRR;
+
+      // Calculate Total Opportunity Cost
+      // Opportunity cost = sum of (max_adverse - actual_rr) for trades where max_adverse > actual_rr
+      // This represents the RR you could have made if you took profit at max_adverse
+      let totalOpportunityCost = 0;
+      tradesWithRR.forEach((trade) => {
+        if (
+          trade.max_adverse !== null &&
+          trade.max_adverse !== undefined &&
+          trade.max_adverse > trade.rr
+        ) {
+          totalOpportunityCost += trade.max_adverse - trade.rr;
+        }
+      });
+
+      // Calculate Expected Value
+      // EV = (Win Rate × Average Win) - (Loss Rate × Average Loss)
+      const winRateDecimal = winRate / 100;
+      const lossRateDecimal = (100 - winRate) / 100;
+      const expectedValue =
+        winRateDecimal * averageWin - lossRateDecimal * Math.abs(averageLoss);
+
+      // Calculate Sharpe Ratio
+      // Sharpe = (Average Return) / (Standard Deviation of Returns)
+      // Using RR values as returns
+      let sharpeRatio = 0;
+      if (rrValues.length > 1) {
+        const mean = averageRR;
+        const variance =
+          rrValues.reduce((sum, rr) => sum + Math.pow(rr - mean, 2), 0) /
+          rrValues.length;
+        const stdDev = Math.sqrt(variance);
+        sharpeRatio = stdDev > 0 ? mean / stdDev : 0;
+      } else if (rrValues.length === 1) {
+        sharpeRatio = rrValues[0] > 0 ? 999 : 0; // Single trade edge case
+      }
+
+      // Calculate Best TP RR
+      // Analyze max_adverse values to suggest optimal take profit
+      // Use the median or average of max_adverse values for winning trades
+      const maxAdverseValues = tradesWithRR
+        .filter(
+          (trade) =>
+            trade.max_adverse !== null &&
+            trade.max_adverse !== undefined &&
+            trade.max_adverse > 0
+        )
+        .map((trade) => trade.max_adverse!);
+
+      let bestTPRR = 0;
+      if (maxAdverseValues.length > 0) {
+        // Sort and get median (more robust than average)
+        const sorted = maxAdverseValues.sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        bestTPRR =
+          sorted.length % 2 === 0
+            ? (sorted[mid - 1] + sorted[mid]) / 2
+            : sorted[mid];
       }
 
       return {
@@ -215,10 +275,14 @@ export default function JournalPage() {
         profitFactor,
         averageWin,
         averageLoss,
-        maxDrawdown: (maxDrawdown / Math.abs(peak)) * 100, // Convert to percentage
+        maxDrawdown: maxDrawdown, // Max drawdown in RR units
         winStreak: maxWinStreak,
         loseStreak: maxLoseStreak,
-        totalPnL: totalPnL
+        totalPnL: totalPnL,
+        totalOpportunityCost,
+        expectedValue,
+        sharpeRatio,
+        bestTPRR
       };
     } catch (error) {
       console.error('Error calculating account stats:', error);
@@ -235,7 +299,11 @@ export default function JournalPage() {
         maxDrawdown: 0,
         winStreak: 0,
         loseStreak: 0,
-        totalPnL: 0
+        totalPnL: 0,
+        totalOpportunityCost: 0,
+        expectedValue: 0,
+        sharpeRatio: 0,
+        bestTPRR: 0
       };
     }
   };
@@ -428,32 +496,38 @@ export default function JournalPage() {
   return (
     <div className="min-h-screen bg-slate-900 py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <h1 className="text-2xl font-bold text-white">Trading Journal</h1>
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => setIsAddTradeModalOpen(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
-            >
-              <Plus size={16} weight="bold" />
-              <span>Add Trade</span>
-            </button>
-            <button
-              onClick={() => setIsSettingsModalOpen(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors"
-              title="Tag Settings"
-            >
-              <Gear size={16} weight="bold" />
-              <span>Settings</span>
-            </button>
-            <AccountSelector
-              accounts={accounts}
-              selectedAccount={selectedAccount}
-              onAccountChange={setSelectedAccount}
-              onAccountCreated={handleAccountCreated}
-              view={view}
-              onViewChange={handleViewChange}
-            />
+          <div className="flex items-center flex-wrap gap-3">
+            {/* Primary Actions */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsAddTradeModalOpen(true)}
+                className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-green-600/20"
+              >
+                <Plus size={18} weight="bold" />
+                <span>Add Trade</span>
+              </button>
+              <button
+                onClick={() => setIsSettingsModalOpen(true)}
+                className="flex items-center justify-center w-10 h-10 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                title="Settings"
+              >
+                <Gear size={18} weight="bold" />
+              </button>
+            </div>
+
+            {/* Account Selector */}
+            <div className="flex items-center gap-2 pl-3 border-l border-slate-700">
+              <AccountSelector
+                accounts={accounts}
+                selectedAccount={selectedAccount}
+                onAccountChange={setSelectedAccount}
+                onAccountCreated={handleAccountCreated}
+                view={view}
+                onViewChange={handleViewChange}
+              />
+            </div>
           </div>
         </div>
 
@@ -481,96 +555,222 @@ export default function JournalPage() {
                 />
               </div>
 
-              {/* PrimeScope Score */}
+              {/* Combined Stats Section */}
               <div className="mb-6">
-                <PrimeScopeScore accountId={null} />
-              </div>
-
-              {/* Comprehensive Metrics Section */}
-              <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700 mb-6">
-                <h3 className="text-lg font-semibold text-white mb-4">
-                  Trading Performance
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {/* Win Rate */}
-                  <div className="bg-slate-700/50 rounded-lg p-4">
-                    <div className="text-xs text-slate-400 mb-1">Win Rate</div>
-                    <div className="text-xl font-bold text-white">
-                      {accounts.reduce(
-                        (sum, acc) => sum + acc.stats.winRate,
-                        0
-                      ) / Math.max(accounts.length, 1)}
-                      %
-                    </div>
-                  </div>
-
-                  {/* Total Trades */}
-                  <div className="bg-slate-700/50 rounded-lg p-4">
-                    <div className="text-xs text-slate-400 mb-1">
-                      Total Trades
-                    </div>
-                    <div className="text-xl font-bold text-white">
-                      {accounts.reduce(
-                        (sum, acc) => sum + acc.stats.totalTrades,
-                        0
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Profit Factor */}
-                  <div className="bg-slate-700/50 rounded-lg p-4">
-                    <div className="text-xs text-slate-400 mb-1">
-                      Profit Factor
-                    </div>
-                    <div className="text-xl font-bold text-white">
-                      {accounts.reduce(
-                        (sum, acc) => sum + acc.stats.profitFactor,
-                        0
-                      ) / Math.max(accounts.length, 1)}
-                    </div>
-                  </div>
-
-                  {/* Max Drawdown */}
-                  <div className="bg-slate-700/50 rounded-lg p-4">
-                    <div className="text-xs text-slate-400 mb-1">
-                      Max Drawdown
-                    </div>
-                    <div className="text-xl font-bold text-orange-400">
-                      {Math.max(
-                        ...accounts.map((acc) => acc.stats.maxDrawdown)
-                      )}
-                      %
-                    </div>
-                  </div>
-
-                  {/* Sharpe Ratio */}
-                  <div className="bg-slate-700/50 rounded-lg p-4">
-                    <div className="text-xs text-slate-400 mb-1">
-                      Sharpe Ratio
-                    </div>
-                    <div className="text-xl font-bold text-white">
-                      {accounts.reduce(
-                        (sum, acc) => sum + acc.stats.totalPnL,
-                        0
-                      ) /
-                        Math.max(
-                          accounts.reduce(
-                            (sum, acc) => sum + acc.stats.maxDrawdown,
-                            0
-                          ),
-                          1
+                <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+                    {/* Total Trades */}
+                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-blue-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10">
+                      <div className="text-xs text-slate-400 mb-1">
+                        Total Trades
+                      </div>
+                      <div className="text-2xl font-bold text-white">
+                        {accounts.reduce(
+                          (sum, acc) => sum + acc.stats.totalTrades,
+                          0
                         )}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Best Trade */}
-                  <div className="bg-slate-700/50 rounded-lg p-4">
-                    <div className="text-xs text-slate-400 mb-1">
-                      Best Trade
+                    {/* Win Rate */}
+                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-emerald-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10">
+                      <div className="text-xs text-slate-400 mb-1">
+                        Win Rate
+                      </div>
+                      <div className="text-2xl font-bold text-emerald-400">
+                        {Math.round(
+                          accounts.reduce(
+                            (sum, acc) => sum + acc.stats.winRate,
+                            0
+                          ) / Math.max(accounts.length, 1)
+                        )}
+                        %
+                      </div>
                     </div>
-                    <div className="text-xl font-bold text-green-400">
-                      {accounts.length > 0 ? accounts[0].currency : 'USD'}{' '}
-                      {Math.max(...accounts.map((acc) => acc.stats.bestTrade))}
+
+                    {/* Total RR */}
+                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-green-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-green-500/10">
+                      <div className="text-xs text-slate-400 mb-1">
+                        Total RR
+                      </div>
+                      <div className="text-2xl font-bold text-green-400">
+                        {accounts.reduce(
+                          (sum, acc) => sum + acc.stats.totalRR,
+                          0
+                        ) >= 0
+                          ? '+'
+                          : ''}
+                        {accounts
+                          .reduce((sum, acc) => sum + acc.stats.totalRR, 0)
+                          .toFixed(2)}
+                        R
+                      </div>
+                    </div>
+
+                    {/* Average RR */}
+                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-cyan-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/10">
+                      <div className="text-xs text-slate-400 mb-1">
+                        Average RR
+                      </div>
+                      <div className="text-2xl font-bold text-cyan-400">
+                        {accounts.reduce(
+                          (sum, acc) => sum + acc.stats.averageRR,
+                          0
+                        ) /
+                          Math.max(accounts.length, 1) >=
+                        0
+                          ? '+'
+                          : ''}
+                        {(
+                          accounts.reduce(
+                            (sum, acc) => sum + acc.stats.averageRR,
+                            0
+                          ) / Math.max(accounts.length, 1)
+                        ).toFixed(2)}
+                        R
+                      </div>
+                    </div>
+
+                    {/* Win Streak */}
+                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-purple-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10">
+                      <div className="text-xs text-slate-400 mb-1">
+                        Win Streak
+                      </div>
+                      <div className="text-2xl font-bold text-purple-400">
+                        {Math.max(
+                          ...accounts.map((acc) => acc.stats.winStreak)
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Loss Streak */}
+                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-red-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-red-500/10">
+                      <div className="text-xs text-slate-400 mb-1">
+                        Loss Streak
+                      </div>
+                      <div className="text-2xl font-bold text-red-400">
+                        {Math.max(
+                          ...accounts.map((acc) => acc.stats.loseStreak)
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Profit Factor */}
+                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-blue-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10">
+                      <div className="text-xs text-slate-400 mb-1">
+                        Profit Factor
+                      </div>
+                      <div className="text-2xl font-bold text-blue-400">
+                        {(
+                          accounts.reduce(
+                            (sum, acc) => sum + acc.stats.profitFactor,
+                            0
+                          ) / Math.max(accounts.length, 1)
+                        ).toFixed(2)}
+                      </div>
+                    </div>
+
+                    {/* Max Drawdown */}
+                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-orange-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/10">
+                      <div className="text-xs text-slate-400 mb-1">
+                        Max Drawdown
+                      </div>
+                      <div className="text-2xl font-bold text-orange-400">
+                        {Math.max(
+                          ...accounts.map((acc) => acc.stats.maxDrawdown)
+                        ) >= 0
+                          ? '+'
+                          : ''}
+                        {Math.max(
+                          ...accounts.map((acc) => acc.stats.maxDrawdown)
+                        ).toFixed(2)}
+                        R
+                      </div>
+                    </div>
+
+                    {/* Opportunity Cost */}
+                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-yellow-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-yellow-500/10">
+                      <div className="text-xs text-slate-400 mb-1">
+                        Opportunity Cost
+                      </div>
+                      <div className="text-2xl font-bold text-yellow-400">
+                        {accounts.reduce(
+                          (sum, acc) => sum + acc.stats.totalOpportunityCost,
+                          0
+                        ) >= 0
+                          ? '+'
+                          : ''}
+                        {accounts
+                          .reduce(
+                            (sum, acc) => sum + acc.stats.totalOpportunityCost,
+                            0
+                          )
+                          .toFixed(2)}
+                        R
+                      </div>
+                    </div>
+
+                    {/* Expected Value */}
+                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-cyan-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/10">
+                      <div className="text-xs text-slate-400 mb-1">
+                        Expected Value
+                      </div>
+                      <div className="text-2xl font-bold text-cyan-400">
+                        {accounts.reduce(
+                          (sum, acc) => sum + acc.stats.expectedValue,
+                          0
+                        ) /
+                          Math.max(accounts.length, 1) >=
+                        0
+                          ? '+'
+                          : ''}
+                        {(
+                          accounts.reduce(
+                            (sum, acc) => sum + acc.stats.expectedValue,
+                            0
+                          ) / Math.max(accounts.length, 1)
+                        ).toFixed(2)}
+                        R
+                      </div>
+                    </div>
+
+                    {/* Sharpe Ratio */}
+                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-indigo-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/10">
+                      <div className="text-xs text-slate-400 mb-1">
+                        Sharpe Ratio
+                      </div>
+                      <div className="text-2xl font-bold text-indigo-400">
+                        {(
+                          accounts.reduce(
+                            (sum, acc) => sum + acc.stats.sharpeRatio,
+                            0
+                          ) / Math.max(accounts.length, 1)
+                        ).toFixed(2)}
+                      </div>
+                    </div>
+
+                    {/* Best TP RR */}
+                    <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-pink-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-pink-500/10">
+                      <div className="text-xs text-slate-400 mb-1">
+                        Best TP RR
+                      </div>
+                      <div className="text-2xl font-bold text-pink-400">
+                        {accounts.reduce(
+                          (sum, acc) => sum + acc.stats.bestTPRR,
+                          0
+                        ) /
+                          Math.max(accounts.length, 1) >=
+                        0
+                          ? '+'
+                          : ''}
+                        {(
+                          accounts.reduce(
+                            (sum, acc) => sum + acc.stats.bestTPRR,
+                            0
+                          ) / Math.max(accounts.length, 1)
+                        ).toFixed(2)}
+                        R
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -632,74 +832,135 @@ export default function JournalPage() {
               />
             </div>
 
-            {/* PrimeScope Score */}
+            {/* Combined Stats Section */}
             <div className="mb-6">
-              <PrimeScopeScore accountId={selectedAccount} />
-            </div>
+              <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+                  {/* Total Trades */}
+                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-blue-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10">
+                    <div className="text-xs text-slate-400 mb-1">
+                      Total Trades
+                    </div>
+                    <div className="text-2xl font-bold text-white">
+                      {selectedAccountData.stats.totalTrades}
+                    </div>
+                  </div>
 
-            {/* Comprehensive Metrics Section */}
-            <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700 mb-6">
-              <h3 className="text-lg font-semibold text-white mb-4">
-                Trading Performance
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {/* Win Rate */}
-                <div className="bg-slate-700/50 rounded-lg p-4">
-                  <div className="text-xs text-slate-400 mb-1">Win Rate</div>
-                  <div className="text-xl font-bold text-white">
-                    {selectedAccountData.stats.winRate.toFixed(1)}%
+                  {/* Win Rate */}
+                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-emerald-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10">
+                    <div className="text-xs text-slate-400 mb-1">Win Rate</div>
+                    <div className="text-2xl font-bold text-emerald-400">
+                      {Math.round(selectedAccountData.stats.winRate)}%
+                    </div>
                   </div>
-                </div>
 
-                {/* Total Trades */}
-                <div className="bg-slate-700/50 rounded-lg p-4">
-                  <div className="text-xs text-slate-400 mb-1">
-                    Total Trades
+                  {/* Total RR */}
+                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-green-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-green-500/10">
+                    <div className="text-xs text-slate-400 mb-1">Total RR</div>
+                    <div className="text-2xl font-bold text-green-400">
+                      {selectedAccountData.stats.totalRR >= 0 ? '+' : ''}
+                      {selectedAccountData.stats.totalRR.toFixed(2)}R
+                    </div>
                   </div>
-                  <div className="text-xl font-bold text-white">
-                    {selectedAccountData.stats.totalTrades}
-                  </div>
-                </div>
 
-                {/* Profit Factor */}
-                <div className="bg-slate-700/50 rounded-lg p-4">
-                  <div className="text-xs text-slate-400 mb-1">
-                    Profit Factor
+                  {/* Average RR */}
+                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-cyan-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/10">
+                    <div className="text-xs text-slate-400 mb-1">
+                      Average RR
+                    </div>
+                    <div className="text-2xl font-bold text-cyan-400">
+                      {selectedAccountData.stats.averageRR >= 0 ? '+' : ''}
+                      {selectedAccountData.stats.averageRR.toFixed(2)}R
+                    </div>
                   </div>
-                  <div className="text-xl font-bold text-white">
-                    {selectedAccountData.stats.profitFactor.toFixed(2)}
-                  </div>
-                </div>
 
-                {/* Max Drawdown */}
-                <div className="bg-slate-700/50 rounded-lg p-4">
-                  <div className="text-xs text-slate-400 mb-1">
-                    Max Drawdown
+                  {/* Win Streak */}
+                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-purple-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10">
+                    <div className="text-xs text-slate-400 mb-1">
+                      Win Streak
+                    </div>
+                    <div className="text-2xl font-bold text-purple-400">
+                      {selectedAccountData.stats.winStreak}
+                    </div>
                   </div>
-                  <div className="text-xl font-bold text-orange-400">
-                    {selectedAccountData.stats.maxDrawdown.toFixed(2)}%
-                  </div>
-                </div>
 
-                {/* Sharpe Ratio */}
-                <div className="bg-slate-700/50 rounded-lg p-4">
-                  <div className="text-xs text-slate-400 mb-1">
-                    Sharpe Ratio
+                  {/* Loss Streak */}
+                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-red-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-red-500/10">
+                    <div className="text-xs text-slate-400 mb-1">
+                      Loss Streak
+                    </div>
+                    <div className="text-2xl font-bold text-red-400">
+                      {selectedAccountData.stats.loseStreak}
+                    </div>
                   </div>
-                  <div className="text-xl font-bold text-white">
-                    {(
-                      selectedAccountData.stats.totalPnL /
-                      Math.max(selectedAccountData.stats.maxDrawdown, 1)
-                    ).toFixed(2)}
-                  </div>
-                </div>
 
-                {/* Best Trade */}
-                <div className="bg-slate-700/50 rounded-lg p-4">
-                  <div className="text-xs text-slate-400 mb-1">Best Trade</div>
-                  <div className="text-xl font-bold text-green-400">
-                    {selectedAccountData.currency}{' '}
-                    {selectedAccountData.stats.bestTrade.toLocaleString()}
+                  {/* Profit Factor */}
+                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-blue-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10">
+                    <div className="text-xs text-slate-400 mb-1">
+                      Profit Factor
+                    </div>
+                    <div className="text-2xl font-bold text-blue-400">
+                      {selectedAccountData.stats.profitFactor.toFixed(2)}
+                    </div>
+                  </div>
+
+                  {/* Max Drawdown */}
+                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-orange-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/10">
+                    <div className="text-xs text-slate-400 mb-1">
+                      Max Drawdown
+                    </div>
+                    <div className="text-2xl font-bold text-orange-400">
+                      {selectedAccountData.stats.maxDrawdown >= 0 ? '+' : ''}
+                      {selectedAccountData.stats.maxDrawdown.toFixed(2)}R
+                    </div>
+                  </div>
+
+                  {/* Opportunity Cost */}
+                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-yellow-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-yellow-500/10">
+                    <div className="text-xs text-slate-400 mb-1">
+                      Opportunity Cost
+                    </div>
+                    <div className="text-2xl font-bold text-yellow-400">
+                      {selectedAccountData.stats.totalOpportunityCost >= 0
+                        ? '+'
+                        : ''}
+                      {selectedAccountData.stats.totalOpportunityCost.toFixed(
+                        2
+                      )}
+                      R
+                    </div>
+                  </div>
+
+                  {/* Expected Value */}
+                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-cyan-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/10">
+                    <div className="text-xs text-slate-400 mb-1">
+                      Expected Value
+                    </div>
+                    <div className="text-2xl font-bold text-cyan-400">
+                      {selectedAccountData.stats.expectedValue >= 0 ? '+' : ''}
+                      {selectedAccountData.stats.expectedValue.toFixed(2)}R
+                    </div>
+                  </div>
+
+                  {/* Sharpe Ratio */}
+                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-indigo-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/10">
+                    <div className="text-xs text-slate-400 mb-1">
+                      Sharpe Ratio
+                    </div>
+                    <div className="text-2xl font-bold text-indigo-400">
+                      {selectedAccountData.stats.sharpeRatio.toFixed(2)}
+                    </div>
+                  </div>
+
+                  {/* Best TP RR */}
+                  <div className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg p-4 border border-slate-600/50 hover:border-pink-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-pink-500/10">
+                    <div className="text-xs text-slate-400 mb-1">
+                      Best TP RR
+                    </div>
+                    <div className="text-2xl font-bold text-pink-400">
+                      {selectedAccountData.stats.bestTPRR >= 0 ? '+' : ''}
+                      {selectedAccountData.stats.bestTPRR.toFixed(2)}R
+                    </div>
                   </div>
                 </div>
               </div>

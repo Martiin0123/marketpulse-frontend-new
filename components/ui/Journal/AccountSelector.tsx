@@ -28,18 +28,18 @@ export default function AccountSelector({
 
   return (
     <>
-      <div className="flex items-center space-x-2 flex-wrap">
+      <div className="flex items-center gap-2 flex-wrap">
         {/* Combined View Button */}
         <button
           onClick={() => onViewChange('combined')}
-          className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+          className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
             view === 'combined'
-              ? 'bg-blue-600 text-white'
-              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+              : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 border border-slate-600/50'
           }`}
         >
           <ViewColumnsIcon className="h-4 w-4" />
-          <span>Combined</span>
+          <span>All Accounts</span>
         </button>
 
         {/* Individual Account Buttons */}
@@ -50,10 +50,10 @@ export default function AccountSelector({
               onViewChange('individual');
               onAccountChange(account.id);
             }}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
               view === 'individual' && selectedAccount === account.id
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 border border-slate-600/50'
             }`}
           >
             <UserIcon className="h-4 w-4" />
@@ -72,13 +72,13 @@ export default function AccountSelector({
           />
         )}
 
-        {/* Create Account Button - Just Plus Icon */}
+        {/* Create Account Button */}
         <button
           onClick={() => setIsCreateModalOpen(true)}
-          className="flex items-center justify-center w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          className="flex items-center justify-center w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-lg shadow-blue-600/20"
           title="Create New Account"
         >
-          <Plus size={20} weight="bold" />
+          <Plus size={18} weight="bold" />
         </button>
       </div>
 

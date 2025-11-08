@@ -23,6 +23,10 @@ export interface AccountStats {
   winStreak: number;
   loseStreak: number;
   totalPnL: number;
+  totalOpportunityCost: number;
+  expectedValue: number;
+  sharpeRatio: number;
+  bestTPRR: number;
 }
 
 export interface DailyStats {
@@ -43,6 +47,8 @@ export interface TradeEntry {
   pnl_percentage: number;
   pnl_amount: number;
   rr: number;
+  max_adverse?: number;
+  risk_multiplier?: number;
   status: 'open' | 'closed';
   entry_date: string;
   exit_date?: string;

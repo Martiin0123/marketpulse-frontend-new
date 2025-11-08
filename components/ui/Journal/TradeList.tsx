@@ -81,8 +81,8 @@ export default function TradeList({
         bValue = new Date(b.entry_date);
         break;
       case 'pnl':
-        aValue = a.pnl_amount || 0;
-        bValue = b.pnl_amount || 0;
+        aValue = a.rr || 0;
+        bValue = b.rr || 0;
         break;
       case 'symbol':
         aValue = a.symbol;
@@ -112,12 +112,6 @@ export default function TradeList({
       hour: '2-digit',
       minute: '2-digit'
     });
-  };
-
-  const formatPnl = (pnl: number | null) => {
-    if (pnl === null || pnl === undefined) return '$0';
-    const sign = pnl >= 0 ? '+' : '';
-    return `${sign}$${Math.abs(pnl).toLocaleString()}`;
   };
 
   const getPnlColor = (pnl: number | null) => {
@@ -240,33 +234,19 @@ export default function TradeList({
                     </div>
                   </div>
 
-                  {/* Entry & Exit Price */}
+                  {/* RR */}
                   <div>
-                    <div className="text-xs text-slate-400">Entry</div>
-                    <div className="text-sm text-white">
-                      ${trade.entry_price?.toFixed(2) || 'N/A'}
-                    </div>
-                    {trade.exit_price && (
-                      <>
-                        <div className="text-xs text-slate-400 mt-1">Exit</div>
-                        <div className="text-sm text-white">
-                          ${trade.exit_price.toFixed(2)}
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* P&L */}
-                  <div>
-                    <div className="text-xs text-slate-400">P&L</div>
+                    <div className="text-xs text-slate-400">RR</div>
                     <div
-                      className={`text-sm font-bold ${getPnlColor(trade.pnl_amount)}`}
+                      className={`text-sm font-bold ${getPnlColor(trade.rr || 0)}`}
                     >
-                      {formatPnl(trade.pnl_amount)}
+                      {trade.rr
+                        ? `${trade.rr >= 0 ? '+' : ''}${trade.rr.toFixed(2)}R`
+                        : 'N/A'}
                     </div>
-                    {trade.rr && (
+                    {trade.max_adverse && (
                       <div className="text-xs text-slate-400">
-                        {trade.rr.toFixed(2)}R
+                        MA: {trade.max_adverse.toFixed(2)}R
                       </div>
                     )}
                   </div>
@@ -280,8 +260,21 @@ export default function TradeList({
                     </span>
                   </div>
 
-                  {/* Image Preview */}
-                  {trade.image_data && (
+                  {/* Image URL / Image Preview */}
+                  {trade.image_url ? (
+                    <div className="flex justify-center">
+                      <a
+                        href={trade.image_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-400 hover:text-blue-300 underline flex items-center space-x-1"
+                        title="Open image URL"
+                      >
+                        <EyeIcon className="h-4 w-4" />
+                        <span>View Image</span>
+                      </a>
+                    </div>
+                  ) : trade.image_data ? (
                     <div className="flex justify-center">
                       <img
                         src={trade.image_data}
@@ -304,7 +297,7 @@ export default function TradeList({
                         title="Click to view full size"
                       />
                     </div>
-                  )}
+                  ) : null}
                 </div>
 
                 {/* Action Buttons */}

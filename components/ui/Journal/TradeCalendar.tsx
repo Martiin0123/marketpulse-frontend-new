@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import {
   ChartBarIcon,
-  CurrencyDollarIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
   CalendarDaysIcon,
@@ -25,7 +24,7 @@ interface TradeCalendarProps {
 interface DailyTradeData {
   date: string;
   trades: number;
-  pnl: number;
+  rr: number;
   wins: number;
   losses: number;
 }
@@ -34,7 +33,7 @@ interface WeeklyTradeData {
   weekStart: string;
   weekEnd: string;
   trades: number;
-  pnl: number;
+  rr: number;
   wins: number;
   losses: number;
   weekNumber: number;
@@ -169,7 +168,7 @@ export default function TradeCalendar({
               dailyMap.set(tradeDate, {
                 date: tradeDate,
                 trades: 0,
-                pnl: 0,
+                rr: 0,
                 wins: 0,
                 losses: 0
               });
@@ -179,14 +178,14 @@ export default function TradeCalendar({
             dayData.trades += 1;
 
             if (
-              trade.pnl_amount !== null &&
-              trade.pnl_amount !== undefined &&
-              !isNaN(trade.pnl_amount)
+              trade.rr !== null &&
+              trade.rr !== undefined &&
+              !isNaN(trade.rr)
             ) {
-              dayData.pnl += trade.pnl_amount;
-              if (trade.pnl_amount > 0) {
+              dayData.rr += trade.rr;
+              if (trade.rr > 0) {
                 dayData.wins += 1;
-              } else if (trade.pnl_amount < 0) {
+              } else if (trade.rr < 0) {
                 dayData.losses += 1;
               }
             }
@@ -233,7 +232,7 @@ export default function TradeCalendar({
                   '-' +
                   String(lastDay.getDate()).padStart(2, '0'),
                 trades: 0,
-                pnl: 0,
+                rr: 0,
                 wins: 0,
                 losses: 0,
                 weekNumber: weekIndex + 1
@@ -251,7 +250,7 @@ export default function TradeCalendar({
                   const dayStats = dailyMap.get(dateStr);
                   if (dayStats) {
                     weekData.trades += dayStats.trades;
-                    weekData.pnl += dayStats.pnl;
+                    weekData.rr += dayStats.rr;
                     weekData.wins += dayStats.wins;
                     weekData.losses += dayStats.losses;
                   }
@@ -266,7 +265,7 @@ export default function TradeCalendar({
               weekStart: '',
               weekEnd: '',
               trades: 0,
-              pnl: 0,
+              rr: 0,
               wins: 0,
               losses: 0,
               weekNumber: weekIndex + 1
@@ -320,20 +319,20 @@ export default function TradeCalendar({
     return dailyData.find((stat) => stat.date === dateStr);
   };
 
-  const getPerformanceColor = (pnl: number) => {
-    if (pnl > 0)
+  const getPerformanceColor = (rr: number) => {
+    if (rr > 0)
       return 'bg-gradient-to-br from-emerald-500/20 to-green-500/20 text-emerald-400 border-emerald-400/50';
-    if (pnl < 0)
+    if (rr < 0)
       return 'bg-gradient-to-br from-red-500/20 to-pink-500/20 text-red-400 border-red-400/50';
     return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
   };
 
-  const formatPnl = (pnl: number) => {
-    if (isNaN(pnl) || pnl === null || pnl === undefined) {
-      return '$0';
+  const formatRR = (rr: number) => {
+    if (isNaN(rr) || rr === null || rr === undefined) {
+      return '0.00R';
     }
-    const sign = pnl >= 0 ? '+' : '';
-    return `${sign}$${Math.abs(pnl).toLocaleString()}`;
+    const sign = rr >= 0 ? '+' : '';
+    return `${sign}${rr.toFixed(2)}R`;
   };
 
   const daysInMonth = getDaysInMonth(month);
@@ -517,8 +516,8 @@ export default function TradeCalendar({
                         const isToday =
                           day.toDateString() === new Date().toDateString();
                         const hasTrades = dayStats && dayStats.trades > 0;
-                        const isProfit = dayStats && dayStats.pnl > 0;
-                        const isLoss = dayStats && dayStats.pnl < 0;
+                        const isProfit = dayStats && dayStats.rr > 0;
+                        const isLoss = dayStats && dayStats.rr < 0;
 
                         return (
                           <button
@@ -586,10 +585,10 @@ export default function TradeCalendar({
                               </div>
                             )}
 
-                            {/* P&L display - only show for current month */}
+                            {/* RR display - only show for current month */}
                             {isCurrentMonth &&
                               dayStats &&
-                              dayStats.pnl !== 0 && (
+                              dayStats.rr !== 0 && (
                                 <div
                                   className={`relative z-10 text-xs font-bold transition-all duration-300 ${
                                     isSelected
@@ -599,7 +598,7 @@ export default function TradeCalendar({
                                         : 'text-red-300'
                                   }`}
                                 >
-                                  {formatPnl(dayStats.pnl)}
+                                  {formatRR(dayStats.rr)}
                                 </div>
                               )}
 
@@ -634,12 +633,12 @@ export default function TradeCalendar({
                             </div>
                             <div
                               className={`text-lg font-bold mb-1 ${
-                                weekData.pnl > 0
+                                weekData.rr > 0
                                   ? 'text-emerald-400'
                                   : 'text-red-400'
                               }`}
                             >
-                              {formatPnl(weekData.pnl)}
+                              {formatRR(weekData.rr)}
                             </div>
                             <div className="text-xs text-slate-400">
                               {weekData.trades} trades
@@ -704,27 +703,27 @@ export default function TradeCalendar({
                       </div>
                     </div>
 
-                    {/* P&L Card */}
+                    {/* RR Card */}
                     <div className="group relative p-6 bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-2xl border border-slate-700/50 hover:border-slate-600/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10">
                       <div className="flex items-center space-x-3 mb-3">
                         <div className="w-10 h-10 bg-gradient-to-br from-emerald-500/20 to-green-500/20 rounded-xl flex items-center justify-center">
-                          <CurrencyDollarIcon className="h-5 w-5 text-emerald-400" />
+                          <ChartBarIcon className="h-5 w-5 text-emerald-400" />
                         </div>
                         <span className="text-slate-400 font-medium">
-                          Net P&L
+                          Total RR
                         </span>
                       </div>
                       <div
                         className={`text-3xl font-bold mb-1 ${
-                          (getStatsForDate(selectedDate!)?.pnl || 0) >= 0
+                          (getStatsForDate(selectedDate!)?.rr || 0) >= 0
                             ? 'text-emerald-400'
                             : 'text-red-400'
                         }`}
                       >
-                        {formatPnl(getStatsForDate(selectedDate!)?.pnl || 0)}
+                        {formatRR(getStatsForDate(selectedDate!)?.rr || 0)}
                       </div>
                       <div className="text-sm text-slate-500">
-                        Profit & Loss
+                        Risk/Reward Ratio
                       </div>
                     </div>
 
