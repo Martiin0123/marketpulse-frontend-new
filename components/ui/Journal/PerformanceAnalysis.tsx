@@ -260,6 +260,69 @@ export default function PerformanceAnalysis({
       {/* Time of Day Analysis */}
       {activeTab === 'time' && (
         <div className="space-y-6">
+          {/* Heatmap */}
+          <div className="bg-slate-700/30 rounded-lg p-6 border border-slate-600/50">
+            <h4 className="text-sm font-semibold text-slate-300 mb-4">
+              Performance Heatmap by Hour
+            </h4>
+            <div className="grid grid-cols-12 gap-2">
+              {timeOfDayStats.map((stat) => {
+                const intensity = Math.min(
+                  Math.abs(stat.totalRR) / Math.max(maxRR, 1),
+                  1
+                );
+                const isPositive = stat.totalRR >= 0;
+                const bgColor = isPositive
+                  ? `rgba(16, 185, 129, ${intensity})`
+                  : `rgba(239, 68, 68, ${intensity})`;
+
+                return (
+                  <div
+                    key={stat.hour}
+                    className="aspect-square rounded-lg border border-slate-600/50 flex flex-col items-center justify-center p-2 hover:scale-110 transition-transform cursor-pointer group relative"
+                    style={{ backgroundColor: bgColor }}
+                    title={`${stat.hour}:00 - ${formatRR(stat.totalRR)} - ${stat.trades} trades`}
+                  >
+                    <div className="text-xs font-medium text-white/90">
+                      {stat.hour}
+                    </div>
+                    {stat.trades > 0 && (
+                      <div className="text-[10px] text-white/70 mt-0.5">
+                        {stat.trades}
+                      </div>
+                    )}
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900/90 rounded-lg flex items-center justify-center">
+                      <div className="text-center text-xs">
+                        <div className="font-bold text-white">
+                          {formatRR(stat.totalRR)}
+                        </div>
+                        <div className="text-slate-400">
+                          {stat.trades} trades
+                        </div>
+                        <div className="text-slate-400">
+                          {stat.winRate.toFixed(0)}% WR
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-green-500 rounded"></div>
+                  <span>Profit</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-red-500 rounded"></div>
+                  <span>Loss</span>
+                </div>
+              </div>
+              <span>Darker = Higher absolute value</span>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Total RR by Hour */}
             <div>
@@ -405,6 +468,73 @@ export default function PerformanceAnalysis({
       {/* Day of Week Analysis */}
       {activeTab === 'day' && (
         <div className="space-y-6">
+          {/* Heatmap */}
+          <div className="bg-slate-700/30 rounded-lg p-6 border border-slate-600/50">
+            <h4 className="text-sm font-semibold text-slate-300 mb-4">
+              Performance Heatmap by Day of Week
+            </h4>
+            <div className="grid grid-cols-7 gap-3">
+              {dayOfWeekStats.map((stat) => {
+                const maxDayRR = Math.max(
+                  ...dayOfWeekStats.map((s) => Math.abs(s.totalRR)),
+                  1
+                );
+                const intensity = Math.min(
+                  Math.abs(stat.totalRR) / maxDayRR,
+                  1
+                );
+                const isPositive = stat.totalRR >= 0;
+                const bgColor = isPositive
+                  ? `rgba(16, 185, 129, ${intensity})`
+                  : `rgba(239, 68, 68, ${intensity})`;
+
+                return (
+                  <div
+                    key={stat.day}
+                    className="aspect-square rounded-lg border border-slate-600/50 flex flex-col items-center justify-center p-3 hover:scale-110 transition-transform cursor-pointer group relative"
+                    style={{ backgroundColor: bgColor }}
+                    title={`${stat.dayName} - ${formatRR(stat.totalRR)} - ${stat.trades} trades`}
+                  >
+                    <div className="text-sm font-bold text-white/90">
+                      {stat.dayName.slice(0, 3)}
+                    </div>
+                    {stat.trades > 0 && (
+                      <div className="text-xs text-white/70 mt-1">
+                        {stat.trades}
+                      </div>
+                    )}
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900/90 rounded-lg flex items-center justify-center">
+                      <div className="text-center text-xs">
+                        <div className="font-bold text-white">
+                          {formatRR(stat.totalRR)}
+                        </div>
+                        <div className="text-slate-400">
+                          {stat.trades} trades
+                        </div>
+                        <div className="text-slate-400">
+                          {stat.winRate.toFixed(0)}% WR
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-green-500 rounded"></div>
+                  <span>Profit</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-red-500 rounded"></div>
+                  <span>Loss</span>
+                </div>
+              </div>
+              <span>Darker = Higher absolute value</span>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Total RR by Day */}
             <div>

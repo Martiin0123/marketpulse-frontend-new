@@ -6,6 +6,7 @@ import { TrashIcon } from '@heroicons/react/24/outline';
 import { Plus } from '@phosphor-icons/react';
 import SettingsModal from './SettingsModal';
 import CreateAccountModal from './CreateAccountModal';
+import EditAccountModal from './EditAccountModal';
 import ConnectBrokerModal from './ConnectBrokerModal';
 import BrokerConnection from './BrokerConnection';
 import type { TradingAccount } from '@/types/journal';
@@ -14,6 +15,7 @@ interface JournalSettingsProps {
   accounts: (TradingAccount & { stats: any })[];
   onAccountDeleted: (accountId: string) => void;
   onAccountCreated: (account: TradingAccount) => Promise<void>;
+  onAccountUpdated?: (account: TradingAccount) => Promise<void>;
   className?: string;
 }
 
@@ -21,10 +23,15 @@ export default function JournalSettings({
   accounts,
   onAccountDeleted,
   onAccountCreated,
+  onAccountUpdated,
   className = ''
 }: JournalSettingsProps) {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<TradingAccount | null>(
+    null
+  );
   const [isConnectBrokerModalOpen, setIsConnectBrokerModalOpen] =
     useState(false);
   const [selectedBrokerType, setSelectedBrokerType] = useState<
@@ -159,14 +166,38 @@ export default function JournalSettings({
                         </span>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleDeleteAccount(account.id)}
-                      disabled={isDeleting === account.id}
-                      className="ml-4 p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
-                      title="Delete account"
-                    >
-                      <TrashIcon className="h-5 w-5" />
-                    </button>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => {
+                          setEditingAccount(account);
+                          setIsEditModalOpen(true);
+                        }}
+                        className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                        title="Edit account"
+                      >
+                        <svg
+                          className="h-5 w-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteAccount(account.id)}
+                        disabled={isDeleting === account.id}
+                        className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                        title="Delete account"
+                      >
+                        <TrashIcon className="h-5 w-5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -197,6 +228,24 @@ export default function JournalSettings({
         onAccountCreated={async (account) => {
           await onAccountCreated(account);
           setIsCreateModalOpen(false);
+        }}
+      />
+
+      {/* Edit Account Modal */}
+      <EditAccountModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingAccount(null);
+        }}
+        account={editingAccount}
+        onAccountUpdated={async (updatedAccount) => {
+          if (onAccountUpdated) {
+            await onAccountUpdated(updatedAccount);
+          } else {
+            // Fallback: reload if no callback provided
+            window.location.reload();
+          }
         }}
       />
 

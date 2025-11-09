@@ -1,34 +1,50 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { createClient } from '@/utils/supabase/client';
 import type { TradingAccount } from '@/types/journal';
 
-interface CreateAccountModalProps {
+interface EditAccountModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAccountCreated: (account: TradingAccount) => void;
+  account: TradingAccount | null;
+  onAccountUpdated: (account: TradingAccount) => void;
 }
 
-export default function CreateAccountModal({
+export default function EditAccountModal({
   isOpen,
   onClose,
-  onAccountCreated
-}: CreateAccountModalProps) {
+  account,
+  onAccountUpdated
+}: EditAccountModalProps) {
   const [formData, setFormData] = useState({
     name: '',
     currency: 'USD',
     initial_balance: '',
-    fixed_risk: '1'
+    fixed_risk: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const supabase = createClient();
 
+  // Populate form when account changes
+  useEffect(() => {
+    if (account) {
+      setFormData({
+        name: account.name || '',
+        currency: account.currency || 'USD',
+        initial_balance: account.initial_balance?.toString() || '',
+        fixed_risk: account.fixed_risk?.toString() || '1'
+      });
+    }
+  }, [account]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!account) return;
+
     setIsLoading(true);
     setError(null);
 
@@ -41,53 +57,45 @@ export default function CreateAccountModal({
         throw new Error('Not authenticated');
       }
 
-      // Save to Supabase
-      const { data, error: insertError } = await supabase
+      // Update in Supabase
+      const { data, error: updateError } = await supabase
         .from('trading_accounts' as any)
-        .insert({
-          user_id: user.id,
+        .update({
           name: formData.name,
           currency: formData.currency,
           initial_balance: parseFloat(formData.initial_balance),
-          fixed_risk: parseFloat(formData.fixed_risk || '1')
+          fixed_risk: parseFloat(formData.fixed_risk)
         })
+        .eq('id', account.id)
         .select()
         .single();
 
-      if (insertError) {
-        console.error('Supabase insert error:', insertError);
-        throw new Error(`Failed to create account: ${insertError.message}`);
+      if (updateError) {
+        console.error('Supabase update error:', updateError);
+        throw new Error(`Failed to update account: ${updateError.message}`);
       }
 
       if (!data) {
         throw new Error('No data returned from database');
       }
 
-      onAccountCreated(data);
-      setFormData({
-        name: '',
-        currency: 'USD',
-        initial_balance: '',
-        fixed_risk: '1'
-      });
+      onAccountUpdated(data);
       onClose();
     } catch (err) {
-      console.error('Error creating account:', err);
-      setError(err instanceof Error ? err.message : 'Failed to create account');
+      console.error('Error updating account:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update account');
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !account) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md mx-4">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">
-            Create New Account
-          </h2>
+          <h2 className="text-lg font-semibold text-white">Edit Account</h2>
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-white transition-colors"
@@ -191,7 +199,7 @@ export default function CreateAccountModal({
               disabled={isLoading}
               className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition-colors"
             >
-              {isLoading ? 'Creating...' : 'Create Account'}
+              {isLoading ? 'Updating...' : 'Update Account'}
             </button>
           </div>
         </form>

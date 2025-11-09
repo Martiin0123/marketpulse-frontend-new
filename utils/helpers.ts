@@ -113,3 +113,58 @@ export const calculateTrialEndUnixTimestamp = (trialPeriodDays: number | null) =
   trialEnd.setDate(trialEnd.getDate() + trialPeriodDays);
   return Math.floor(trialEnd.getTime() / 1000);
 };
+
+/**
+ * Extracts a clean symbol name from contract symbols
+ * Examples:
+ * - "CON.F.US.MNQ.Z25" -> "MNQ"
+ * - "CON.F.US.ES.Z25" -> "ES"
+ * - "MNQ" -> "MNQ"
+ * - "BTCUSDT" -> "BTCUSDT"
+ */
+export function getCleanSymbol(symbol: string | null | undefined): string {
+  if (!symbol) return '';
+  
+  // If it's already a clean symbol (no dots), return as is
+  if (!symbol.includes('.')) {
+    return symbol;
+  }
+  
+  // Split by dots and find the instrument name
+  // Pattern: CON.F.US.MNQ.Z25 or similar
+  const parts = symbol.split('.');
+  
+  // Common futures instrument prefixes to skip
+  const skipPrefixes = ['CON', 'F', 'US', 'C', 'M'];
+  
+  // Look for parts that are all uppercase letters (the instrument)
+  // Skip common prefixes like CON, F, US, etc.
+  for (const part of parts) {
+    // Check if it's all uppercase letters (2-4 chars typically)
+    // and not in the skip list
+    if (/^[A-Z]{2,4}$/.test(part) && !skipPrefixes.includes(part)) {
+      return part;
+    }
+  }
+  
+  // Fallback: try to extract from common patterns
+  // CON.F.US.MNQ.Z25 -> MNQ (look for pattern after US)
+  const match = symbol.match(/\.US\.([A-Z]{2,4})\./);
+  if (match && match[1]) {
+    return match[1];
+  }
+  
+  // Another fallback: get the longest uppercase part that's not a prefix
+  let longestPart = '';
+  for (const part of parts) {
+    if (/^[A-Z]{2,4}$/.test(part) && !skipPrefixes.includes(part) && part.length > longestPart.length) {
+      longestPart = part;
+    }
+  }
+  if (longestPart) {
+    return longestPart;
+  }
+  
+  // If no pattern matches, return the original
+  return symbol;
+}

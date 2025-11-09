@@ -32,176 +32,190 @@ interface SyncResult {
 
 /**
  * Group individual executions into round-trip trades
- * ProjectX Gateway API may return executions (fills) that need to be grouped,
- * OR it may return completed trades with profitAndLoss already calculated.
+ * TopStep API returns individual executions (fills) with PnL already calculated.
  * 
- * Strategy:
- * 1. If an execution has profitAndLoss (PnL), use it as-is (it's a completed trade)
- * 2. Otherwise, group executions by matching entry/exit pairs
+ * KEY INSIGHT: 
+ * - PnL = 0 means this execution OPENED a position
+ * - PnL != 0 means this execution CLOSED a position (partial or full)
+ * - Multiple closes can belong to the same opening position
+ * 
+ * LOGIC:
+ * 1. Sort all executions by timestamp
+ * 2. Group by symbol
+ * 3. For each symbol, track open positions:
+ *    - When PnL = 0: This opens a new position (BUY = LONG, SELL = SHORT)
+ *    - When PnL != 0: This closes an existing position (BUY closes SHORT, SELL closes LONG)
+ * 4. Match closes to opens using FIFO
+ * 5. Create a trade when a position is fully closed (sum of closes >= sum of opens)
  */
+/**
+ * Calculate signed quantity from a fill
+ * side: 0 = BUY (long/cover) → positive
+ * side: 1 = SELL (short) → negative
+ */
+function signedQty(exec: ProjectXTrade): number {
+  // Get quantity (might be quantity or size field)
+  const qty = exec.quantity || (exec as any).size || 0;
+  
+  // Map side to signed quantity
+  // side: 0 = BUY (long/cover) → positive
+  // side: 1 = SELL (short) → negative
+  // Also handle string values 'BUY'/'SELL'
+  const sideNum = exec.side === 'BUY' ? 0 : 
+                  exec.side === 'SELL' ? 1 : 
+                  (exec as any).side;
+  
+  return sideNum === 0 ? qty : -qty;
+}
+
 function groupExecutionsIntoTrades(executions: ProjectXTrade[]): ProjectXTrade[] {
-  // Sort executions by timestamp
-  const sorted = [...executions].sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  );
-
-  // Separate executions that already have PnL (completed trades from API)
-  // vs executions that need to be grouped
-  const completedTradesFromAPI: ProjectXTrade[] = [];
-  const executionsToGroup: ProjectXTrade[] = [];
-  
-  for (const exec of sorted) {
-    // Check if this is a completed trade from the API
-    // ProjectX API returns completed trades with:
-    // - EntryPrice and ExitPrice (different values)
-    // - PnL (profit and loss)
-    // - Type (Long or Short)
-    // - EnteredAt and ExitedAt (timestamps)
-    
-    // If it has PnL AND different entry/exit prices, it's a completed trade
-    const hasDifferentPrices = exec.price !== exec.executedPrice && 
-                               exec.executedPrice !== 0 && 
-                               exec.price !== 0;
-    
-    // Also check if it has the Type field (indicates completed trade from API)
-    const hasTypeField = (exec as any).tradeType || (exec as any).Type || (exec as any).type;
-    
-    // If it has Type field, it's definitely a completed trade from the API
-    // Use it directly without grouping
-    if (hasTypeField) {
-      completedTradesFromAPI.push(exec);
-    } else if (exec.pnl !== null && exec.pnl !== undefined && exec.pnl !== 0 && hasDifferentPrices) {
-      // This is a completed trade with PnL AND separate entry/exit prices - use it as-is
-      completedTradesFromAPI.push(exec);
-    } else {
-      // No Type field, no PnL, or same prices - this is just an execution that needs to be grouped
-      executionsToGroup.push(exec);
-    }
-  }
-  
-  console.log(`📊 Grouping: ${completedTradesFromAPI.length} completed trades from API, ${executionsToGroup.length} executions to group`);
-  
-  // Log first completed trade to verify structure
-  if (completedTradesFromAPI.length > 0) {
-    const firstTrade = completedTradesFromAPI[0];
-    console.log(`📋 First completed trade from API:`, {
-      id: firstTrade.id,
-      symbol: firstTrade.symbol,
-      side: firstTrade.side,
-      price: firstTrade.price,
-      executedPrice: firstTrade.executedPrice,
-      pnl: firstTrade.pnl,
-      quantity: firstTrade.quantity,
-      type: (firstTrade as any).Type || (firstTrade as any).type
-    });
+  if (executions.length === 0) {
+    return [];
   }
 
-  console.log(`📊 Grouping executions: ${completedTradesFromAPI.length} completed trades from API, ${executionsToGroup.length} executions to group`);
-
-  // Group remaining executions by symbol
-  const bySymbol = new Map<string, ProjectXTrade[]>();
-  executionsToGroup.forEach((exec) => {
-    if (!bySymbol.has(exec.symbol)) {
-      bySymbol.set(exec.symbol, []);
+  // Group by (accountId, symbol)
+  const byAccountSymbol = new Map<string, ProjectXTrade[]>();
+  executions.forEach((exec) => {
+    const key = `${exec.accountId}_${exec.symbol}`;
+    if (!byAccountSymbol.has(key)) {
+      byAccountSymbol.set(key, []);
     }
-    bySymbol.get(exec.symbol)!.push(exec);
+    byAccountSymbol.get(key)!.push(exec);
   });
 
-  const completedTrades: ProjectXTrade[] = [...completedTradesFromAPI];
+  const completedTrades: ProjectXTrade[] = [];
 
-  // Process each symbol separately
-  const symbolEntries = Array.from(bySymbol.entries());
-  for (const [symbol, symbolExecutions] of symbolEntries) {
-    // Track open positions using FIFO (First In, First Out) matching
-    // Each position tracks: direction, entries, exits
-    interface OpenPosition {
+  // Process each (accountId, symbol) separately
+  const accountSymbolEntries = Array.from(byAccountSymbol.entries());
+  for (const [key, fills] of accountSymbolEntries) {
+    const [accountId, symbol] = key.split('_');
+    
+    // Sort by creationTimestamp (and id as tiebreaker)
+    const sorted = [...fills].sort((a, b) => {
+      const timeA = new Date(a.timestamp).getTime();
+      const timeB = new Date(b.timestamp).getTime();
+      if (timeA !== timeB) {
+        return timeA - timeB;
+      }
+      // Use id as tiebreaker
+      const idA = parseInt(a.id) || 0;
+      const idB = parseInt(b.id) || 0;
+      return idA - idB;
+    });
+
+    interface CurrentTrade {
       direction: 'LONG' | 'SHORT';
+      qtyOpen: number;
+      entryNotional: number;
+      exitNotional: number;
+      realizedPnL: number;
+      totalFees: number;
+      openTime: string;
+      closeTime: string;
+      fillIds: string[];
       entries: ProjectXTrade[];
       exits: ProjectXTrade[];
     }
-    
-    const openPositions: OpenPosition[] = [];
 
-    for (const exec of symbolExecutions) {
-      const isBuy = exec.side === 'BUY';
-      const isSell = exec.side === 'SELL';
+    let current: CurrentTrade | null = null;
+    let netPos = 0;
+    let tradeCounter = 1;
 
-      if (isBuy) {
-        // BUY can be:
-        // 1. Entry for a LONG position (if no open SHORT)
-        // 2. Exit for a SHORT position (if open SHORT exists)
-        
-        // First, try to close an open SHORT position (FIFO)
-        const openShortIndex = openPositions.findIndex(
-          p => p.direction === 'SHORT' && p.entries.length > p.exits.length
-        );
-        
-        if (openShortIndex >= 0) {
-          // Close the SHORT position
-          const position = openPositions[openShortIndex];
-          position.exits.push(exec);
-          
-          // Check if fully closed
-          const totalEntryQty = position.entries.reduce((sum, e) => sum + e.quantity, 0);
-          const totalExitQty = position.exits.reduce((sum, e) => sum + e.quantity, 0);
-          
-          if (totalExitQty >= totalEntryQty) {
-            // Position fully closed, create trade
-            const trade = createTradeFromPosition(position, symbol, exec.accountId);
-            completedTrades.push(trade);
-            openPositions.splice(openShortIndex, 1);
-          }
-        } else {
-          // No open SHORT - this is a new LONG entry
-          openPositions.push({
-            direction: 'LONG',
-            entries: [exec],
+    for (const f of sorted) {
+      // Skip voided fills
+      if ((f as any).voided) continue;
+
+      const qty = signedQty(f); // buy=+, sell=-
+      let remaining = qty;
+
+      while (remaining !== 0) {
+        // flat -> new trade
+        if (netPos === 0) {
+          const dir = remaining > 0 ? 'LONG' : 'SHORT';
+          current = {
+            direction: dir,
+            qtyOpen: 0,
+            entryNotional: 0,
+            exitNotional: 0,
+            realizedPnL: 0,
+            totalFees: 0,
+            openTime: f.timestamp,
+            closeTime: f.timestamp,
+            fillIds: [],
+            entries: [],
             exits: []
-          });
+          };
         }
-      } else if (isSell) {
-        // SELL can be:
-        // 1. Entry for a SHORT position (if no open LONG)
-        // 2. Exit for a LONG position (if open LONG exists)
-        
-        // First, try to close an open LONG position (FIFO)
-        const openLongIndex = openPositions.findIndex(
-          p => p.direction === 'LONG' && p.entries.length > p.exits.length
-        );
-        
-        if (openLongIndex >= 0) {
-          // Close the LONG position
-          const position = openPositions[openLongIndex];
-          position.exits.push(exec);
-          
-          // Check if fully closed
-          const totalEntryQty = position.entries.reduce((sum, e) => sum + e.quantity, 0);
-          const totalExitQty = position.exits.reduce((sum, e) => sum + e.quantity, 0);
-          
-          if (totalExitQty >= totalEntryQty) {
-            // Position fully closed, create trade
-            const trade = createTradeFromPosition(position, symbol, exec.accountId);
-            completedTrades.push(trade);
-            openPositions.splice(openLongIndex, 1);
-          }
+
+        if (!current) throw new Error('Current trade missing');
+
+        const sameDirection =
+          (netPos >= 0 && remaining > 0) || (netPos <= 0 && remaining < 0);
+
+        // Add to position (opening / scaling in)
+        if (sameDirection || netPos === 0) {
+          const openQty = remaining;
+          current.qtyOpen += Math.abs(openQty);
+          current.entryNotional += Math.abs(openQty) * f.price;
+          current.totalFees += f.commission || 0;
+          current.fillIds.push(f.id);
+          current.entries.push(f);
+          netPos += openQty;
+          remaining = 0;
+          current.closeTime = f.timestamp;
         } else {
-          // No open LONG - this is a new SHORT entry
-          openPositions.push({
-            direction: 'SHORT',
-            entries: [exec],
-            exits: []
-          });
+          // This fill is (partially) closing)
+          const closeQty = Math.min(Math.abs(remaining), Math.abs(netPos));
+          const closeSign = remaining > 0 ? 1 : -1; // buy closes short, sell closes long
+
+          current.exitNotional += closeQty * f.price;
+          current.totalFees += (f.commission || 0) * (closeQty / Math.abs(qty));
+          current.fillIds.push(f.id);
+          current.exits.push(f);
+          netPos += closeSign * closeQty;
+          remaining -= closeSign * closeQty;
+          current.closeTime = f.timestamp;
+
+          // if flat -> finalize this trade
+          if (netPos === 0) {
+            const finalQty = current.qtyOpen;
+            const avgEntry = current.entryNotional / finalQty;
+            const avgExit = current.exitNotional / finalQty;
+            
+            // Calculate realized PnL from API (sum of PnL from exit fills)
+            const realizedPnL = current.exits.reduce((sum, e) => sum + (e.pnl || 0), 0);
+            
+            // Create completed trade
+            const trade = createTradeFromPosition(
+              { entries: current.entries, exits: current.exits },
+              symbol,
+              accountId
+            );
+            
+            // Override with calculated values (but preserve exitLevels)
+            trade.price = avgEntry;
+            trade.executedPrice = avgExit;
+            trade.quantity = finalQty;
+            trade.executedQuantity = finalQty;
+            trade.pnl = realizedPnL - current.totalFees;
+            trade.commission = current.totalFees;
+            trade.timestamp = current.closeTime;
+            // exitLevels should already be set by createTradeFromPosition if exits.length > 1
+            
+            completedTrades.push(trade);
+            current = null;
+          }
         }
       }
     }
 
-    // Handle any remaining open positions (incomplete trades)
-    // For now, we'll skip them - they're not closed yet
-    if (openPositions.length > 0) {
-      console.log(`⚠️ ${openPositions.length} open positions remaining for ${symbol} (incomplete trades)`);
+    // Log any remaining open position (incomplete trade)
+    if (current && netPos !== 0) {
+      console.log(`⚠️ Incomplete trade for ${symbol}: ${current.direction} ${current.qtyOpen} qty, netPos=${netPos}`);
     }
   }
 
+  console.log(`✅ Created ${completedTrades.length} completed trades from ${executions.length} executions`);
   return completedTrades;
 }
 
@@ -241,27 +255,29 @@ function createTradeFromPosition(
   const isLong = direction === 'BUY';
 
   // Calculate PnL
-  // For LONG: PnL = (Exit Price - Entry Price) * Quantity
-  // For SHORT: PnL = (Entry Price - Exit Price) * Quantity
+  // TopStep API already provides PnL on each closing execution
+  // Sum all the PnL from exit executions (this is the actual PnL from the broker)
   const quantity = Math.min(totalEntryQty, totalExitQty); // Use the smaller quantity
   
-  // Try to use PnL from executions if available (sum all PnLs from entries and exits)
-  // This is more accurate than calculating manually
-  let pnl = 0;
-  const totalPnLFromExecutions = 
-    position.entries.reduce((sum, e) => sum + (e.pnl || 0), 0) +
-    position.exits.reduce((sum, e) => sum + (e.pnl || 0), 0);
+  // Sum PnL from all exit executions (this is what TopStep calculated)
+  // This is more accurate than calculating from prices
+  const totalPnLFromExits = position.exits.reduce((sum, e) => sum + (e.pnl || 0), 0);
   
-  if (totalPnLFromExecutions !== 0) {
-    // Use PnL from API if available (more accurate)
-    pnl = totalPnLFromExecutions;
+  // Also calculate from price difference as a sanity check
+  let calculatedPnL = 0;
+  if (isLong) {
+    calculatedPnL = (avgExitPrice - avgEntryPrice) * quantity;
   } else {
-    // Calculate manually if API didn't provide PnL
-    if (isLong) {
-      pnl = (avgExitPrice - avgEntryPrice) * quantity;
-    } else {
-      pnl = (avgEntryPrice - avgExitPrice) * quantity;
-    }
+    calculatedPnL = (avgEntryPrice - avgExitPrice) * quantity;
+  }
+  
+  // Use the PnL from exits (broker's calculation) as it's more accurate
+  const pnl = totalPnLFromExits;
+  
+  // Log calculation for debugging (only if there's a significant difference)
+  const pnlDifference = Math.abs(totalPnLFromExits - calculatedPnL);
+  if (pnlDifference > 10) { // Only log if difference is significant
+    console.log(`⚠️ PnL mismatch for ${isLong ? 'LONG' : 'SHORT'}: API=${totalPnLFromExits}, Calculated=${calculatedPnL}, Diff=${pnlDifference}`);
   }
 
   // Sum commissions
@@ -279,6 +295,20 @@ function createTradeFromPosition(
     ...position.exits.map((e) => e.id)
   ].join('_');
 
+  // Store exit levels information for display
+  // Each exit represents a partial exit (can be profit or loss)
+  // Only create exitLevels if there are multiple exits (multiple partial exits)
+  const exitLevels = position.exits.length > 1 
+    ? position.exits.map((exit, index) => ({
+        level: index + 1,
+        quantity: exit.quantity,
+        price: exit.price,
+        pnl: exit.pnl || 0,
+        timestamp: exit.timestamp,
+        commission: exit.commission || 0
+      }))
+    : undefined;
+
   return {
     id: executionIds,
     accountId,
@@ -291,11 +321,13 @@ function createTradeFromPosition(
     timestamp: exitTimestamp, // Use exit timestamp as trade completion time
     pnl: pnl - totalCommission, // Net PnL after commissions
     commission: totalCommission,
-    status: 'FILLED',
+    status: 'FILLED', // Always mark grouped trades as FILLED (they're completed)
     // Add entry/exit timestamps for proper date mapping
     entryTimestamp,
-    exitTimestamp
-  } as ProjectXTrade & { entryTimestamp: string; exitTimestamp: string };
+    exitTimestamp,
+    // Store exit levels for display in UI
+    exitLevels
+  } as ProjectXTrade & { entryTimestamp: string; exitTimestamp: string; exitLevels: Array<{ level: number; quantity: number; price: number; pnl: number; timestamp: string; commission: number }> };
 }
 
 /**
@@ -311,22 +343,29 @@ function mapProjectXTradeToJournal(
   const side = trade.side === 'BUY' ? 'long' : 'short';
 
   // Extract currency amounts
-  // Use the exact entry/exit prices from the trade object
-  // These should have been extracted from the API response in the client
-  // trade.price = entry price, trade.executedPrice = exit price (from client mapping)
+  // For grouped trades, price = weighted avg entry price, executedPrice = weighted avg exit price
+  // For direct API trades, price = EntryPrice, executedPrice = ExitPrice
   let entryPrice = trade.price || 0;
   let exitPrice = trade.executedPrice || 0;
-  
-  // If exit price is 0 or same as entry, try to get it from executedPrice
-  if (exitPrice === 0 || exitPrice === entryPrice) {
-    exitPrice = trade.executedPrice || trade.price || 0;
-  }
   
   const size = Math.abs(trade.executedQuantity || trade.quantity || 0);
   
   // PnL from ProjectX - this should be the profitAndLoss from the API
-  // If it's a grouped trade, it will be calculated from the executions
-  const pnlAmount = trade.pnl || 0;
+  // For grouped trades, this is calculated in createTradeFromPosition
+  // For direct API trades, this comes from the API
+  let pnlAmount = trade.pnl || 0;
+  
+  // If PnL is 0 but we have different entry/exit prices, calculate it
+  // This handles cases where the API doesn't provide PnL but we have prices
+  if (pnlAmount === 0 && entryPrice !== exitPrice && entryPrice > 0 && exitPrice > 0 && size > 0) {
+    const side = trade.side === 'BUY' ? 'long' : 'short';
+    if (side === 'long') {
+      pnlAmount = (exitPrice - entryPrice) * size;
+    } else {
+      pnlAmount = (entryPrice - exitPrice) * size;
+    }
+    console.log(`📊 Calculated PnL from prices: ${pnlAmount} (${side}, entry: ${entryPrice}, exit: ${exitPrice}, size: ${size})`);
+  }
   
   // Only calculate from PnL as a last resort if prices are still the same
   // This should rarely happen if the API provides proper entry/exit prices
@@ -464,11 +503,6 @@ function mapProjectXTradeToJournal(
   } else if (costBasis > 0 && pnlAmount === 0) {
     pnlPercentage = 0;
   }
-  
-  // Log calculation in development
-  if (process.env.NODE_ENV === 'development' && costBasis > 0) {
-    console.log(`📊 PnL Calculation: PnL=${pnlAmount}, CostBasis=${costBasis}, Percentage=${pnlPercentage}%`);
-  }
 
   // Calculate RR from PnL and fixed risk
   // RR = PnL / Risk, where Risk = Entry Price * Size * (Fixed Risk % / 100)
@@ -477,6 +511,27 @@ function mapProjectXTradeToJournal(
     const riskAmount = entryPrice * size * (fixedRisk / 100);
     if (riskAmount > 0) {
       rr = pnlAmount / riskAmount;
+    }
+  }
+
+  // Store exit levels in exit_levels field if multiple exits exist
+  const tradeAny = trade as any;
+  let exitLevels: Array<{ tp: number; qty: number; price: number; pnl: number; timestamp?: string }> | undefined = undefined;
+  
+  // Check if trade has exitLevels (from createTradeFromPosition)
+  if (tradeAny.exitLevels && Array.isArray(tradeAny.exitLevels) && tradeAny.exitLevels.length > 1) {
+    // Store exit levels as structured data
+    exitLevels = tradeAny.exitLevels.map((level: any) => ({
+      tp: level.level || level.tp || 0,
+      qty: level.quantity || level.qty || 0,
+      price: level.price || 0,
+      pnl: level.pnl || 0,
+      timestamp: level.timestamp
+    }));
+    
+    // Log for debugging
+    if (exitLevels) {
+      console.log(`📊 Storing ${exitLevels.length} exit levels for trade ${trade.symbol}:`, exitLevels);
     }
   }
 
@@ -499,6 +554,8 @@ function mapProjectXTradeToJournal(
     broker_trade_id: `projectx_${trade.id}`,
     // Size field (database has this column even if TypeScript type doesn't)
     size: size,
+    // Store exit levels in dedicated field
+    exit_levels: exitLevels ? JSON.stringify(exitLevels) : undefined,
   } as any;
 }
 
@@ -679,31 +736,137 @@ export async function syncProjectXTrades(
     // Get Project X account ID
     const projectXAccountId = conn.broker_account_name;
 
-    // Get trades - for first sync, fetch ALL historical trades
-    // For subsequent syncs, only fetch since last sync
+    // Get trades - ALWAYS fetch ALL historical trades for now (testing mode)
+    // Add 1 day buffer to endTime to ensure we get all trades including today
     const endTime = new Date();
-    const startTime = conn.last_sync_at
-      ? new Date(conn.last_sync_at)
-      : new Date(0); // Start from epoch (1970) to get ALL historical trades on first sync
+    endTime.setHours(23, 59, 59, 999); // End of today to include all trades
+    const isFirstSync = !conn.last_sync_at;
+    
+    // FOR TESTING: Always fetch ALL historical trades from the beginning
+    // This ensures we get all trades regardless of last_sync_at
+    let startTime = new Date(0); // Start from epoch (1970) to get ALL historical trades
+    
+    console.log(`📅 Date range for sync: ${startTime.toISOString()} to ${endTime.toISOString()}`);
+    console.log(`📅 Last sync was: ${conn.last_sync_at ? new Date(conn.last_sync_at).toISOString() : 'Never (first sync)'}`);
+    console.log(`📅 Fetching ALL historical trades (TESTING MODE - always from epoch)`);
+
+    // FOR TESTING: Delete all existing trades to force full resync
+    // This ensures we always get a clean sync with all trades
+    console.log(`🗑️ Deleting all existing trades for account ${conn.trading_account_id} (TESTING MODE - full resync)`);
+    const { error: deleteError } = await supabase
+      .from('trade_entries' as any)
+      .delete()
+      .eq('account_id', conn.trading_account_id)
+      .eq('sync_source', 'projectx');
+    
+    if (deleteError) {
+      console.error(`❌ Error deleting existing trades:`, deleteError);
+    } else {
+      console.log(`✅ Deleted all existing ProjectX trades for full resync`);
+    }
 
     // Fetch executions from Project X
     const executions = await client.getTrades(projectXAccountId, startTime, endTime);
     
-    console.log(`📥 Fetched ${executions.length} items from ProjectX API`);
+    console.log(`\n📥 ========== FETCHED EXECUTIONS FROM PROJECTX API ==========`);
+    console.log(`Total executions fetched: ${executions.length}`);
+    
+    // Log EXACT structure of first 10 executions after mapping
+    console.log(`\n📋 First 10 executions (after mapping to ProjectXTrade format):`);
+    executions.slice(0, 10).forEach((exec: any, idx: number) => {
+      console.log(`\n--- Execution ${idx + 1} ---`);
+      console.log(`ID: ${exec.id}`);
+      console.log(`Symbol: ${exec.symbol}`);
+      console.log(`Side: ${exec.side}`);
+      console.log(`Quantity: ${exec.quantity}`);
+      console.log(`Price: ${exec.price}`);
+      console.log(`ExecutedPrice: ${exec.executedPrice}`);
+      console.log(`PnL: ${exec.pnl}`);
+      console.log(`Commission: ${exec.commission}`);
+      console.log(`Timestamp: ${exec.timestamp}`);
+      console.log(`Status: ${exec.status}`);
+      console.log(`EnteredAt: ${(exec as any).enteredAt || 'N/A'}`);
+      console.log(`ExitedAt: ${(exec as any).exitedAt || 'N/A'}`);
+      console.log(`TradeType: ${(exec as any).tradeType || 'N/A'}`);
+      console.log(`Full object:`, JSON.stringify(exec, null, 2));
+    });
+    console.log(`\n📥 ========== END FETCHED EXECUTIONS ==========\n`);
+
+    // Filter to only include filled/completed trades
+    // Only process trades that are fully executed (status: 'FILLED', 'closed', or similar)
+    const filledExecutions = executions.filter(exec => {
+      const status = (exec.status || '').toUpperCase();
+      // Include filled, closed, completed, or executed trades
+      // Exclude pending, cancelled, rejected, etc.
+      return status === 'FILLED' || 
+             status === 'CLOSED' || 
+             status === 'COMPLETED' || 
+             status === 'EXECUTED' ||
+             status === 'FILL' ||
+             // If no status field, assume it's filled if it has PnL or different entry/exit prices
+             (!status && (exec.pnl !== 0 || (exec.price !== exec.executedPrice && exec.executedPrice !== 0)));
+    });
+    
+    const filteredCount = executions.length - filledExecutions.length;
+    if (filteredCount > 0) {
+      console.log(`🔍 Filtered out ${filteredCount} non-filled executions (status: pending, cancelled, etc.)`);
+    }
+    
+    console.log(`✅ Processing ${filledExecutions.length} filled executions`);
+
+    // Log summary of fetched executions
+    const opens = filledExecutions.filter(e => e.pnl === 0 || e.pnl === null).length;
+    const closes = filledExecutions.filter(e => e.pnl !== 0 && e.pnl !== null).length;
+    console.log(`📊 Fetched ${filledExecutions.length} filled executions (${opens} opens, ${closes} closes)`);
+    
+    // Show date range of executions
+    if (filledExecutions.length > 0) {
+      const dates = filledExecutions.map(e => new Date(e.timestamp));
+      const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+      const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+      console.log(`📅 Execution date range: ${minDate.toISOString().split('T')[0]} to ${maxDate.toISOString().split('T')[0]}`);
+      
+      // Log November 7th executions specifically for debugging
+      const nov7Executions = filledExecutions.filter(e => {
+        const execDate = new Date(e.timestamp);
+        return execDate.getFullYear() === 2025 && 
+               execDate.getMonth() === 10 && // November (0-indexed)
+               execDate.getDate() === 7;
+      });
+      if (nov7Executions.length > 0) {
+        console.log(`📅 November 7th executions: ${nov7Executions.length} (${nov7Executions.filter(e => e.pnl === 0 || e.pnl === null).length} opens, ${nov7Executions.filter(e => e.pnl !== 0 && e.pnl !== null).length} closes)`);
+        nov7Executions.slice(0, 10).forEach((e, idx) => {
+          console.log(`  Nov7 ${idx + 1}: ${e.side} ${e.quantity} @ ${e.price}, PnL=${e.pnl}, time=${e.timestamp}`);
+        });
+      }
+    }
 
     // Group executions into round-trip trades
-    // ProjectX returns individual executions (fills), not completed trades
-    // We need to match entry and exit executions to form complete trades
-    const groupedTrades = groupExecutionsIntoTrades(executions);
+    // TopStep API: PnL=0/null means opening, PnL!=0 means closing
+    // Multiple closes can belong to the same opening position
+    // The API returns individual executions, not completed trades, so we need to group them
+    const groupedTrades = groupExecutionsIntoTrades(filledExecutions);
     
-    console.log(`✅ Grouped into ${groupedTrades.length} completed trades (from ${executions.length} executions)`);
+    // Use grouped trades as all trades (API doesn't return pre-completed trades)
+    const allTrades = groupedTrades;
+    
+    // Log summary with date range
+    if (allTrades.length > 0) {
+      const tradeDates = allTrades.map(t => new Date(t.timestamp));
+      const minTradeDate = new Date(Math.min(...tradeDates.map(d => d.getTime())));
+      const maxTradeDate = new Date(Math.max(...tradeDates.map(d => d.getTime())));
+      console.log(`✅ Created ${allTrades.length} trades from ${filledExecutions.length} executions`);
+      console.log(`📅 Trade date range: ${minTradeDate.toISOString().split('T')[0]} to ${maxTradeDate.toISOString().split('T')[0]}`);
+    } else {
+      console.log(`⚠️ No trades created from ${filledExecutions.length} executions`);
+    }
 
     // Map and insert trades
     // IMPORTANT: This sync only ADDS new trades. It never deletes or modifies existing trades.
     // Existing trades are identified by broker_trade_id and skipped.
     const tradesToInsert: any[] = [];
 
-    for (const trade of groupedTrades) {
+    for (const trade of allTrades) {
       // Check if trade already exists (deduplication)
       // We use broker_trade_id to identify trades that were already synced
       const { data: existingTrade } = await supabase
@@ -733,19 +896,6 @@ export async function syncProjectXTrades(
     if (tradesToInsert.length > 0) {
       console.log(`💾 Inserting ${tradesToInsert.length} completed trades into database`);
       
-      // Log sample of what we're inserting
-      if (tradesToInsert.length > 0) {
-        console.log(`📋 Sample trade being inserted:`, {
-          symbol: tradesToInsert[0].symbol,
-          side: tradesToInsert[0].side,
-          entry_price: tradesToInsert[0].entry_price,
-          exit_price: tradesToInsert[0].exit_price,
-          pnl_amount: tradesToInsert[0].pnl_amount,
-          rr: tradesToInsert[0].rr,
-          status: tradesToInsert[0].status,
-          broker_trade_id: tradesToInsert[0].broker_trade_id
-        });
-      }
       
       const { error: insertError } = await supabase
         .from('trade_entries' as any)
@@ -759,7 +909,7 @@ export async function syncProjectXTrades(
         console.log(`✅ Successfully inserted ${result.tradesSynced} trades`);
       }
     } else {
-      console.log(`ℹ️ No new trades to insert (all ${groupedTrades.length} trades already exist)`);
+      console.log(`ℹ️ No new trades to insert (all ${filledExecutions.length} trades already exist)`);
     }
 
     // Update last sync time

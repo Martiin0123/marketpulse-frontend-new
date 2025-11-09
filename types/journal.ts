@@ -37,6 +37,14 @@ export interface DailyStats {
   losses: number;
 }
 
+export interface ExitLevel {
+  tp: number; // Exit level number (1, 2, 3, etc.) - can be profit or loss
+  qty: number; // Quantity closed at this level
+  price: number; // Exit price at this level
+  pnl: number; // PnL at this level (can be positive or negative)
+  timestamp?: string; // Timestamp of this exit
+}
+
 export interface TradeEntry {
   id: string;
   account_id: string;
@@ -56,6 +64,7 @@ export interface TradeEntry {
   balance?: number;
   image_url?: string;
   image_data?: string;
+  exit_levels?: ExitLevel[]; // Array of exit levels for trades with multiple partial exits
   created_at: string;
   updated_at: string;
 }

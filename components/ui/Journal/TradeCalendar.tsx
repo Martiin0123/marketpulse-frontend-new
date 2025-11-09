@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/solid';
 import { createClient } from '@/utils/supabase/client';
 import type { DailyStats, TradeEntry } from '@/types/journal';
+import { getCleanSymbol } from '@/utils/helpers';
 
 interface TradeCalendarProps {
   accountId?: string | null;
@@ -52,9 +53,58 @@ export default function TradeCalendar({
   const [weeklyData, setWeeklyData] = useState<WeeklyTradeData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showDollarAmount, setShowDollarAmount] = useState(false); // Toggle between RR and dollar
+  const [showDollarAmount, setShowDollarAmount] = useState(true); // Toggle between RR and dollar (default: dollar)
+  const [selectedDateTrades, setSelectedDateTrades] = useState<TradeEntry[]>(
+    []
+  );
+  const [isLoadingTrades, setIsLoadingTrades] = useState(false);
 
   const supabase = createClient();
+
+  // Fetch trades for a specific date
+  const fetchTradesForDate = async (date: Date) => {
+    try {
+      setIsLoadingTrades(true);
+
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      let query = supabase
+        .from('trade_entries' as any)
+        .select('*')
+        .eq('status', 'closed')
+        .gte('entry_date', startOfDay.toISOString())
+        .lte('entry_date', endOfDay.toISOString())
+        .order('entry_date', { ascending: false });
+
+      if (accountId) {
+        query = query.eq('account_id', accountId);
+      }
+
+      const { data: trades, error: fetchError } = await query;
+
+      if (fetchError) {
+        console.error('Error fetching trades for date:', fetchError);
+        setSelectedDateTrades([]);
+        return;
+      }
+
+      setSelectedDateTrades((trades || []) as unknown as TradeEntry[]);
+    } catch (err) {
+      console.error('Error in fetchTradesForDate:', err);
+      setSelectedDateTrades([]);
+    } finally {
+      setIsLoadingTrades(false);
+    }
+  };
+
+  // Clear trades when month changes
+  useEffect(() => {
+    setSelectedDate(null);
+    setSelectedDateTrades([]);
+  }, [month, refreshKey]);
 
   useEffect(() => {
     const fetchTradesForMonth = async () => {
@@ -563,7 +613,11 @@ export default function TradeCalendar({
                         return (
                           <button
                             key={dayIndex}
-                            onClick={() => setSelectedDate(day)}
+                            onClick={async () => {
+                              setSelectedDate(day);
+                              // Fetch trades for the selected date
+                              await fetchTradesForDate(day);
+                            }}
                             className={`group relative h-24 p-3 rounded-2xl border transition-all duration-300 flex flex-col justify-center items-center overflow-hidden ${
                               isSelected
                                 ? 'bg-gradient-to-br from-blue-500 to-purple-600 border-blue-400 shadow-lg shadow-blue-500/25 scale-105'
@@ -838,6 +892,120 @@ export default function TradeCalendar({
                     </p>
                   </div>
                 )}
+
+                {/* Trades List for Selected Date */}
+                {selectedDate && selectedDateTrades.length > 0 && (
+                  <div className="mt-8">
+                    <h3 className="text-lg font-semibold text-white mb-4">
+                      Trades on{' '}
+                      {selectedDate.toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </h3>
+                    <div className="space-y-2">
+                      {selectedDateTrades.map((trade) => {
+                        const isWin =
+                          (trade.rr && trade.rr > 0) ||
+                          (trade.pnl_amount && trade.pnl_amount > 0);
+                        return (
+                          <div
+                            key={trade.id}
+                            className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50 hover:border-slate-600/50 transition-all"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-4 flex-1">
+                                <div
+                                  className={`w-3 h-3 rounded-full ${isWin ? 'bg-green-400' : 'bg-red-400'}`}
+                                ></div>
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-3">
+                                    <span className="font-semibold text-white">
+                                      {getCleanSymbol(trade.symbol)}
+                                    </span>
+                                    <span
+                                      className={`text-sm px-2 py-0.5 rounded ${
+                                        trade.side === 'long'
+                                          ? 'bg-blue-500/20 text-blue-400'
+                                          : 'bg-red-500/20 text-red-400'
+                                      }`}
+                                    >
+                                      {trade.side.toUpperCase()}
+                                    </span>
+                                  </div>
+                                  <div className="text-sm text-slate-400 mt-1">
+                                    {new Date(
+                                      trade.entry_date
+                                    ).toLocaleTimeString('en-US', {
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                    {trade.entry_price && trade.exit_price && (
+                                      <span className="ml-2">
+                                        {trade.entry_price.toFixed(2)} →{' '}
+                                        {trade.exit_price.toFixed(2)}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                {trade.rr !== null &&
+                                  trade.rr !== undefined && (
+                                    <div
+                                      className={`text-lg font-bold ${
+                                        trade.rr >= 0
+                                          ? 'text-green-400'
+                                          : 'text-red-400'
+                                      }`}
+                                    >
+                                      {trade.rr >= 0 ? '+' : ''}
+                                      {trade.rr.toFixed(2)}R
+                                    </div>
+                                  )}
+                                {trade.pnl_amount !== null &&
+                                  trade.pnl_amount !== undefined && (
+                                    <div
+                                      className={`text-sm ${
+                                        trade.pnl_amount >= 0
+                                          ? 'text-green-400'
+                                          : 'text-red-400'
+                                      }`}
+                                    >
+                                      {trade.pnl_amount >= 0 ? '+' : ''}$
+                                      {trade.pnl_amount.toFixed(2)}
+                                    </div>
+                                  )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {selectedDate && isLoadingTrades && (
+                  <div className="mt-8 text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+                    <p className="mt-2 text-sm text-slate-400">
+                      Loading trades...
+                    </p>
+                  </div>
+                )}
+
+                {selectedDate &&
+                  !isLoadingTrades &&
+                  selectedDateTrades.length === 0 &&
+                  getStatsForDate(selectedDate) && (
+                    <div className="mt-8 text-center py-8">
+                      <p className="text-slate-400">
+                        No trades found for this date
+                      </p>
+                    </div>
+                  )}
               </div>
             </div>
           )}

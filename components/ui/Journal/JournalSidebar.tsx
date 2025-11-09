@@ -5,7 +5,9 @@ import {
   CalendarIcon,
   ListBulletIcon,
   Cog6ToothIcon,
-  HomeIcon
+  HomeIcon,
+  ViewColumnsIcon,
+  UserIcon
 } from '@heroicons/react/24/outline';
 import {
   ChartBarIcon as ChartBarIconSolid,
@@ -14,10 +16,16 @@ import {
   Cog6ToothIcon as Cog6ToothIconSolid,
   HomeIcon as HomeIconSolid
 } from '@heroicons/react/24/solid';
+import type { TradingAccount } from '@/types/journal';
 
 interface JournalSidebarProps {
   currentSection: string;
   onSectionChange: (section: string) => void;
+  accounts: (TradingAccount & { stats: any })[];
+  selectedAccount: string | null;
+  onAccountChange: (accountId: string | null) => void;
+  view: 'individual' | 'combined';
+  onViewChange: (view: 'individual' | 'combined') => void;
 }
 
 const sections = [
@@ -55,7 +63,12 @@ const sections = [
 
 export default function JournalSidebar({
   currentSection,
-  onSectionChange
+  onSectionChange,
+  accounts,
+  selectedAccount,
+  onAccountChange,
+  view,
+  onViewChange
 }: JournalSidebarProps) {
   return (
     <div className="fixed left-8 top-24 w-64 bg-slate-800/95 backdrop-blur-lg border border-slate-700/50 rounded-2xl shadow-2xl flex flex-col z-40">
@@ -64,7 +77,57 @@ export default function JournalSidebar({
         <p className="text-xs text-slate-400 mt-1">Manage your trades</p>
       </div>
 
-      <nav className="p-4 space-y-2">
+      {/* Account Selection */}
+      <div className="p-4 border-b border-slate-700/50">
+        <div className="mb-3">
+          <button
+            onClick={() => onViewChange('combined')}
+            className={`w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+              view === 'combined'
+                ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-600/30'
+                : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50'
+            }`}
+          >
+            <ViewColumnsIcon className="h-4 w-4" />
+            <span>All Accounts</span>
+          </button>
+        </div>
+        <div className="space-y-1.5 max-h-64 overflow-y-auto">
+          {accounts.map((account) => (
+            <button
+              key={account.id}
+              onClick={() => {
+                onViewChange('individual');
+                onAccountChange(account.id);
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all ${
+                view === 'individual' && selectedAccount === account.id
+                  ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-600/30'
+                  : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50'
+              }`}
+            >
+              <div className="flex items-center space-x-2 flex-1 min-w-0">
+                <UserIcon className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">{account.name}</span>
+              </div>
+              {account.stats && (
+                <span
+                  className={`text-xs px-1.5 py-0.5 rounded flex-shrink-0 ml-2 ${
+                    account.stats.totalRR >= 0
+                      ? 'bg-green-500/20 text-green-400'
+                      : 'bg-red-500/20 text-red-400'
+                  }`}
+                >
+                  {account.stats.totalRR >= 0 ? '+' : ''}
+                  {account.stats.totalRR?.toFixed(1) || '0.0'}R
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <nav className="p-4 space-y-2 flex-1 overflow-y-auto">
         {sections.map((section) => {
           const Icon =
             currentSection === section.id ? section.iconSolid : section.icon;

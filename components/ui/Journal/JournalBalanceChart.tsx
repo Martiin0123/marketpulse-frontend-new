@@ -26,6 +26,7 @@ interface RRPoint {
   rr: number;
   balance: number; // Currency balance
   trades: number;
+  pnl?: number; // Daily PnL
 }
 
 export default function JournalBalanceChart({
@@ -124,7 +125,7 @@ export default function JournalBalanceChart({
           rrPoints.push({
             date: firstDate,
             rr: runningRR,
-            balance: runningBalance,
+            balance: initialBalance, // Start with initial balance, not runningBalance
             trades: 0
           });
         }
@@ -392,7 +393,7 @@ export default function JournalBalanceChart({
           </div>
         </div>
 
-        <div className="flex items-center space-x-6 text-right">
+        <div className="flex items-center justify-end text-right">
           <div>
             <div
               className={`text-4xl font-bold mb-2 ${
@@ -402,42 +403,24 @@ export default function JournalBalanceChart({
                   : 'text-red-400'
               }`}
             >
-              {(
-                (rrData[rrData.length - 1]?.balance || initialBalance) -
-                initialBalance
-              ).toLocaleString('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-                signDisplay: 'always'
-              })}
+              {(() => {
+                const currentBalance =
+                  rrData[rrData.length - 1]?.balance ?? initialBalance;
+                const totalPnL = currentBalance - initialBalance;
+                return `${totalPnL >= 0 ? '+' : ''}${totalPnL.toLocaleString(
+                  'en-US',
+                  {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  }
+                )}`;
+              })()}
             </div>
             <div className="text-slate-400 text-sm flex items-center justify-end">
               <ChartLine className="h-4 w-4 mr-1" />
               Total P&L ({currency})
             </div>
           </div>
-          {rrData[rrData.length - 1]?.balance !== undefined && (
-            <div>
-              <div
-                className={`text-4xl font-bold mb-2 ${
-                  (rrData[rrData.length - 1]?.balance || 0) >= initialBalance
-                    ? 'text-green-400'
-                    : 'text-red-400'
-                }`}
-              >
-                {(
-                  rrData[rrData.length - 1]?.balance || initialBalance
-                ).toLocaleString('en-US', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                })}
-              </div>
-              <div className="text-slate-400 text-sm flex items-center justify-end">
-                <ChartLine className="h-4 w-4 mr-1" />
-                Balance ({currency})
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -485,17 +468,25 @@ export default function JournalBalanceChart({
               // Normalize date string for comparison (remove time if present)
               const normalizedDate = dateStr.split('T')[0];
 
-              const rrPoint = rrData.find((p) => {
+              const rrPointIndex = rrData.findIndex((p) => {
                 const pDate = p.date.split('T')[0];
                 return pDate === normalizedDate;
               });
 
-              if (rrPoint) {
+              if (rrPointIndex !== -1) {
+                const rrPoint = rrData[rrPointIndex];
+                // Calculate daily PnL (difference from previous day)
+                const dailyPnL =
+                  rrPointIndex > 0
+                    ? rrPoint.balance - rrData[rrPointIndex - 1].balance
+                    : 0;
+
                 setHoveredPoint({
                   date: rrPoint.date,
                   rr: rrPoint.rr,
                   balance: rrPoint.balance,
-                  trades: rrPoint.trades
+                  trades: rrPoint.trades,
+                  pnl: dailyPnL // Add daily PnL
                 });
               } else {
                 // If no exact match, clear hover
@@ -517,29 +508,55 @@ export default function JournalBalanceChart({
                 day: 'numeric'
               })}
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
+              {/* Daily PnL */}
+              {hoveredPoint.pnl !== undefined && hoveredPoint.pnl !== 0 && (
+                <div>
+                  <div className="text-xs text-slate-400 mb-0.5">Daily P&L</div>
+                  <div
+                    className={`text-xl font-bold ${
+                      hoveredPoint.pnl >= 0 ? 'text-green-400' : 'text-red-400'
+                    }`}
+                  >
+                    {hoveredPoint.pnl >= 0 ? '+' : ''}
+                    {hoveredPoint.pnl.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}{' '}
+                    {currency}
+                  </div>
+                </div>
+              )}
+              {/* Total P&L */}
               {hoveredPoint.balance !== undefined && (
-                <div
-                  className={`text-2xl font-bold ${
-                    hoveredPoint.balance >= initialBalance
-                      ? 'text-green-400'
-                      : 'text-red-400'
-                  }`}
-                >
-                  {hoveredPoint.balance.toLocaleString('en-US', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                  })}{' '}
-                  {currency}
+                <div>
+                  <div className="text-xs text-slate-400 mb-0.5">Total P&L</div>
+                  <div
+                    className={`text-2xl font-bold ${
+                      hoveredPoint.balance - initialBalance >= 0
+                        ? 'text-green-400'
+                        : 'text-red-400'
+                    }`}
+                  >
+                    {hoveredPoint.balance - initialBalance >= 0 ? '+' : ''}
+                    {(hoveredPoint.balance - initialBalance).toLocaleString(
+                      'en-US',
+                      {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      }
+                    )}{' '}
+                    {currency}
+                  </div>
                 </div>
               )}
               {hoveredPoint.rr !== undefined && hoveredPoint.rr !== 0 && (
-                <div className="text-lg font-medium text-slate-400">
+                <div className="text-sm font-medium text-slate-400">
                   {formatRR(hoveredPoint.rr)}
                 </div>
               )}
               {hoveredPoint.trades > 0 && (
-                <div className="text-sm text-slate-400">
+                <div className="text-xs text-slate-400">
                   {hoveredPoint.trades} trade
                   {hoveredPoint.trades !== 1 ? 's' : ''}
                 </div>

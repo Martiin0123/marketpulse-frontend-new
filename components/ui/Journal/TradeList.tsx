@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline';
 import type { TradeEntry } from '@/types/journal';
+import { getCleanSymbol } from '@/utils/helpers';
 
 interface TradeListProps {
   accountId?: string | null;
@@ -92,7 +93,7 @@ export default function TradeList({
 
       let query = supabase
         .from('trade_entries' as any)
-        .select('*')
+        .select('*, exit_levels') // Explicitly select exit_levels field
         .eq('status', 'closed') // Only show closed/completed trades
         .order('entry_date', { ascending: false });
 
@@ -153,7 +154,9 @@ export default function TradeList({
       let filteredTrades = tradesWithTags;
       if (selectedTags.length > 0) {
         filteredTrades = tradesWithTags.filter((trade) =>
-          trade.tags?.some((tag) => selectedTags.includes(tag.id))
+          trade.tags?.some((tag: { id: string; name: string; color: string }) =>
+            selectedTags.includes(tag.id)
+          )
         );
       }
 
@@ -501,7 +504,7 @@ export default function TradeList({
                   {/* Symbol & Side */}
                   <div>
                     <div className="text-sm font-medium text-white">
-                      {trade.symbol}
+                      {getCleanSymbol(trade.symbol)}
                     </div>
                     <div
                       className={`text-xs font-medium ${getSideColor(trade.side)}`}
@@ -546,6 +549,101 @@ export default function TradeList({
                                 {trade.exit_price.toFixed(2)}
                               </div>
                             )}
+                            {/* Show TP levels if multiple exits */}
+                            {(() => {
+                              // Check exit_levels field first (new way)
+                              let exitLevels: Array<{
+                                tp: number;
+                                qty: number;
+                                price: number;
+                                pnl: number;
+                                timestamp?: string;
+                              }> | null = null;
+
+                              // Debug: log what we have
+                              if (process.env.NODE_ENV === 'development') {
+                                console.log(
+                                  'Trade exit_levels:',
+                                  trade.exit_levels,
+                                  'Type:',
+                                  typeof trade.exit_levels
+                                );
+                              }
+
+                              if (trade.exit_levels) {
+                                try {
+                                  exitLevels =
+                                    typeof trade.exit_levels === 'string'
+                                      ? JSON.parse(trade.exit_levels)
+                                      : trade.exit_levels;
+
+                                  // Ensure it's an array
+                                  if (!Array.isArray(exitLevels)) {
+                                    exitLevels = null;
+                                  }
+                                } catch (e) {
+                                  console.error(
+                                    'Error parsing exit_levels:',
+                                    e
+                                  );
+                                  // Invalid JSON, ignore
+                                }
+                              }
+
+                              // Fallback to notes field (old way) for backwards compatibility
+                              if (!exitLevels && trade.notes) {
+                                try {
+                                  const notesData = JSON.parse(trade.notes);
+                                  if (
+                                    notesData?.type === 'multiple_exits' &&
+                                    notesData.exitLevels?.length > 1
+                                  ) {
+                                    exitLevels = notesData.exitLevels;
+                                  }
+                                } catch (e) {
+                                  // Not JSON, ignore
+                                }
+                              }
+
+                              if (exitLevels && exitLevels.length > 1) {
+                                return (
+                                  <div className="mt-2 pt-2 border-t border-slate-600/50">
+                                    <div className="text-xs font-medium text-slate-300 mb-1.5">
+                                      {exitLevels.length} Exit Levels
+                                    </div>
+                                    <div className="space-y-1">
+                                      {exitLevels.map((level, idx) => (
+                                        <div
+                                          key={idx}
+                                          className="flex items-center justify-between text-xs bg-slate-800/50 rounded px-2 py-1"
+                                        >
+                                          <div className="flex items-center space-x-2">
+                                            <span className="font-medium text-slate-300">
+                                              TP{level.tp}
+                                            </span>
+                                            <span className="text-slate-400">
+                                              {level.qty} @{' '}
+                                              {level.price.toFixed(2)}
+                                            </span>
+                                          </div>
+                                          <span
+                                            className={`font-medium ${
+                                              level.pnl >= 0
+                                                ? 'text-green-400'
+                                                : 'text-red-400'
+                                            }`}
+                                          >
+                                            {level.pnl >= 0 ? '+' : ''}
+                                            {level.pnl.toFixed(2)}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
                         )}
                     </div>

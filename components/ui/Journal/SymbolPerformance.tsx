@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { ChartBarIcon } from '@heroicons/react/24/outline';
+import { getCleanSymbol } from '@/utils/helpers';
 
 interface SymbolPerformanceProps {
   accountId: string | null;
@@ -343,7 +344,9 @@ export default function SymbolPerformance({
                   className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors"
                 >
                   <td className="py-3 px-4">
-                    <div className="font-medium text-white">{stat.symbol}</div>
+                    <div className="font-medium text-white">
+                      {getCleanSymbol(stat.symbol)}
+                    </div>
                   </td>
                   <td className="py-3 px-4 text-right text-slate-300">
                     {stat.trades}
@@ -431,7 +434,7 @@ export default function SymbolPerformance({
                   Best Performer
                 </div>
                 <div className="text-lg font-bold text-green-400">
-                  {bestSymbol.symbol}
+                  {getCleanSymbol(bestSymbol.symbol)}
                 </div>
                 <div className="text-xs text-slate-400">
                   {formatRR(bestSymbol.totalRR)}
@@ -442,7 +445,7 @@ export default function SymbolPerformance({
                   Worst Performer
                 </div>
                 <div className="text-lg font-bold text-red-400">
-                  {worstSymbol.symbol}
+                  {getCleanSymbol(worstSymbol.symbol)}
                 </div>
                 <div className="text-xs text-slate-400">
                   {formatRR(worstSymbol.totalRR)}
@@ -451,7 +454,7 @@ export default function SymbolPerformance({
               <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600">
                 <div className="text-xs text-slate-400 mb-1">Most Traded</div>
                 <div className="text-lg font-bold text-blue-400">
-                  {mostTraded.symbol}
+                  {getCleanSymbol(mostTraded.symbol)}
                 </div>
                 <div className="text-xs text-slate-400">
                   {mostTraded.trades} trades
@@ -463,7 +466,7 @@ export default function SymbolPerformance({
                     Best Win Rate
                   </div>
                   <div className="text-lg font-bold text-purple-400">
-                    {bestWinRate.symbol}
+                    {getCleanSymbol(bestWinRate.symbol)}
                   </div>
                   <div className="text-xs text-slate-400">
                     {bestWinRate.winRate.toFixed(1)}%

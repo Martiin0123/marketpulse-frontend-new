@@ -10,7 +10,12 @@ interface BalanceCurveChartProps {
     pnl: number;
   }>;
   onHover?: (
-    point: { date: Date | string; balance: number; trades?: number } | null
+    point: {
+      date: Date | string;
+      balance: number;
+      pnl?: number;
+      trades?: number;
+    } | null
   ) => void;
 }
 
@@ -237,6 +242,7 @@ export default function BalanceCurveChart({
           d={chartData.areaPath}
           fill="url(#balanceArea)"
           className="opacity-80"
+          style={{ pointerEvents: 'none' }}
         />
 
         {/* Main line with glow effect */}
@@ -249,6 +255,7 @@ export default function BalanceCurveChart({
           strokeLinejoin="round"
           filter="url(#glow)"
           className="drop-shadow-lg"
+          style={{ pointerEvents: 'none' }}
         />
 
         {/* Data points with enhanced styling */}
@@ -258,19 +265,23 @@ export default function BalanceCurveChart({
 
           return (
             <g key={index}>
-              {/* Hover area (invisible but larger) */}
+              {/* Hover area (invisible but larger, rendered first so it's behind but captures events) */}
               <circle
                 cx={point.x}
                 cy={point.y}
-                r="12"
+                r="15"
                 fill="transparent"
                 className="cursor-pointer"
+                style={{ pointerEvents: 'all' }}
                 onMouseEnter={() => {
                   setHoveredIndex(index);
-                  // Pass the actual data point with correct balance (dollar amount)
+                  // Pass the actual data point with correct balance (dollar amount) and daily PnL
+                  const dailyPnL =
+                    index > 0 ? point.balance - data[index - 1].balance : 0;
                   onHover?.({
                     date: data[index].date,
-                    balance: point.balance, // Dollar balance
+                    balance: point.balance, // Dollar balance (total cumulative)
+                    pnl: dailyPnL, // Daily PnL for this point
                     trades: (data[index] as any).trades || 1
                   });
                 }}
@@ -280,7 +291,7 @@ export default function BalanceCurveChart({
                 }}
               />
 
-              {/* Data point */}
+              {/* Data point - also handles hover for better responsiveness */}
               <circle
                 cx={point.x}
                 cy={point.y}
@@ -288,8 +299,24 @@ export default function BalanceCurveChart({
                 fill={point.pnl >= 0 ? '#10b981' : '#ef4444'}
                 stroke="white"
                 strokeWidth={isHovered ? '3' : '2'}
-                className={`transition-all duration-300 ${isHovered ? 'drop-shadow-lg' : ''}`}
+                className={`cursor-pointer transition-all duration-300 ${isHovered ? 'drop-shadow-lg' : ''}`}
                 filter={isHovered ? 'url(#dropshadow)' : 'none'}
+                style={{ pointerEvents: 'all' }}
+                onMouseEnter={() => {
+                  setHoveredIndex(index);
+                  const dailyPnL =
+                    index > 0 ? point.balance - data[index - 1].balance : 0;
+                  onHover?.({
+                    date: data[index].date,
+                    balance: point.balance,
+                    pnl: dailyPnL,
+                    trades: (data[index] as any).trades || 1
+                  });
+                }}
+                onMouseLeave={() => {
+                  setHoveredIndex(null);
+                  onHover?.(null);
+                }}
               />
 
               {/* Inner glow for last point */}
@@ -299,7 +326,7 @@ export default function BalanceCurveChart({
                   cy={point.y}
                   r="2"
                   fill="white"
-                  className="animate-pulse"
+                  className="animate-pulse pointer-events-none"
                 />
               )}
 

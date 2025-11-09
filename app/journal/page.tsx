@@ -9,12 +9,12 @@ import TradeCalendar from '@/components/ui/Journal/TradeCalendar';
 import TradeList from '@/components/ui/Journal/TradeList';
 import EditTradeModal from '@/components/ui/Journal/EditTradeModal';
 import ViewSelector from '@/components/ui/Journal/ViewSelector';
-import AccountsOverview from '@/components/ui/Journal/AccountsOverview';
 import ImageTradeModal from '@/components/ui/Journal/ImageTradeModal';
 import JournalBalanceChart from '@/components/ui/Journal/JournalBalanceChart';
 import SettingsModal from '@/components/ui/Journal/SettingsModal';
 import PerformanceAnalysis from '@/components/ui/Journal/PerformanceAnalysis';
 import SymbolPerformance from '@/components/ui/Journal/SymbolPerformance';
+import AdvancedPerformanceAnalysis from '@/components/ui/Journal/AdvancedPerformanceAnalysis';
 import CSVImportExport from '@/components/ui/Journal/CSVImportExport';
 import JournalSidebar from '@/components/ui/Journal/JournalSidebar';
 import JournalSettings from '@/components/ui/Journal/JournalSettings';
@@ -672,6 +672,11 @@ export default function JournalPage() {
       <JournalSidebar
         currentSection={currentSection}
         onSectionChange={(section) => setCurrentSection(section as any)}
+        accounts={accounts}
+        selectedAccount={selectedAccount}
+        onAccountChange={setSelectedAccount}
+        view={view}
+        onViewChange={handleViewChange}
       />
 
       {/* Main Content */}
@@ -680,14 +685,7 @@ export default function JournalPage() {
         <div className="sticky top-20 z-30 bg-slate-800/95 backdrop-blur-lg border border-slate-700/50 rounded-2xl shadow-xl px-6 py-4 mt-6 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4 flex-1">
-              <AccountSelector
-                accounts={accounts}
-                selectedAccount={selectedAccount}
-                onAccountChange={setSelectedAccount}
-                onAccountCreated={handleAccountCreated}
-                view={view}
-                onViewChange={handleViewChange}
-              />
+              {/* Account selection moved to sidebar */}
             </div>
             <div className="flex items-center gap-2">
               {currentSection === 'trades' && (
@@ -782,6 +780,17 @@ export default function JournalPage() {
                 accounts={accounts}
                 onAccountDeleted={handleDeleteAccount}
                 onAccountCreated={handleAccountCreated}
+                onAccountUpdated={async (updatedAccount) => {
+                  // Recalculate stats for the updated account
+                  const stats = await calculateAccountStats(updatedAccount.id);
+                  setAccounts((prev) =>
+                    prev.map((acc) =>
+                      acc.id === updatedAccount.id
+                        ? { ...updatedAccount, stats }
+                        : acc
+                    )
+                  );
+                }}
               />
             )}
           </div>
@@ -833,8 +842,6 @@ function OverviewSection({
 }) {
   return (
     <div className="space-y-6">
-      <AccountsOverview accounts={accounts} onSelectAccount={onAccountSelect} />
-
       <JournalBalanceChart
         accountId={selectedAccount}
         currency={
@@ -909,7 +916,13 @@ function OverviewSection({
               />
               <StatCard
                 label="Total P&L"
-                value={`${accounts.reduce((sum: number, acc: any) => sum + (acc.stats.totalPnL || 0), 0) >= 0 ? '+' : ''}$${Math.abs(accounts.reduce((sum: number, acc: any) => sum + (acc.stats.totalPnL || 0), 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                value={(() => {
+                  const totalPnL = accounts.reduce(
+                    (sum: number, acc: any) => sum + (acc.stats.totalPnL || 0),
+                    0
+                  );
+                  return `${totalPnL >= 0 ? '+' : ''}$${totalPnL.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                })()}
                 subtitle={
                   accounts.reduce(
                     (sum: number, acc: any) => sum + acc.stats.totalRR,
@@ -957,6 +970,10 @@ function PerformanceSection({
 }) {
   return (
     <div className="space-y-6">
+      <AdvancedPerformanceAnalysis
+        accountId={accountId}
+        refreshKey={refreshKey}
+      />
       <PerformanceAnalysis accountId={accountId} refreshKey={refreshKey} />
       <SymbolPerformance accountId={accountId} refreshKey={refreshKey} />
     </div>

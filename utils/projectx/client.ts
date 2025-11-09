@@ -491,12 +491,25 @@ export class ProjectXClient {
       requestBody.startTime = startTime.toISOString();
     }
     if (endTime) {
-      requestBody.endTime = endTime.toISOString();
+      // Add 1 day buffer to ensure we get all trades including today
+      const endTimeWithBuffer = new Date(endTime);
+      endTimeWithBuffer.setDate(endTimeWithBuffer.getDate() + 1);
+      requestBody.endTime = endTimeWithBuffer.toISOString();
     }
+
+    // Log the request details
+    console.log(`🔍 Fetching trades from ProjectX API:`, {
+      accountId,
+      startTime: startTime?.toISOString(),
+      endTime: endTime?.toISOString(),
+      baseUrl: this.baseUrl,
+      endpoints: endpoints
+    });
 
     for (const endpoint of endpoints) {
       try {
         const url = `${this.baseUrl}${endpoint}`;
+        console.log(`🔍 Trying endpoint: ${url}`);
         const headers: HeadersInit = {
           'accept': 'text/plain',
           'Content-Type': 'application/json',
@@ -540,19 +553,36 @@ export class ProjectXClient {
         }
         
         // Handle different response formats
-        const trades = data.executions || data.trades || data.data || [];
-        
-        if (!Array.isArray(trades)) {
+        let trades: any[] = [];
+        if (Array.isArray(data)) {
+          trades = data;
+        } else if (data.executions && Array.isArray(data.executions)) {
+          trades = data.executions;
+        } else if (data.trades && Array.isArray(data.trades)) {
+          trades = data.trades;
+        } else if (data.data && Array.isArray(data.data)) {
+          trades = data.data;
+        } else if (data.results && Array.isArray(data.results)) {
+          trades = data.results;
+        } else {
+          console.error(`❌ Unexpected response format. Keys:`, Object.keys(data));
           throw new Error('Invalid response format: trades array not found');
         }
         
-        console.log(`✅ Successfully fetched ${trades.length} trades from ProjectX`);
-        
-        // ALWAYS log first trade to see structure (critical for debugging)
-        if (trades.length > 0) {
-          console.log('📋 Sample trade from ProjectX API:', JSON.stringify(trades[0], null, 2));
-          console.log('📋 Available fields in trade:', Object.keys(trades[0]));
+        if (trades.length === 0) {
+          continue;
         }
+        
+        console.log(`✅ Fetched ${trades.length} items from ${endpoint}`);
+        
+        // Log EXACT raw API response for first 10 items
+        console.log(`\n📋 ========== EXACT RAW API DATA (First 10 items) ==========`);
+        trades.slice(0, 10).forEach((trade: any, idx: number) => {
+          console.log(`\n--- Item ${idx + 1} (ALL FIELDS) ---`);
+          console.log(JSON.stringify(trade, null, 2));
+          console.log(`Keys: ${Object.keys(trade).join(', ')}`);
+        });
+        console.log(`\n📋 ========== END RAW API DATA ==========\n`);
         
         // Map to our format
         return trades.map((trade: any, index: number) => {
@@ -626,23 +656,25 @@ export class ProjectXClient {
           let entryPrice = 0;
           let exitPrice = 0;
           
-          // Check for EntryPrice/ExitPrice (exact case)
-          if (trade.EntryPrice !== undefined && trade.EntryPrice !== null) {
+          // Check for EntryPrice/ExitPrice (exact case) - PRIORITY 1
+          // These are the correct fields from TopStep API for completed trades
+          if (trade.EntryPrice !== undefined && trade.EntryPrice !== null && trade.EntryPrice !== 0) {
             entryPrice = trade.EntryPrice;
-          } else if (trade.entryPrice !== undefined && trade.entryPrice !== null) {
+          } else if (trade.entryPrice !== undefined && trade.entryPrice !== null && trade.entryPrice !== 0) {
             entryPrice = trade.entryPrice;
-          } else if (trade.openPrice !== undefined && trade.openPrice !== null) {
+          } else if (trade.openPrice !== undefined && trade.openPrice !== null && trade.openPrice !== 0) {
             entryPrice = trade.openPrice;
           } else {
             // Fallback to price field (for individual executions)
             entryPrice = trade.price || trade.fillPrice || 0;
           }
           
-          if (trade.ExitPrice !== undefined && trade.ExitPrice !== null) {
+          // Check for ExitPrice (exact case) - PRIORITY 1
+          if (trade.ExitPrice !== undefined && trade.ExitPrice !== null && trade.ExitPrice !== 0) {
             exitPrice = trade.ExitPrice;
-          } else if (trade.exitPrice !== undefined && trade.exitPrice !== null) {
+          } else if (trade.exitPrice !== undefined && trade.exitPrice !== null && trade.exitPrice !== 0) {
             exitPrice = trade.exitPrice;
-          } else if (trade.closePrice !== undefined && trade.closePrice !== null) {
+          } else if (trade.closePrice !== undefined && trade.closePrice !== null && trade.closePrice !== 0) {
             exitPrice = trade.closePrice;
           } else if (trade.executedPrice !== undefined && trade.executedPrice !== null && trade.executedPrice !== 0) {
             exitPrice = trade.executedPrice;
@@ -651,68 +683,25 @@ export class ProjectXClient {
             exitPrice = trade.price || trade.fillPrice || 0;
           }
           
+          // Log price extraction issues only if critical
+          if (index < 3 && entryPrice === exitPrice && entryPrice > 0 && pnl !== 0) {
+            console.warn(`⚠️ Same entry/exit price (${entryPrice}) but PnL=${pnl} for trade ${index}`);
+          }
+          
           // Extract quantity
           // ProjectX Gateway API: Size (exact case) or size is the quantity
           const quantity = Math.abs(trade.Size || trade.size || trade.quantity || trade.qty || trade.executedQuantity || 0);
           
-          // Log first few trades to verify mapping - show ALL relevant fields
-          if (index < 3) {
-            console.log(`🔍 Trade ${index} mapping:`, {
-              original: {
-                // Price fields
-                EntryPrice: trade.EntryPrice,
-                entryPrice: trade.entryPrice,
-                ExitPrice: trade.ExitPrice,
-                exitPrice: trade.exitPrice,
-                openPrice: trade.openPrice,
-                closePrice: trade.closePrice,
-                price: trade.price,
-                fillPrice: trade.fillPrice,
-                executedPrice: trade.executedPrice,
-                // PnL fields
-                PnL: trade.PnL,
-                profitAndLoss: trade.profitAndLoss,
-                pnl: trade.pnl,
-                // Direction fields
-                Type: trade.Type,
-                type: trade.type,
-                side: trade.side,
-                // Timestamp fields
-                EnteredAt: trade.EnteredAt,
-                enteredAt: trade.enteredAt,
-                ExitedAt: trade.ExitedAt,
-                exitedAt: trade.exitedAt,
-                creationTimestamp: trade.creationTimestamp,
-                // Quantity fields
-                Size: trade.Size,
-                size: trade.size,
-                // Symbol fields
-                ContractName: trade.ContractName,
-                contractName: trade.contractName,
-                symbol: trade.symbol,
-                allKeys: Object.keys(trade),
-                // Show full trade object for first trade to see structure
-                fullTrade: index === 0 ? trade : undefined
-              },
-              mapped: {
-                pnl,
-                entryPrice,
-                exitPrice,
-                quantity,
-                timestamp,
-                side: (() => {
-                  if (trade.Type === 'Short' || trade.type === 'Short' || trade.Type === 'SHORT' || trade.type === 'SHORT') {
-                    return 'SELL';
-                  }
-                  if (trade.Type === 'Long' || trade.type === 'Long' || trade.Type === 'LONG' || trade.type === 'LONG') {
-                    return 'BUY';
-                  }
-                  if (trade.side === 1 || trade.side === 'SELL' || trade.side === 'Sell' || trade.side === 'sell') {
-                    return 'SELL';
-                  }
-                  return 'BUY';
-                })()
-              }
+          // Minimal logging - only log first trade structure for debugging
+          if (index === 0 && process.env.NODE_ENV === 'development') {
+            console.log(`📋 First trade sample:`, {
+              id: trade.id,
+              contractId: trade.contractId,
+              side: trade.side,
+              price: trade.price,
+              profitAndLoss: trade.profitAndLoss,
+              size: trade.size,
+              creationTimestamp: trade.creationTimestamp
             });
           }
           
