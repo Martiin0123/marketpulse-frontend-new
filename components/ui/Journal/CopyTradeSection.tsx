@@ -58,13 +58,10 @@ export default function CopyTradeSection({
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      // For now, we'll use a simple approach - store configs in a table
-      // In the future, we can create a proper copy_trade_configs table
+      // Load copy trade configurations
       const { data, error: fetchError } = await supabase
         .from('copy_trade_configs' as any)
-        .select(
-          '*, source_account:trading_accounts!source_account_id(*), destination_account:trading_accounts!destination_account_id(*)'
-        )
+        .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
