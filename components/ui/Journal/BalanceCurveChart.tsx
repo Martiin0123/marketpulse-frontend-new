@@ -28,6 +28,7 @@ export default function BalanceCurveChart({
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   // Helper function to round to nice intervals
+  // roundUp: true = round up (for max), false = round down (for min)
   const roundToNiceNumber = (value: number, roundUp: boolean): number => {
     const absValue = Math.abs(value);
     const sign = value >= 0 ? 1 : -1;
@@ -41,18 +42,50 @@ export default function BalanceCurveChart({
     // Round to nice numbers: 1, 2, 5, 10, 20, 50, 100, etc.
     let niceNormalized: number;
     if (roundUp) {
+      // Round UP to next nice number
       if (normalized <= 1) niceNormalized = 1;
       else if (normalized <= 2) niceNormalized = 2;
       else if (normalized <= 5) niceNormalized = 5;
       else niceNormalized = 10;
     } else {
+      // Round DOWN to previous nice number (or same if already nice)
       if (normalized >= 10) niceNormalized = 10;
       else if (normalized >= 5) niceNormalized = 5;
       else if (normalized >= 2) niceNormalized = 2;
-      else niceNormalized = 1;
+      else if (normalized >= 1) niceNormalized = 1;
+      else {
+        // If normalized < 1, go to previous magnitude
+        const prevMagnitude = magnitude - 1;
+        return sign * 10 * Math.pow(10, prevMagnitude);
+      }
     }
     
-    return sign * niceNormalized * Math.pow(10, magnitude);
+    let result = sign * niceNormalized * Math.pow(10, magnitude);
+    
+    // Ensure we actually round down/up correctly
+    if (roundUp && result < value) {
+      // If we rounded down but need to round up, go to next nice number
+      if (niceNormalized === 1) niceNormalized = 2;
+      else if (niceNormalized === 2) niceNormalized = 5;
+      else if (niceNormalized === 5) niceNormalized = 10;
+      else {
+        niceNormalized = 1;
+        magnitude++;
+      }
+      result = sign * niceNormalized * Math.pow(10, magnitude);
+    } else if (!roundUp && result > value) {
+      // If we rounded up but need to round down, go to previous nice number
+      if (niceNormalized === 10) niceNormalized = 5;
+      else if (niceNormalized === 5) niceNormalized = 2;
+      else if (niceNormalized === 2) niceNormalized = 1;
+      else {
+        niceNormalized = 10;
+        magnitude--;
+      }
+      result = sign * niceNormalized * Math.pow(10, magnitude);
+    }
+    
+    return result;
   };
 
   const chartData = useMemo(() => {
@@ -61,11 +94,25 @@ export default function BalanceCurveChart({
     const minBalance = Math.min(...data.map((d) => d.balance));
     const maxBalance = Math.max(...data.map((d) => d.balance));
     const range = maxBalance - minBalance;
-    const padding = range * 0.15; // 15% padding for better visual
+    const padding = Math.max(range * 0.15, Math.abs(minBalance) * 0.1); // At least 15% padding or 10% of min value
 
-    // Round min and max to nice numbers
-    const minY = roundToNiceNumber(minBalance - padding, false);
-    const maxY = roundToNiceNumber(maxBalance + padding, true);
+    // Round min and max to nice numbers, ensuring min is below actual min and max is above actual max
+    let minY = roundToNiceNumber(minBalance - padding, false);
+    let maxY = roundToNiceNumber(maxBalance + padding, true);
+    
+    // Double-check: ensure minY is actually below minBalance and maxY is above maxBalance
+    if (minY > minBalance - padding) {
+      // If rounded min is still above actual min, round down more aggressively
+      const diff = minBalance - padding - minY;
+      const step = Math.pow(10, Math.floor(Math.log10(Math.abs(minY))));
+      minY = minY - step;
+    }
+    if (maxY < maxBalance + padding) {
+      // If rounded max is still below actual max, round up more aggressively
+      const diff = maxBalance + padding - maxY;
+      const step = Math.pow(10, Math.floor(Math.log10(Math.abs(maxY))));
+      maxY = maxY + step;
+    }
 
     const width = 800;
     const height = 400;
