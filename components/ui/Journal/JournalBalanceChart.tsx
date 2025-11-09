@@ -40,6 +40,7 @@ export default function JournalBalanceChart({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [trades, setTrades] = useState<TradeEntry[]>([]);
+  const [allTrades, setAllTrades] = useState<TradeEntry[]>([]); // Store all trades for total P&L calculation
   const [selectedPeriod, setSelectedPeriod] = useState<
     '7d' | '30d' | '90d' | 'all'
   >('30d');
@@ -74,9 +75,30 @@ export default function JournalBalanceChart({
             startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
         }
 
+        // First, fetch ALL trades for total P&L calculation
+        let allTradesQuery = supabase
+          .from('trade_entries' as any)
+          .select('*')
+          .eq('status', 'closed')
+          .order('entry_date', { ascending: true });
+
+        if (accountId) {
+          allTradesQuery = allTradesQuery.eq('account_id', accountId);
+        }
+
+        const { data: allTradesData, error: allTradesError } = await allTradesQuery;
+        
+        if (allTradesError) {
+          console.error('Error fetching all trades:', allTradesError);
+        } else {
+          setAllTrades(allTradesData || []);
+        }
+
+        // Then fetch trades for the selected period (for chart display)
         let query = supabase
           .from('trade_entries' as any)
           .select('*')
+          .eq('status', 'closed')
           .gte('entry_date', startDate.toISOString())
           .order('entry_date', { ascending: true });
 
@@ -404,9 +426,14 @@ export default function JournalBalanceChart({
               }`}
             >
               {(() => {
-                const currentBalance =
-                  rrData[rrData.length - 1]?.balance ?? initialBalance;
-                const totalPnL = currentBalance - initialBalance;
+                // Calculate total P&L from ALL trades, not just the selected period
+                const totalPnL = allTrades.reduce((sum, trade) => {
+                  return sum + (trade.pnl_amount || 0);
+                }, 0);
+                
+                // The balance should be initialBalance + totalPnL
+                const currentBalance = initialBalance + totalPnL;
+                
                 return `${totalPnL >= 0 ? '+' : ''}${totalPnL.toLocaleString(
                   'en-US',
                   {
