@@ -426,13 +426,10 @@ export default function JournalBalanceChart({
               }`}
             >
               {(() => {
-                // Calculate total P&L from ALL trades, not just the selected period
-                const totalPnL = allTrades.reduce((sum, trade) => {
+                // Calculate total P&L from trades in the selected period
+                const totalPnL = trades.reduce((sum, trade) => {
                   return sum + (trade.pnl_amount || 0);
                 }, 0);
-                
-                // The balance should be initialBalance + totalPnL
-                const currentBalance = initialBalance + totalPnL;
                 
                 return `${totalPnL >= 0 ? '+' : ''}${totalPnL.toLocaleString(
                   'en-US',

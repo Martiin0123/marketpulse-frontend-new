@@ -20,13 +20,15 @@ interface ShareButtonProps {
   accountName: string;
   isPublic?: boolean;
   onTogglePublic?: (isPublic: boolean) => void;
+  id?: string;
 }
 
 export default function ShareButton({
   accountId,
   accountName,
   isPublic = false,
-  onTogglePublic
+  onTogglePublic,
+  id
 }: ShareButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -75,18 +77,20 @@ export default function ShareButton({
 
   return (
     <div className="relative">
-      {/* Share Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="group relative flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-blue-500/25"
-      >
-        <ShareIconSolid className="h-4 w-4 group-hover:scale-110 transition-transform" />
-        <span className="font-medium">Share</span>
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 to-purple-500/0 group-hover:from-blue-500/20 group-hover:to-purple-500/20 rounded-xl transition-all duration-300"></div>
-      </button>
+      {/* Share Button - only show if no id (not triggered externally) */}
+      {!id && (
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="group relative flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-blue-500/25"
+        >
+          <ShareIconSolid className="h-4 w-4 group-hover:scale-110 transition-transform" />
+          <span className="font-medium">Share</span>
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 to-purple-500/0 group-hover:from-blue-500/20 group-hover:to-purple-500/20 rounded-xl transition-all duration-300"></div>
+        </button>
+      )}
 
-      {/* Dropdown Menu */}
-      {isOpen && (
+      {/* Dropdown Menu - show if open or if id is provided (external trigger) */}
+      {(isOpen || id) && (
         <div className="absolute right-0 top-full mt-2 w-80 bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl rounded-2xl border border-slate-700/50 shadow-2xl z-50">
           {/* Header */}
           <div className="p-6 border-b border-slate-700/50">

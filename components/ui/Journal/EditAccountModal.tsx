@@ -175,7 +175,8 @@ export default function EditAccountModal({
               required
             />
             <p className="text-xs text-slate-400 mt-1">
-              Dollar amount that equals 1R. Example: If $100 = 1R, then $200 profit = 2R, $50 loss = -0.5R
+              Dollar amount that equals 1R. Example: If $100 = 1R, then $200
+              profit = 2R, $50 loss = -0.5R
             </p>
           </div>
 

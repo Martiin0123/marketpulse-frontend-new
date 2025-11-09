@@ -127,12 +127,16 @@ export default function BalanceCurveChart({
     };
   }, [data]);
 
-  const formatRR = (rr: number) => {
-    if (isNaN(rr) || rr === null || rr === undefined) {
-      return '0.00R';
+  const formatCurrency = (amount: number) => {
+    if (isNaN(amount) || amount === null || amount === undefined) {
+      return '$0.00';
     }
-    const sign = rr >= 0 ? '+' : '';
-    return `${sign}${rr.toFixed(2)}R`;
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
   };
 
   if (!chartData) {
@@ -218,7 +222,7 @@ export default function BalanceCurveChart({
               className="text-xs fill-slate-500"
               fontSize="11"
             >
-              {formatRR(label.value)}
+              {formatCurrency(label.value)}
             </text>
           </g>
         ))}

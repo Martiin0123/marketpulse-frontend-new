@@ -217,7 +217,7 @@ export default function EditTradeModal({
           if (riskPerR > 0) {
             calculatedPnL = calculatedRR * riskPerR;
           }
-          
+
           // For exit price calculation, we still need entry price and size
           if (!calculatedEntryPrice)
             calculatedEntryPrice = trade.entry_price || 1;
