@@ -56,7 +56,12 @@ export default function JournalPage() {
   const [view, setView] = useState<'individual' | 'combined'>('combined');
   const [displayMode, setDisplayMode] = useState<'calendar' | 'list'>('list');
   const [currentSection, setCurrentSection] = useState<
-    'overview' | 'performance' | 'trades' | 'calendar' | 'copy-trade' | 'settings'
+    | 'overview'
+    | 'performance'
+    | 'trades'
+    | 'calendar'
+    | 'copy-trade'
+    | 'settings'
   >('overview');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

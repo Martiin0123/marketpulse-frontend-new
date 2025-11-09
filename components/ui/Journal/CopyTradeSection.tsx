@@ -75,7 +75,7 @@ export default function CopyTradeSection({
       }
 
       if (data) {
-        setConfigs((data as unknown) as CopyTradeConfig[]);
+        setConfigs(data as unknown as CopyTradeConfig[]);
       }
     } catch (err) {
       console.error('Error loading copy trade configs:', err);
