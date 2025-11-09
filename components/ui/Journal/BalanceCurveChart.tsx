@@ -9,6 +9,7 @@ interface BalanceCurveChartProps {
     balance: number;
     pnl: number;
   }>;
+  currency?: string;
   onHover?: (
     point: {
       date: Date | string;
@@ -21,6 +22,7 @@ interface BalanceCurveChartProps {
 
 export default function BalanceCurveChart({
   data,
+  currency = 'USD',
   onHover
 }: BalanceCurveChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -129,11 +131,11 @@ export default function BalanceCurveChart({
 
   const formatCurrency = (amount: number) => {
     if (isNaN(amount) || amount === null || amount === undefined) {
-      return '$0.00';
+      return `${currency === 'USD' ? '$' : currency} 0.00`;
     }
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: currency || 'USD',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(amount);

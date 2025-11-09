@@ -18,7 +18,7 @@ import {
 } from '@heroicons/react/24/solid';
 import type { TradingAccount } from '@/types/journal';
 import { ShareIcon } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import ShareButton from './ShareButton';
 
 interface JournalSidebarProps {
@@ -74,6 +74,25 @@ export default function JournalSidebar({
   onViewChange
 }: JournalSidebarProps) {
   const [shareAccountId, setShareAccountId] = useState<string | null>(null);
+  const shareRef = useRef<HTMLDivElement>(null);
+
+  // Close share dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (shareRef.current && !shareRef.current.contains(event.target as Node)) {
+        setShareAccountId(null);
+      }
+    };
+
+    if (shareAccountId) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [shareAccountId]);
+
   return (
     <div className="fixed left-8 top-24 w-64 bg-slate-800/95 backdrop-blur-lg border border-slate-700/50 rounded-2xl shadow-2xl flex flex-col z-40">
       <div className="p-6 border-b border-slate-700/50">
@@ -83,85 +102,86 @@ export default function JournalSidebar({
 
       {/* Account Selection */}
       <div className="p-4 border-b border-slate-700/50">
-      <div className="mb-3">
-        <button
-          onClick={() => onViewChange('combined')}
-          className={`w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-            view === 'combined'
-              ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-600/30'
-              : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50'
-          }`}
-        >
-          <ViewColumnsIcon className="h-4 w-4" />
-          <span>All Accounts</span>
-        </button>
-      </div>
-      <div className="space-y-1.5 max-h-64 overflow-y-auto">
-        {accounts.map((account) => {
-          const isSelected = view === 'individual' && selectedAccount === account.id;
-          return (
-            <div
-              key={account.id}
-              className="relative group"
-            >
-              <button
-                onClick={() => {
-                  onViewChange('individual');
-                  onAccountChange(account.id);
-                }}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all ${
-                  isSelected
-                    ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-600/30'
-                    : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50'
-                }`}
-              >
-                <div className="flex items-center space-x-2 flex-1 min-w-0">
-                  <UserIcon className="h-4 w-4 flex-shrink-0" />
-                  <span className="truncate">{account.name}</span>
-                </div>
-                <div className="flex items-center space-x-1.5 flex-shrink-0">
-                  {account.stats && (
-                    <span
-                      className={`text-xs px-1.5 py-0.5 rounded ${
-                        account.stats.totalRR >= 0
-                          ? 'bg-green-500/20 text-green-400'
-                          : 'bg-red-500/20 text-red-400'
+        <div className="mb-3">
+          <button
+            onClick={() => onViewChange('combined')}
+            className={`w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+              view === 'combined'
+                ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-600/30'
+                : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50'
+            }`}
+          >
+            <ViewColumnsIcon className="h-4 w-4" />
+            <span>All Accounts</span>
+          </button>
+        </div>
+        <div className="space-y-1.5 max-h-64 overflow-y-auto">
+          {accounts.map((account) => {
+            const isSelected =
+              view === 'individual' && selectedAccount === account.id;
+            return (
+              <div key={account.id} className="relative group">
+                <button
+                  onClick={() => {
+                    onViewChange('individual');
+                    onAccountChange(account.id);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all ${
+                    isSelected
+                      ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-600/30'
+                      : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2 flex-1 min-w-0">
+                    <UserIcon className="h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">{account.name}</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5 flex-shrink-0">
+                    {account.stats && (
+                      <span
+                        className={`text-xs px-1.5 py-0.5 rounded ${
+                          account.stats.totalRR >= 0
+                            ? 'bg-green-500/20 text-green-400'
+                            : 'bg-red-500/20 text-red-400'
+                        }`}
+                      >
+                        {account.stats.totalRR >= 0 ? '+' : ''}
+                        {account.stats.totalRR?.toFixed(1) || '0.0'}R
+                      </span>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShareAccountId(
+                          shareAccountId === account.id ? null : account.id
+                        );
+                      }}
+                      className={`p-1 rounded hover:bg-opacity-20 transition-all ${
+                        isSelected
+                          ? 'text-white hover:bg-white/20'
+                          : 'text-slate-400 hover:text-slate-300 hover:bg-slate-600/50'
                       }`}
+                      title="Share account"
                     >
-                      {account.stats.totalRR >= 0 ? '+' : ''}
-                      {account.stats.totalRR?.toFixed(1) || '0.0'}R
-                    </span>
-                  )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShareAccountId(shareAccountId === account.id ? null : account.id);
-                    }}
-                    className={`p-1 rounded hover:bg-opacity-20 transition-all ${
-                      isSelected
-                        ? 'text-white hover:bg-white/20'
-                        : 'text-slate-400 hover:text-slate-300 hover:bg-slate-600/50'
-                    }`}
-                    title="Share account"
-                  >
-                    <ShareIcon className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </button>
+                      <ShareIcon className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </button>
               {/* Share dropdown for this account */}
               {shareAccountId === account.id && (
-                <div className="absolute right-0 top-full mt-1 z-50">
+                <div ref={shareRef} className="absolute right-0 top-full mt-1 z-50">
                   <ShareButton
+                    id={`share-${account.id}`}
                     accountId={account.id}
                     accountName={account.name}
                     isPublic={true}
                   />
                 </div>
               )}
-            </div>
-          );
-        })}
-      </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <nav className="p-4 space-y-2 flex-1 overflow-y-auto">

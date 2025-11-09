@@ -477,6 +477,7 @@ export default function JournalBalanceChart({
       <div className="relative z-10 h-[500px] mb-8 group">
         <BalanceCurveChart
           data={chartData}
+          currency={currency}
           onHover={(point) => {
             if (point) {
               // Find matching RRPoint by date - handle both Date objects and strings
