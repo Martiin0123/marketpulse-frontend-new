@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import {
-  Plus,
+  PlusIcon,
   TrashIcon,
   PlayIcon,
   PauseIcon
@@ -78,7 +78,7 @@ export default function CopyTradeSection({
       }
 
       if (data) {
-        setConfigs(data as CopyTradeConfig[]);
+        setConfigs((data as unknown) as CopyTradeConfig[]);
       }
     } catch (err) {
       console.error('Error loading copy trade configs:', err);
