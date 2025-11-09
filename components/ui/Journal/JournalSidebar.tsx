@@ -7,14 +7,16 @@ import {
   Cog6ToothIcon,
   HomeIcon,
   ViewColumnsIcon,
-  UserIcon
+  UserIcon,
+  DocumentDuplicateIcon
 } from '@heroicons/react/24/outline';
 import {
   ChartBarIcon as ChartBarIconSolid,
   CalendarIcon as CalendarIconSolid,
   ListBulletIcon as ListBulletIconSolid,
   Cog6ToothIcon as Cog6ToothIconSolid,
-  HomeIcon as HomeIconSolid
+  HomeIcon as HomeIconSolid,
+  DocumentDuplicateIcon as DocumentDuplicateIconSolid
 } from '@heroicons/react/24/solid';
 import type { TradingAccount } from '@/types/journal';
 import { ShareIcon } from '@heroicons/react/24/outline';
@@ -67,6 +69,12 @@ const sections = [
     name: 'Calendar',
     icon: CalendarIcon,
     iconSolid: CalendarIconSolid
+  },
+  {
+    id: 'copy-trade',
+    name: 'Copy Trade',
+    icon: DocumentDuplicateIcon,
+    iconSolid: DocumentDuplicateIconSolid
   },
   {
     id: 'settings',

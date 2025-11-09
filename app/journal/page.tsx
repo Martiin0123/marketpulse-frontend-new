@@ -18,6 +18,7 @@ import AdvancedPerformanceAnalysis from '@/components/ui/Journal/AdvancedPerform
 import CSVImportExport from '@/components/ui/Journal/CSVImportExport';
 import JournalSidebar from '@/components/ui/Journal/JournalSidebar';
 import JournalSettings from '@/components/ui/Journal/JournalSettings';
+import CopyTradeSection from '@/components/ui/Journal/CopyTradeSection';
 import type {
   TradingAccount,
   AccountStats,
@@ -55,7 +56,7 @@ export default function JournalPage() {
   const [view, setView] = useState<'individual' | 'combined'>('combined');
   const [displayMode, setDisplayMode] = useState<'calendar' | 'list'>('list');
   const [currentSection, setCurrentSection] = useState<
-    'overview' | 'performance' | 'trades' | 'calendar' | 'settings'
+    'overview' | 'performance' | 'trades' | 'calendar' | 'copy-trade' | 'settings'
   >('overview');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -741,6 +742,10 @@ export default function JournalPage() {
                 onMonthChange={setCurrentMonth}
                 refreshKey={refreshKey}
               />
+            )}
+
+            {currentSection === 'copy-trade' && (
+              <CopyTradeSection accounts={accounts} refreshKey={refreshKey} />
             )}
 
             {currentSection === 'settings' && (
