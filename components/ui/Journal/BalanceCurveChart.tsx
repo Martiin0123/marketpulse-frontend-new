@@ -96,21 +96,25 @@ export default function BalanceCurveChart({
     const range = maxBalance - minBalance;
     const padding = Math.max(range * 0.15, Math.abs(minBalance) * 0.1); // At least 15% padding or 10% of min value
 
-    // Round min and max to nice numbers, ensuring min is below actual min and max is above actual max
-    let minY = roundToNiceNumber(minBalance - padding, false);
-    let maxY = roundToNiceNumber(maxBalance + padding, true);
-
-    // Double-check: ensure minY is actually below minBalance and maxY is above maxBalance
-    if (minY > minBalance - padding) {
-      // If rounded min is still above actual min, round down more aggressively
-      const diff = minBalance - padding - minY;
-      const step = Math.pow(10, Math.floor(Math.log10(Math.abs(minY))));
+    // Calculate target min/max with padding
+    const targetMin = minBalance - padding;
+    const targetMax = maxBalance + padding;
+    
+    // Round min and max to nice numbers
+    let minY = roundToNiceNumber(targetMin, false);
+    let maxY = roundToNiceNumber(targetMax, true);
+    
+    // Ensure minY is actually below targetMin (with some extra margin for safety)
+    while (minY >= targetMin) {
+      // Calculate step size based on current magnitude
+      const step = Math.pow(10, Math.floor(Math.log10(Math.abs(minY) || 1)));
       minY = minY - step;
     }
-    if (maxY < maxBalance + padding) {
-      // If rounded max is still below actual max, round up more aggressively
-      const diff = maxBalance + padding - maxY;
-      const step = Math.pow(10, Math.floor(Math.log10(Math.abs(maxY))));
+    
+    // Ensure maxY is actually above targetMax (with some extra margin for safety)
+    while (maxY <= targetMax) {
+      // Calculate step size based on current magnitude
+      const step = Math.pow(10, Math.floor(Math.log10(Math.abs(maxY) || 1)));
       maxY = maxY + step;
     }
 
