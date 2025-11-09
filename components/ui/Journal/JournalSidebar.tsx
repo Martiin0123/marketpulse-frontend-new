@@ -17,6 +17,7 @@ import {
   HomeIcon as HomeIconSolid
 } from '@heroicons/react/24/solid';
 import type { TradingAccount } from '@/types/journal';
+import ShareButton from './ShareButton';
 
 interface JournalSidebarProps {
   currentSection: string;
@@ -125,6 +126,19 @@ export default function JournalSidebar({
             </button>
           ))}
         </div>
+        
+        {/* Share Button for selected account */}
+        {view === 'individual' && selectedAccount && (
+          <div className="mt-3 pt-3 border-t border-slate-700/50">
+            <ShareButton
+              accountId={selectedAccount}
+              accountName={
+                accounts.find((acc) => acc.id === selectedAccount)?.name || ''
+              }
+              isPublic={true}
+            />
+          </div>
+        )}
       </div>
 
       <nav className="p-4 space-y-2 flex-1 overflow-y-auto">
