@@ -18,6 +18,10 @@
     {
       "path": "/api/cron/check-referral-payouts",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/sync-brokers",
+      "schedule": "*/10 * * * *"
     }
   ],
   "rewrites": [

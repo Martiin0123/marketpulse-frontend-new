@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import {
   ViewColumnsIcon,
-  UserIcon,
-  TrashIcon
+  UserIcon
 } from '@heroicons/react/24/outline';
 import { Plus } from '@phosphor-icons/react';
 import type { TradingAccount } from '@/types/journal';
@@ -16,7 +15,6 @@ interface AccountSelectorProps {
   selectedAccount: string | null;
   onAccountChange: (accountId: string | null) => void;
   onAccountCreated: (account: TradingAccount) => void;
-  onAccountDeleted: (accountId: string) => void;
   view: 'individual' | 'combined';
   onViewChange: (view: 'individual' | 'combined') => void;
 }
@@ -26,7 +24,6 @@ export default function AccountSelector({
   selectedAccount,
   onAccountChange,
   onAccountCreated,
-  onAccountDeleted,
   view,
   onViewChange
 }: AccountSelectorProps) {
@@ -50,44 +47,33 @@ export default function AccountSelector({
 
         {/* Individual Account Buttons */}
         {accounts.map((account) => (
-          <div key={account.id} className="flex items-center gap-1.5 group">
-            <button
-              onClick={() => {
-                onViewChange('individual');
-                onAccountChange(account.id);
-              }}
-              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                view === 'individual' && selectedAccount === account.id
-                  ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-600/30'
-                  : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 border border-slate-600/50'
-              }`}
-            >
-              <UserIcon className="h-4 w-4" />
-              <span>{account.name}</span>
-              {account.stats && (
-                <span
-                  className={`text-xs px-1.5 py-0.5 rounded ${
-                    account.stats.totalRR >= 0
-                      ? 'bg-green-500/20 text-green-400'
-                      : 'bg-red-500/20 text-red-400'
-                  }`}
-                >
-                  {account.stats.totalRR >= 0 ? '+' : ''}
-                  {account.stats.totalRR?.toFixed(1) || '0.0'}R
-                </span>
-              )}
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onAccountDeleted(account.id);
-              }}
-              className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-              title="Delete account"
-            >
-              <TrashIcon className="h-4 w-4" />
-            </button>
-          </div>
+          <button
+            key={account.id}
+            onClick={() => {
+              onViewChange('individual');
+              onAccountChange(account.id);
+            }}
+            className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+              view === 'individual' && selectedAccount === account.id
+                ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-600/30'
+                : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 border border-slate-600/50'
+            }`}
+          >
+            <UserIcon className="h-4 w-4" />
+            <span>{account.name}</span>
+            {account.stats && (
+              <span
+                className={`text-xs px-1.5 py-0.5 rounded ${
+                  account.stats.totalRR >= 0
+                    ? 'bg-green-500/20 text-green-400'
+                    : 'bg-red-500/20 text-red-400'
+                }`}
+              >
+                {account.stats.totalRR >= 0 ? '+' : ''}
+                {account.stats.totalRR?.toFixed(1) || '0.0'}R
+              </span>
+            )}
+          </button>
         ))}
 
         {/* Share Button for selected account */}

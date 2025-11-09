@@ -24,6 +24,7 @@ interface JournalBalanceChartProps {
 interface RRPoint {
   date: string;
   rr: number;
+  balance: number; // Currency balance
   trades: number;
 }
 
@@ -92,16 +93,13 @@ export default function JournalBalanceChart({
 
         setTrades(tradesData || []);
 
-        // Calculate RR progression - only create points for days with trades
+        // Calculate both RR and currency progression
         const rrPoints: RRPoint[] = [];
         let runningRR = 0;
+        let runningBalance = initialBalance;
 
-        // Add initial point
-        rrPoints.push({
-          date: startDate.toISOString().split('T')[0],
-          rr: runningRR,
-          trades: 0
-        });
+        // Only add initial point if we have trades, otherwise start from first trade
+        // (We'll add it after processing trades if needed)
 
         // Sort trades by date
         const sortedTrades = (tradesData || []).sort(
@@ -109,16 +107,68 @@ export default function JournalBalanceChart({
             new Date(a.entry_date).getTime() - new Date(b.entry_date).getTime()
         );
 
-        // Create points only for days with trades
+        // Group trades by date to avoid duplicate points
+        const tradesByDate = new Map<string, any[]>();
         sortedTrades.forEach((trade) => {
-          if (trade.rr !== null && trade.rr !== undefined) {
-            runningRR += trade.rr;
-            rrPoints.push({
-              date: trade.entry_date.split('T')[0],
-              rr: runningRR,
-              trades: 1 // Each trade gets its own point
-            });
+          const dateStr = trade.entry_date.split('T')[0];
+          if (!tradesByDate.has(dateStr)) {
+            tradesByDate.set(dateStr, []);
           }
+          tradesByDate.get(dateStr)!.push(trade);
+        });
+
+        // Add initial point if we have trades
+        if (tradesByDate.size > 0) {
+          // Get the first trade date
+          const firstDate = Array.from(tradesByDate.keys()).sort()[0];
+          rrPoints.push({
+            date: firstDate,
+            rr: runningRR,
+            balance: runningBalance,
+            trades: 0
+          });
+        }
+
+        // Create points for each day with trades
+        const sortedDates = Array.from(tradesByDate.keys()).sort();
+        sortedDates.forEach((dateStr) => {
+          const dayTrades = tradesByDate.get(dateStr)!;
+
+          // Aggregate RR and PnL for this day
+          let dayRR = 0;
+          let dayPnL = 0;
+
+          dayTrades.forEach((trade) => {
+            // Update RR if available
+            if (
+              trade.rr !== null &&
+              trade.rr !== undefined &&
+              !isNaN(trade.rr)
+            ) {
+              dayRR += trade.rr;
+            }
+
+            // Update currency balance if PnL available
+            if (
+              trade.pnl_amount !== null &&
+              trade.pnl_amount !== undefined &&
+              !isNaN(trade.pnl_amount)
+            ) {
+              dayPnL += trade.pnl_amount;
+            }
+          });
+
+          // Update running totals
+          runningRR += dayRR;
+          runningBalance += dayPnL;
+
+          // Add point for this day
+          rrPoints.push({
+            date: dateStr,
+            rr: runningRR,
+            balance: runningBalance,
+            trades: dayTrades.length
+          });
         });
 
         setRrData(rrPoints);
@@ -135,32 +185,34 @@ export default function JournalBalanceChart({
     fetchBalanceData();
   }, [accountId, initialBalance, refreshKey, supabase, selectedPeriod]);
 
-  // Convert RR data to chart format
+  // Convert data to chart format
+  // Chart displays dollar amounts (balance) as primary
   const chartData = useMemo(() => {
     if (rrData.length === 0) return [];
 
     return rrData.map((point, index) => {
-      // Calculate RR change for this point
-      let rrChange = 0;
+      // Calculate PnL change for this point
+      let pnlChange = 0;
       if (index === 0) {
-        // First point has no RR change
-        rrChange = 0;
+        pnlChange = 0;
       } else {
-        // RR change is the difference from previous RR
-        rrChange = point.rr - rrData[index - 1].rr;
+        pnlChange = point.balance - rrData[index - 1].balance;
       }
 
       return {
         date: new Date(point.date),
-        balance: point.rr, // Using balance field for chart compatibility
-        pnl: rrChange
+        balance: point.balance, // Primary display: dollar balance
+        balanceCurrency: point.balance, // Same as balance (dollar amount)
+        pnl: pnlChange,
+        rr: point.rr, // Keep RR for reference
+        trades: point.trades // Include trade count for hover
       };
     });
   }, [rrData]);
 
   // Calculate summary stats
   const stats = useMemo(() => {
-    if (rrData.length === 0) {
+    if (rrData.length === 0 || !trades || trades.length === 0) {
       return {
         totalTrades: 0,
         totalRR: 0,
@@ -174,31 +226,40 @@ export default function JournalBalanceChart({
       };
     }
 
-    const totalTrades = rrData.reduce((sum, point) => sum + point.trades, 0);
+    // Use actual trades count, not points count
+    const totalTrades = trades.length;
     const totalRR = rrData[rrData.length - 1]?.rr || 0;
 
-    // Calculate daily RR changes
+    // Calculate stats from actual trades, not aggregated points
+    const tradesWithRR = trades.filter(
+      (t: any) => t.rr !== null && t.rr !== undefined && !isNaN(t.rr)
+    );
+
+    const wins = tradesWithRR.filter((t: any) => t.rr > 0);
+    const losses = tradesWithRR.filter((t: any) => t.rr < 0);
+
+    const winRate =
+      tradesWithRR.length > 0 ? (wins.length / tradesWithRR.length) * 100 : 0;
+
+    const averageWin =
+      wins.length > 0
+        ? wins.reduce((sum: number, t: any) => sum + t.rr, 0) / wins.length
+        : 0;
+    const averageLoss =
+      losses.length > 0
+        ? losses.reduce((sum: number, t: any) => sum + t.rr, 0) / losses.length
+        : 0;
+
+    // Calculate daily RR changes for streaks
     const dailyRR = rrData.slice(1).map((point, index) => {
       const prevPoint = rrData[index];
       return point.rr - prevPoint.rr;
     });
 
-    const profitableDays = dailyRR.filter((rr) => rr > 0);
-    const losingDays = dailyRR.filter((rr) => rr < 0);
-
     const bestDay = dailyRR.length > 0 ? Math.max(...dailyRR) : 0;
     const worstDay = dailyRR.length > 0 ? Math.min(...dailyRR) : 0;
-    const averageWin =
-      profitableDays.length > 0
-        ? profitableDays.reduce((sum, rr) => sum + rr, 0) /
-          profitableDays.length
-        : 0;
-    const averageLoss =
-      losingDays.length > 0
-        ? losingDays.reduce((sum, rr) => sum + rr, 0) / losingDays.length
-        : 0;
 
-    // Calculate streaks
+    // Calculate streaks from daily changes
     let currentWinStreak = 0;
     let currentLoseStreak = 0;
     let maxWinStreak = 0;
@@ -232,6 +293,13 @@ export default function JournalBalanceChart({
       }
     }
 
+    // Calculate average RR
+    const averageRR =
+      tradesWithRR.length > 0
+        ? tradesWithRR.reduce((sum: number, t: any) => sum + t.rr, 0) /
+          tradesWithRR.length
+        : 0;
+
     return {
       totalTrades,
       totalRR,
@@ -241,9 +309,11 @@ export default function JournalBalanceChart({
       averageLoss,
       maxDrawdown,
       winStreak: maxWinStreak,
-      loseStreak: maxLoseStreak
+      loseStreak: maxLoseStreak,
+      winRate,
+      averageRR
     };
-  }, [rrData]);
+  }, [rrData, trades]);
 
   const formatRR = (rr: number) => {
     if (isNaN(rr) || rr === null || rr === undefined) {
@@ -314,7 +384,7 @@ export default function JournalBalanceChart({
           </div>
           <div>
             <h3 className="text-3xl font-bold bg-gradient-to-r from-white via-emerald-100 to-green-100 bg-clip-text text-transparent">
-              RR Progression
+              Performance Overview
             </h3>
             <p className="text-slate-400 text-sm">
               Your trading journey over time
@@ -322,14 +392,52 @@ export default function JournalBalanceChart({
           </div>
         </div>
 
-        <div className="text-right">
-          <div className="text-4xl font-bold text-white mb-2">
-            {formatRR(rrData[rrData.length - 1]?.rr || 0)}
+        <div className="flex items-center space-x-6 text-right">
+          <div>
+            <div
+              className={`text-4xl font-bold mb-2 ${
+                (rrData[rrData.length - 1]?.balance || initialBalance) >=
+                initialBalance
+                  ? 'text-green-400'
+                  : 'text-red-400'
+              }`}
+            >
+              {(
+                (rrData[rrData.length - 1]?.balance || initialBalance) -
+                initialBalance
+              ).toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+                signDisplay: 'always'
+              })}
+            </div>
+            <div className="text-slate-400 text-sm flex items-center justify-end">
+              <ChartLine className="h-4 w-4 mr-1" />
+              Total P&L ({currency})
+            </div>
           </div>
-          <div className="text-slate-400 text-sm flex items-center justify-end">
-            <ChartLine className="h-4 w-4 mr-1" />
-            Total RR
-          </div>
+          {rrData[rrData.length - 1]?.balance !== undefined && (
+            <div>
+              <div
+                className={`text-4xl font-bold mb-2 ${
+                  (rrData[rrData.length - 1]?.balance || 0) >= initialBalance
+                    ? 'text-green-400'
+                    : 'text-red-400'
+                }`}
+              >
+                {(
+                  rrData[rrData.length - 1]?.balance || initialBalance
+                ).toLocaleString('en-US', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2
+                })}
+              </div>
+              <div className="text-slate-400 text-sm flex items-center justify-end">
+                <ChartLine className="h-4 w-4 mr-1" />
+                Balance ({currency})
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -360,7 +468,44 @@ export default function JournalBalanceChart({
 
       {/* Enhanced Chart with Hover Info */}
       <div className="relative z-10 h-[500px] mb-8 group">
-        <BalanceCurveChart data={chartData} onHover={setHoveredPoint} />
+        <BalanceCurveChart
+          data={chartData}
+          onHover={(point) => {
+            if (point) {
+              // Find matching RRPoint by date - handle both Date objects and strings
+              let dateStr: string;
+              if (point.date instanceof Date) {
+                dateStr = point.date.toISOString().split('T')[0];
+              } else if (typeof point.date === 'string') {
+                dateStr = point.date.split('T')[0];
+              } else {
+                dateStr = String(point.date);
+              }
+
+              // Normalize date string for comparison (remove time if present)
+              const normalizedDate = dateStr.split('T')[0];
+
+              const rrPoint = rrData.find((p) => {
+                const pDate = p.date.split('T')[0];
+                return pDate === normalizedDate;
+              });
+
+              if (rrPoint) {
+                setHoveredPoint({
+                  date: rrPoint.date,
+                  rr: rrPoint.rr,
+                  balance: rrPoint.balance,
+                  trades: rrPoint.trades
+                });
+              } else {
+                // If no exact match, clear hover
+                setHoveredPoint(null);
+              }
+            } else {
+              setHoveredPoint(null);
+            }
+          }}
+        />
 
         {/* Hover Tooltip */}
         {hoveredPoint && (
@@ -372,11 +517,33 @@ export default function JournalBalanceChart({
                 day: 'numeric'
               })}
             </div>
-            <div className="text-2xl font-bold text-white mb-1">
-              {formatRR(hoveredPoint.rr)}
-            </div>
-            <div className="text-sm text-slate-400">
-              {hoveredPoint.trades} trades
+            <div className="space-y-1">
+              {hoveredPoint.balance !== undefined && (
+                <div
+                  className={`text-2xl font-bold ${
+                    hoveredPoint.balance >= initialBalance
+                      ? 'text-green-400'
+                      : 'text-red-400'
+                  }`}
+                >
+                  {hoveredPoint.balance.toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  })}{' '}
+                  {currency}
+                </div>
+              )}
+              {hoveredPoint.rr !== undefined && hoveredPoint.rr !== 0 && (
+                <div className="text-lg font-medium text-slate-400">
+                  {formatRR(hoveredPoint.rr)}
+                </div>
+              )}
+              {hoveredPoint.trades > 0 && (
+                <div className="text-sm text-slate-400">
+                  {hoveredPoint.trades} trade
+                  {hoveredPoint.trades !== 1 ? 's' : ''}
+                </div>
+              )}
             </div>
           </div>
         )}

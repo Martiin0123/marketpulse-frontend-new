@@ -64,12 +64,43 @@ export default function JournalPage() {
   const [editingTrade, setEditingTrade] = useState<TradeEntry | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [searchDate, setSearchDate] = useState('');
+  const [brokerError, setBrokerError] = useState<string | null>(null);
 
   const supabase = createClient();
+
+  // Handle OAuth callback errors
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('error');
+    const broker = params.get('broker');
+    const message = params.get('message');
+
+    if (error === 'broker_not_configured') {
+      const brokerName =
+        broker === 'tradovate'
+          ? 'Tradovate'
+          : broker === 'projectx'
+            ? 'Project X'
+            : 'Broker';
+      setBrokerError(
+        `${brokerName} integration is not configured. Please add the API credentials to your environment variables. See BROKER_SETUP.md for instructions.`
+      );
+      // Clean up URL
+      window.history.replaceState({}, '', '/journal');
+    }
+  }, []);
 
   const calculateAccountStats = async (
     accountId: string
   ): Promise<AccountStats> => {
+    // Get account data to access fixed_risk
+    const { data: accountData } = await supabase
+      .from('trading_accounts' as any)
+      .select('fixed_risk')
+      .eq('id', accountId)
+      .single();
     try {
       const { data: trades, error } = await supabase
         .from('trade_entries' as any)
@@ -102,12 +133,14 @@ export default function JournalPage() {
 
       const closedTrades = (trades || []) as any[];
 
-      // Filter out trades with null rr for stats calculation (using RR instead of PnL)
-      const tradesWithRR = closedTrades.filter(
-        (trade) => trade.rr !== null && trade.rr !== undefined
+      // Filter trades - use RR if available, otherwise use PnL
+      const tradesWithData = closedTrades.filter(
+        (trade) =>
+          (trade.rr !== null && trade.rr !== undefined) ||
+          (trade.pnl_amount !== null && trade.pnl_amount !== undefined)
       );
 
-      if (tradesWithRR.length === 0) {
+      if (tradesWithData.length === 0) {
         return {
           totalTrades: 0,
           winRate: 0,
@@ -129,79 +162,172 @@ export default function JournalPage() {
         };
       }
 
-      // Calculate basic stats using RR
-      const totalTrades = tradesWithRR.length;
-      const wins = tradesWithRR.filter((trade) => trade.rr > 0);
-      const losses = tradesWithRR.filter((trade) => trade.rr < 0);
+      // Calculate basic stats - prefer RR if available, fallback to PnL
+      const totalTrades = tradesWithData.length;
+
+      // Determine wins/losses - use RR if available, otherwise use PnL
+      const wins = tradesWithData.filter(
+        (trade) =>
+          (trade.rr !== null && trade.rr !== undefined && trade.rr > 0) ||
+          (trade.rr === null &&
+            trade.pnl_amount !== null &&
+            trade.pnl_amount > 0)
+      );
+      const losses = tradesWithData.filter(
+        (trade) =>
+          (trade.rr !== null && trade.rr !== undefined && trade.rr < 0) ||
+          (trade.rr === null &&
+            trade.pnl_amount !== null &&
+            trade.pnl_amount < 0)
+      );
       const winRate = totalTrades > 0 ? (wins.length / totalTrades) * 100 : 0;
 
-      // Calculate R:R stats
-      const rrValues = tradesWithRR.map((trade) => trade.rr || 0);
+      // Calculate currency P&L stats first (source of truth)
+      const pnlValues = tradesWithData
+        .map((trade) => trade.pnl_amount || 0)
+        .filter((pnl) => pnl !== null && pnl !== undefined);
+      const totalPnL =
+        pnlValues.length > 0 ? pnlValues.reduce((sum, pnl) => sum + pnl, 0) : 0;
+
+      // Calculate R:R stats - ensure consistency with PnL
+      // If RR exists, use it. If not, calculate from PnL using fixed_risk
+      const fixedRisk = (accountData as any)?.fixed_risk || 1; // Default 1%
+      const rrValues = tradesWithData.map((trade) => {
+        if (trade.rr !== null && trade.rr !== undefined && !isNaN(trade.rr)) {
+          // Use existing RR, but validate it matches PnL sign
+          const pnl = trade.pnl_amount || 0;
+          // If RR and PnL have opposite signs, something is wrong - recalculate RR
+          if (pnl !== 0 && trade.rr > 0 !== pnl > 0) {
+            // Recalculate RR from PnL
+            if (trade.entry_price && trade.size && fixedRisk > 0) {
+              const riskAmount =
+                trade.entry_price * trade.size * (fixedRisk / 100);
+              return riskAmount > 0 ? pnl / riskAmount : 0;
+            }
+          }
+          return trade.rr;
+        }
+        // Calculate RR from PnL if available
+        const pnl = trade.pnl_amount || 0;
+        if (pnl !== 0 && trade.entry_price && trade.size && fixedRisk > 0) {
+          const riskAmount = trade.entry_price * trade.size * (fixedRisk / 100);
+          return riskAmount > 0 ? pnl / riskAmount : 0;
+        }
+        return 0;
+      });
       const averageRR =
         rrValues.length > 0
           ? rrValues.reduce((sum, rr) => sum + rr, 0) / rrValues.length
           : 0;
       const totalRR = rrValues.reduce((sum, rr) => sum + rr, 0);
 
-      // Best/worst trade based on RR
+      // Best/worst trade - prefer RR, fallback to PnL
       const bestTrade =
-        tradesWithRR.length > 0
-          ? Math.max(...tradesWithRR.map((trade) => trade.rr))
+        tradesWithData.length > 0
+          ? Math.max(
+              ...tradesWithData.map((trade) =>
+                trade.rr !== null && trade.rr !== undefined
+                  ? trade.rr
+                  : trade.pnl_amount || 0
+              )
+            )
           : 0;
       const worstTrade =
-        tradesWithRR.length > 0
-          ? Math.min(...tradesWithRR.map((trade) => trade.rr))
+        tradesWithData.length > 0
+          ? Math.min(
+              ...tradesWithData.map((trade) =>
+                trade.rr !== null && trade.rr !== undefined
+                  ? trade.rr
+                  : trade.pnl_amount || 0
+              )
+            )
           : 0;
 
-      // Calculate average win/loss in RR
+      // Calculate average win/loss - use RR if available
       const averageWin =
         wins.length > 0
-          ? wins.reduce((sum, trade) => sum + trade.rr, 0) / wins.length
+          ? wins.reduce(
+              (sum, trade) =>
+                sum +
+                (trade.rr !== null && trade.rr !== undefined
+                  ? trade.rr
+                  : trade.pnl_amount || 0),
+              0
+            ) / wins.length
           : 0;
       const averageLoss =
         losses.length > 0
-          ? losses.reduce((sum, trade) => sum + trade.rr, 0) / losses.length
+          ? losses.reduce(
+              (sum, trade) =>
+                sum +
+                (trade.rr !== null && trade.rr !== undefined
+                  ? trade.rr
+                  : trade.pnl_amount || 0),
+              0
+            ) / losses.length
           : 0;
 
-      // Calculate profit factor using RR
-      const totalWins = wins.reduce((sum, trade) => sum + trade.rr, 0);
+      // Calculate profit factor using RR (or PnL as fallback)
+      const totalWins = wins.reduce(
+        (sum, trade) =>
+          sum +
+          (trade.rr !== null && trade.rr !== undefined
+            ? trade.rr
+            : trade.pnl_amount || 0),
+        0
+      );
       const totalLosses = Math.abs(
-        losses.reduce((sum, trade) => sum + trade.rr, 0)
+        losses.reduce(
+          (sum, trade) =>
+            sum +
+            (trade.rr !== null && trade.rr !== undefined
+              ? trade.rr
+              : trade.pnl_amount || 0),
+          0
+        )
       );
       const profitFactor =
         totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? 999 : 0;
 
-      // Calculate streaks using RR
+      // Calculate streaks - use RR if available, fallback to PnL
       let currentWinStreak = 0;
       let currentLoseStreak = 0;
       let maxWinStreak = 0;
       let maxLoseStreak = 0;
 
-      for (const trade of tradesWithRR.sort(
+      for (const trade of tradesWithData.sort(
         (a, b) =>
           new Date(a.entry_date).getTime() - new Date(b.entry_date).getTime()
       )) {
-        if (trade.rr > 0) {
+        const tradeValue =
+          trade.rr !== null && trade.rr !== undefined
+            ? trade.rr
+            : trade.pnl_amount || 0;
+        if (tradeValue > 0) {
           currentWinStreak++;
           currentLoseStreak = 0;
           maxWinStreak = Math.max(maxWinStreak, currentWinStreak);
-        } else if (trade.rr < 0) {
+        } else if (tradeValue < 0) {
           currentLoseStreak++;
           currentWinStreak = 0;
           maxLoseStreak = Math.max(maxLoseStreak, currentLoseStreak);
         }
       }
 
-      // Calculate max drawdown using RR (cumulative RR)
+      // Calculate max drawdown - use RR if available, fallback to cumulative PnL
       let maxDrawdown = 0;
       let peak = 0;
       let current = 0;
 
-      for (const trade of tradesWithRR.sort(
+      for (const trade of tradesWithData.sort(
         (a, b) =>
           new Date(a.entry_date).getTime() - new Date(b.entry_date).getTime()
       )) {
-        current += trade.rr;
+        const tradeValue =
+          trade.rr !== null && trade.rr !== undefined
+            ? trade.rr
+            : trade.pnl_amount || 0;
+        current += tradeValue;
         if (current > peak) {
           peak = current;
         }
@@ -211,15 +337,13 @@ export default function JournalPage() {
         }
       }
 
-      // Total PnL is now totalRR (for backward compatibility)
-      const totalPnL = totalRR;
-
-      // Calculate Total Opportunity Cost
+      // Calculate Total Opportunity Cost (RR-based only)
       // Opportunity cost = sum of (max_adverse - actual_rr) for trades where max_adverse > actual_rr
-      // This represents the RR you could have made if you took profit at max_adverse
       let totalOpportunityCost = 0;
-      tradesWithRR.forEach((trade) => {
+      tradesWithData.forEach((trade) => {
         if (
+          trade.rr !== null &&
+          trade.rr !== undefined &&
           trade.max_adverse !== null &&
           trade.max_adverse !== undefined &&
           trade.max_adverse > trade.rr
@@ -253,14 +377,14 @@ export default function JournalPage() {
       // Calculate Best TP RR
       // Analyze max_adverse values to suggest optimal take profit
       // Use the median or average of max_adverse values for winning trades
-      const maxAdverseValues = tradesWithRR
+      const maxAdverseValues = tradesWithData
         .filter(
-          (trade) =>
+          (trade: any) =>
             trade.max_adverse !== null &&
             trade.max_adverse !== undefined &&
             trade.max_adverse > 0
         )
-        .map((trade) => trade.max_adverse!);
+        .map((trade: any) => trade.max_adverse!);
 
       let bestTPRR = 0;
       if (maxAdverseValues.length > 0) {
@@ -561,7 +685,6 @@ export default function JournalPage() {
                 selectedAccount={selectedAccount}
                 onAccountChange={setSelectedAccount}
                 onAccountCreated={handleAccountCreated}
-                onAccountDeleted={handleDeleteAccount}
                 view={view}
                 onViewChange={handleViewChange}
               />
@@ -593,6 +716,25 @@ export default function JournalPage() {
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-7xl">
+            {/* Broker Configuration Error Banner */}
+            {brokerError && (
+              <div className="mb-6 bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-yellow-400 font-semibold mb-1">
+                      Broker Integration Not Configured
+                    </h3>
+                    <p className="text-sm text-yellow-300/80">{brokerError}</p>
+                  </div>
+                  <button
+                    onClick={() => setBrokerError(null)}
+                    className="text-yellow-400 hover:text-yellow-300 ml-4"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            )}
             {/* Section Content */}
             {currentSection === 'overview' && (
               <OverviewSection
@@ -605,7 +747,6 @@ export default function JournalPage() {
                   setSelectedAccount(id);
                   setView('individual');
                 }}
-                onDeleteAccount={handleDeleteAccount}
               />
             )}
 
@@ -681,8 +822,7 @@ function OverviewSection({
   selectedAccountData,
   view,
   refreshKey,
-  onAccountSelect,
-  onDeleteAccount
+  onAccountSelect
 }: {
   accounts: any[];
   selectedAccount: string | null;
@@ -690,15 +830,10 @@ function OverviewSection({
   view: string;
   refreshKey: number;
   onAccountSelect: (id: string) => void;
-  onDeleteAccount: (id: string) => void;
 }) {
   return (
     <div className="space-y-6">
-      <AccountsOverview
-        accounts={accounts}
-        onSelectAccount={onAccountSelect}
-        onDeleteAccount={onDeleteAccount}
-      />
+      <AccountsOverview accounts={accounts} onSelectAccount={onAccountSelect} />
 
       <JournalBalanceChart
         accountId={selectedAccount}
@@ -733,6 +868,12 @@ function OverviewSection({
               <StatCard
                 label="Total RR"
                 value={`${selectedAccountData.stats.totalRR >= 0 ? '+' : ''}${selectedAccountData.stats.totalRR.toFixed(2)}R`}
+                subtitle={
+                  selectedAccountData.stats.totalPnL !== null &&
+                  selectedAccountData.stats.totalPnL !== undefined
+                    ? `${selectedAccountData.stats.totalPnL >= 0 ? '+' : ''}${selectedAccountData.stats.totalPnL.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${selectedAccountData.currency || 'USD'}`
+                    : undefined
+                }
                 color="green"
               />
               <StatCard
@@ -767,8 +908,16 @@ function OverviewSection({
                 color="emerald"
               />
               <StatCard
-                label="Total RR"
-                value={`${accounts.reduce((sum: number, acc: any) => sum + acc.stats.totalRR, 0) >= 0 ? '+' : ''}${accounts.reduce((sum: number, acc: any) => sum + acc.stats.totalRR, 0).toFixed(2)}R`}
+                label="Total P&L"
+                value={`${accounts.reduce((sum: number, acc: any) => sum + (acc.stats.totalPnL || 0), 0) >= 0 ? '+' : ''}$${Math.abs(accounts.reduce((sum: number, acc: any) => sum + (acc.stats.totalPnL || 0), 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                subtitle={
+                  accounts.reduce(
+                    (sum: number, acc: any) => sum + acc.stats.totalRR,
+                    0
+                  ) !== 0
+                    ? `${accounts.reduce((sum: number, acc: any) => sum + acc.stats.totalRR, 0) >= 0 ? '+' : ''}${accounts.reduce((sum: number, acc: any) => sum + acc.stats.totalRR, 0).toFixed(2)}R`
+                    : undefined
+                }
                 color="green"
               />
               <StatCard
@@ -892,10 +1041,12 @@ function CalendarSection({
 function StatCard({
   label,
   value,
+  subtitle,
   color
 }: {
   label: string;
   value: string | number;
+  subtitle?: string;
   color: string;
 }) {
   const colorClasses: Record<string, string> = {
@@ -920,6 +1071,9 @@ function StatCard({
       >
         {value}
       </div>
+      {subtitle && (
+        <div className="text-xs text-slate-400 mt-1">{subtitle}</div>
+      )}
     </div>
   );
 }

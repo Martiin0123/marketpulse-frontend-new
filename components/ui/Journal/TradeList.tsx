@@ -93,6 +93,7 @@ export default function TradeList({
       let query = supabase
         .from('trade_entries' as any)
         .select('*')
+        .eq('status', 'closed') // Only show closed/completed trades
         .order('entry_date', { ascending: false });
 
       if (accountId) {
@@ -486,7 +487,7 @@ export default function TradeList({
               className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/50 hover:bg-slate-700/50 transition-colors"
             >
               <div className="flex items-center justify-between">
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-6 gap-4 items-center">
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-7 gap-4 items-center">
                   {/* Date & Time */}
                   <div className="md:col-span-2">
                     <div className="text-sm font-medium text-white">
@@ -509,21 +510,45 @@ export default function TradeList({
                     </div>
                   </div>
 
-                  {/* RR */}
-                  <div>
-                    <div className="text-xs text-slate-400">RR</div>
-                    <div
-                      className={`text-sm font-bold ${getPnlColor(trade.rr || 0)}`}
-                    >
-                      {trade.rr
-                        ? `${trade.rr >= 0 ? '+' : ''}${trade.rr.toFixed(2)}R`
-                        : 'N/A'}
-                    </div>
-                    {trade.max_adverse && (
-                      <div className="text-xs text-slate-400">
-                        MA: {trade.max_adverse.toFixed(2)}R
+                  {/* RR & Currency */}
+                  <div className="md:col-span-2">
+                    <div className="flex items-start space-x-4">
+                      {/* RR */}
+                      <div>
+                        <div className="text-xs text-slate-400">RR</div>
+                        <div
+                          className={`text-sm font-bold ${getPnlColor(trade.rr || 0)}`}
+                        >
+                          {trade.rr !== null && trade.rr !== undefined
+                            ? `${trade.rr >= 0 ? '+' : ''}${trade.rr.toFixed(2)}R`
+                            : 'N/A'}
+                        </div>
+                        {trade.max_adverse && (
+                          <div className="text-xs text-slate-400">
+                            MA: {trade.max_adverse.toFixed(2)}R
+                          </div>
+                        )}
                       </div>
-                    )}
+                      {/* Currency P&L */}
+                      {trade.pnl_amount !== null &&
+                        trade.pnl_amount !== undefined && (
+                          <div>
+                            <div className="text-xs text-slate-400">P&L</div>
+                            <div
+                              className={`text-sm font-bold ${getPnlColor(trade.pnl_amount)}`}
+                            >
+                              {trade.pnl_amount >= 0 ? '+' : ''}
+                              {trade.pnl_amount.toFixed(2)}
+                            </div>
+                            {trade.entry_price && trade.exit_price && (
+                              <div className="text-xs text-slate-400">
+                                {trade.entry_price.toFixed(2)} →{' '}
+                                {trade.exit_price.toFixed(2)}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                    </div>
                   </div>
 
                   {/* Status */}

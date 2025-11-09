@@ -10,7 +10,7 @@ interface BalanceCurveChartProps {
     pnl: number;
   }>;
   onHover?: (
-    point: { date: string; balance: number; trades: number } | null
+    point: { date: Date | string; balance: number; trades?: number } | null
   ) => void;
 }
 
@@ -267,10 +267,11 @@ export default function BalanceCurveChart({
                 className="cursor-pointer"
                 onMouseEnter={() => {
                   setHoveredIndex(index);
+                  // Pass the actual data point with correct balance (dollar amount)
                   onHover?.({
-                    date: data[index].date.toISOString().split('T')[0],
-                    balance: point.balance, // This is actually RR now
-                    trades: 1
+                    date: data[index].date,
+                    balance: point.balance, // Dollar balance
+                    trades: (data[index] as any).trades || 1
                   });
                 }}
                 onMouseLeave={() => {
@@ -302,53 +303,7 @@ export default function BalanceCurveChart({
                 />
               )}
 
-              {/* Hover tooltip */}
-              {isHovered && (
-                <g>
-                  <rect
-                    x={point.x - 50}
-                    y={point.y - 80}
-                    width="100"
-                    height="60"
-                    rx="12"
-                    fill="rgba(15, 23, 42, 0.95)"
-                    stroke="rgba(71, 85, 105, 0.5)"
-                    strokeWidth="1"
-                    filter="url(#dropshadow)"
-                  />
-                  <text
-                    x={point.x}
-                    y={point.y - 60}
-                    textAnchor="middle"
-                    className="text-sm fill-white font-bold"
-                    fontSize="12"
-                  >
-                    {formatRR(point.balance)}
-                  </text>
-                  <text
-                    x={point.x}
-                    y={point.y - 45}
-                    textAnchor="middle"
-                    className={`text-xs font-medium ${point.pnl >= 0 ? 'fill-emerald-400' : 'fill-red-400'}`}
-                    fontSize="10"
-                  >
-                    {formatRR(point.pnl)}
-                  </text>
-                  <text
-                    x={point.x}
-                    y={point.y - 30}
-                    textAnchor="middle"
-                    className="text-xs fill-slate-400"
-                    fontSize="9"
-                  >
-                    {data[index].date.toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: '2-digit'
-                    })}
-                  </text>
-                </g>
-              )}
+              {/* Tooltip removed - using custom tooltip in parent component */}
             </g>
           );
         })}

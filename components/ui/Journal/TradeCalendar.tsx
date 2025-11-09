@@ -25,6 +25,7 @@ interface DailyTradeData {
   date: string;
   trades: number;
   rr: number;
+  pnl_amount: number; // Add dollar amount
   wins: number;
   losses: number;
 }
@@ -34,6 +35,7 @@ interface WeeklyTradeData {
   weekEnd: string;
   trades: number;
   rr: number;
+  pnl_amount: number; // Add dollar amount
   wins: number;
   losses: number;
   weekNumber: number;
@@ -50,6 +52,7 @@ export default function TradeCalendar({
   const [weeklyData, setWeeklyData] = useState<WeeklyTradeData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showDollarAmount, setShowDollarAmount] = useState(false); // Toggle between RR and dollar
 
   const supabase = createClient();
 
@@ -169,6 +172,7 @@ export default function TradeCalendar({
                 date: tradeDate,
                 trades: 0,
                 rr: 0,
+                pnl_amount: 0,
                 wins: 0,
                 losses: 0
               });
@@ -177,6 +181,7 @@ export default function TradeCalendar({
             const dayData = dailyMap.get(tradeDate)!;
             dayData.trades += 1;
 
+            // Add RR
             if (
               trade.rr !== null &&
               trade.rr !== undefined &&
@@ -188,6 +193,15 @@ export default function TradeCalendar({
               } else if (trade.rr < 0) {
                 dayData.losses += 1;
               }
+            }
+
+            // Add dollar amount
+            if (
+              trade.pnl_amount !== null &&
+              trade.pnl_amount !== undefined &&
+              !isNaN(trade.pnl_amount)
+            ) {
+              dayData.pnl_amount += trade.pnl_amount;
             }
           }
         });
@@ -233,6 +247,7 @@ export default function TradeCalendar({
                   String(lastDay.getDate()).padStart(2, '0'),
                 trades: 0,
                 rr: 0,
+                pnl_amount: 0,
                 wins: 0,
                 losses: 0,
                 weekNumber: weekIndex + 1
@@ -251,6 +266,7 @@ export default function TradeCalendar({
                   if (dayStats) {
                     weekData.trades += dayStats.trades;
                     weekData.rr += dayStats.rr;
+                    weekData.pnl_amount += dayStats.pnl_amount;
                     weekData.wins += dayStats.wins;
                     weekData.losses += dayStats.losses;
                   }
@@ -266,6 +282,7 @@ export default function TradeCalendar({
               weekEnd: '',
               trades: 0,
               rr: 0,
+              pnl_amount: 0,
               wins: 0,
               losses: 0,
               weekNumber: weekIndex + 1
@@ -333,6 +350,14 @@ export default function TradeCalendar({
     }
     const sign = rr >= 0 ? '+' : '';
     return `${sign}${rr.toFixed(2)}R`;
+  };
+
+  const formatDollar = (amount: number) => {
+    if (isNaN(amount) || amount === null || amount === undefined) {
+      return '$0.00';
+    }
+    const sign = amount >= 0 ? '+' : '';
+    return `${sign}$${Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   const daysInMonth = getDaysInMonth(month);
@@ -406,6 +431,22 @@ export default function TradeCalendar({
           </div>
 
           <div className="flex items-center space-x-3">
+            {/* Toggle between RR and Dollar */}
+            <button
+              onClick={() => setShowDollarAmount(!showDollarAmount)}
+              className={`group relative px-4 py-2 rounded-xl transition-all duration-300 border ${
+                showDollarAmount
+                  ? 'bg-gradient-to-r from-emerald-500 to-green-600 border-emerald-400 text-white shadow-lg shadow-emerald-500/25'
+                  : 'bg-slate-800/50 hover:bg-slate-700/50 border-slate-600/50 hover:border-slate-500/50 text-slate-300 hover:text-white'
+              }`}
+              title={
+                showDollarAmount ? 'Switch to RR' : 'Switch to Dollar Amount'
+              }
+            >
+              <span className="text-sm font-medium">
+                {showDollarAmount ? '$' : 'R'}
+              </span>
+            </button>
             <button
               onClick={handlePreviousMonth}
               className="group relative p-3 bg-slate-800/50 hover:bg-slate-700/50 rounded-2xl transition-all duration-300 border border-slate-600/50 hover:border-slate-500/50 hover:shadow-lg hover:shadow-blue-500/10"
@@ -467,20 +508,20 @@ export default function TradeCalendar({
                 (day, index) => (
                   <div
                     key={day}
-                    className="text-center p-4 rounded-2xl bg-slate-800/30 backdrop-blur-sm border border-slate-700/50"
+                    className="text-center p-4 rounded-2xl bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 flex flex-col items-center justify-center"
                   >
                     <div className="text-sm font-bold text-slate-300 mb-1">
                       {day}
                     </div>
-                    <div className="w-2 h-2 mx-auto bg-gradient-to-r from-blue-400 to-purple-400 rounded-full opacity-60"></div>
+                    <div className="w-2 h-2 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full opacity-60"></div>
                   </div>
                 )
               )}
-              <div className="text-center p-4 rounded-2xl bg-slate-800/30 backdrop-blur-sm border border-slate-700/50">
+              <div className="text-center p-4 rounded-2xl bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 flex flex-col items-center justify-center">
                 <div className="text-sm font-bold text-slate-300 mb-1">
                   Week
                 </div>
-                <div className="w-2 h-2 mx-auto bg-gradient-to-r from-emerald-400 to-green-400 rounded-full opacity-60"></div>
+                <div className="w-2 h-2 bg-gradient-to-r from-emerald-400 to-green-400 rounded-full opacity-60"></div>
               </div>
             </div>
 
@@ -585,10 +626,12 @@ export default function TradeCalendar({
                               </div>
                             )}
 
-                            {/* RR display - only show for current month */}
+                            {/* RR or Dollar display - only show for current month */}
                             {isCurrentMonth &&
                               dayStats &&
-                              dayStats.rr !== 0 && (
+                              ((showDollarAmount &&
+                                dayStats.pnl_amount !== 0) ||
+                                (!showDollarAmount && dayStats.rr !== 0)) && (
                                 <div
                                   className={`relative z-10 text-xs font-bold transition-all duration-300 ${
                                     isSelected
@@ -598,7 +641,9 @@ export default function TradeCalendar({
                                         : 'text-red-300'
                                   }`}
                                 >
-                                  {formatRR(dayStats.rr)}
+                                  {showDollarAmount
+                                    ? formatDollar(dayStats.pnl_amount)
+                                    : formatRR(dayStats.rr)}
                                 </div>
                               )}
 
@@ -633,12 +678,18 @@ export default function TradeCalendar({
                             </div>
                             <div
                               className={`text-lg font-bold mb-1 ${
-                                weekData.rr > 0
-                                  ? 'text-emerald-400'
-                                  : 'text-red-400'
+                                showDollarAmount
+                                  ? weekData.pnl_amount > 0
+                                    ? 'text-emerald-400'
+                                    : 'text-red-400'
+                                  : weekData.rr > 0
+                                    ? 'text-emerald-400'
+                                    : 'text-red-400'
                               }`}
                             >
-                              {formatRR(weekData.rr)}
+                              {showDollarAmount
+                                ? formatDollar(weekData.pnl_amount)
+                                : formatRR(weekData.rr)}
                             </div>
                             <div className="text-xs text-slate-400">
                               {weekData.trades} trades
@@ -703,27 +754,38 @@ export default function TradeCalendar({
                       </div>
                     </div>
 
-                    {/* RR Card */}
+                    {/* RR or Dollar Card */}
                     <div className="group relative p-6 bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-2xl border border-slate-700/50 hover:border-slate-600/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10">
                       <div className="flex items-center space-x-3 mb-3">
                         <div className="w-10 h-10 bg-gradient-to-br from-emerald-500/20 to-green-500/20 rounded-xl flex items-center justify-center">
                           <ChartBarIcon className="h-5 w-5 text-emerald-400" />
                         </div>
                         <span className="text-slate-400 font-medium">
-                          Total RR
+                          {showDollarAmount ? 'Total P&L' : 'Total RR'}
                         </span>
                       </div>
                       <div
                         className={`text-3xl font-bold mb-1 ${
-                          (getStatsForDate(selectedDate!)?.rr || 0) >= 0
-                            ? 'text-emerald-400'
-                            : 'text-red-400'
+                          showDollarAmount
+                            ? (getStatsForDate(selectedDate!)?.pnl_amount ||
+                                0) >= 0
+                              ? 'text-emerald-400'
+                              : 'text-red-400'
+                            : (getStatsForDate(selectedDate!)?.rr || 0) >= 0
+                              ? 'text-emerald-400'
+                              : 'text-red-400'
                         }`}
                       >
-                        {formatRR(getStatsForDate(selectedDate!)?.rr || 0)}
+                        {showDollarAmount
+                          ? formatDollar(
+                              getStatsForDate(selectedDate!)?.pnl_amount || 0
+                            )
+                          : formatRR(getStatsForDate(selectedDate!)?.rr || 0)}
                       </div>
                       <div className="text-sm text-slate-500">
-                        Risk/Reward Ratio
+                        {showDollarAmount
+                          ? 'Profit & Loss'
+                          : 'Risk/Reward Ratio'}
                       </div>
                     </div>
 

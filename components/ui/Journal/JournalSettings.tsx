@@ -6,6 +6,8 @@ import { TrashIcon } from '@heroicons/react/24/outline';
 import { Plus } from '@phosphor-icons/react';
 import SettingsModal from './SettingsModal';
 import CreateAccountModal from './CreateAccountModal';
+import ConnectBrokerModal from './ConnectBrokerModal';
+import BrokerConnection from './BrokerConnection';
 import type { TradingAccount } from '@/types/journal';
 
 interface JournalSettingsProps {
@@ -23,6 +25,11 @@ export default function JournalSettings({
 }: JournalSettingsProps) {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isConnectBrokerModalOpen, setIsConnectBrokerModalOpen] =
+    useState(false);
+  const [selectedBrokerType, setSelectedBrokerType] = useState<
+    'projectx' | null
+  >(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
   const handleDeleteAccount = async (accountId: string) => {
@@ -90,13 +97,25 @@ export default function JournalSettings({
           <h3 className="text-lg font-semibold text-white">
             Account Management
           </h3>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            <Plus size={18} weight="bold" />
-            <span>Create Account</span>
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => {
+                setSelectedBrokerType('projectx');
+                setIsConnectBrokerModalOpen(true);
+              }}
+              className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              <Plus size={18} weight="bold" />
+              <span>Connect Project X</span>
+            </button>
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              <Plus size={18} weight="bold" />
+              <span>Create Manual Account</span>
+            </button>
+          </div>
         </div>
         <div className="space-y-3">
           {accounts.length === 0 ? (
@@ -108,46 +127,56 @@ export default function JournalSettings({
             </div>
           ) : (
             accounts.map((account) => (
-              <div
-                key={account.id}
-                className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/50 hover:border-slate-500 transition-colors group"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3">
-                      <h4 className="text-white font-medium">{account.name}</h4>
-                      <span className="text-xs text-slate-400 bg-slate-600 px-2 py-0.5 rounded">
-                        {account.currency}
-                      </span>
+              <div key={account.id} className="space-y-3">
+                <div className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/50 hover:border-slate-500 transition-colors group">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3">
+                        <h4 className="text-white font-medium">
+                          {account.name}
+                        </h4>
+                        <span className="text-xs text-slate-400 bg-slate-600 px-2 py-0.5 rounded">
+                          {account.currency}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex items-center space-x-4 text-sm text-slate-400">
+                        <span>
+                          Initial: {account.initial_balance.toLocaleString()}{' '}
+                          {account.currency}
+                        </span>
+                        <span>•</span>
+                        <span>{account.stats?.totalTrades || 0} trades</span>
+                        <span>•</span>
+                        <span
+                          className={
+                            account.stats?.totalRR >= 0
+                              ? 'text-green-400'
+                              : 'text-red-400'
+                          }
+                        >
+                          {account.stats?.totalRR >= 0 ? '+' : ''}
+                          {account.stats?.totalRR?.toFixed(2) || '0.00'}R
+                        </span>
+                      </div>
                     </div>
-                    <div className="mt-2 flex items-center space-x-4 text-sm text-slate-400">
-                      <span>
-                        Initial: {account.initial_balance.toLocaleString()}{' '}
-                        {account.currency}
-                      </span>
-                      <span>•</span>
-                      <span>{account.stats?.totalTrades || 0} trades</span>
-                      <span>•</span>
-                      <span
-                        className={
-                          account.stats?.totalRR >= 0
-                            ? 'text-green-400'
-                            : 'text-red-400'
-                        }
-                      >
-                        {account.stats?.totalRR >= 0 ? '+' : ''}
-                        {account.stats?.totalRR?.toFixed(2) || '0.00'}R
-                      </span>
-                    </div>
+                    <button
+                      onClick={() => handleDeleteAccount(account.id)}
+                      disabled={isDeleting === account.id}
+                      className="ml-4 p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                      title="Delete account"
+                    >
+                      <TrashIcon className="h-5 w-5" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleDeleteAccount(account.id)}
-                    disabled={isDeleting === account.id}
-                    className="ml-4 p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
-                    title="Delete account"
-                  >
-                    <TrashIcon className="h-5 w-5" />
-                  </button>
+                </div>
+
+                {/* Broker Connections */}
+                <div className="space-y-2">
+                  <BrokerConnection
+                    tradingAccountId={account.id}
+                    accountName={account.name}
+                    brokerType="projectx"
+                  />
                 </div>
               </div>
             ))
@@ -170,6 +199,23 @@ export default function JournalSettings({
           setIsCreateModalOpen(false);
         }}
       />
+
+      {/* Connect Broker Modal */}
+      {selectedBrokerType && (
+        <ConnectBrokerModal
+          isOpen={isConnectBrokerModalOpen}
+          onClose={() => {
+            setIsConnectBrokerModalOpen(false);
+            setSelectedBrokerType(null);
+          }}
+          brokerType={selectedBrokerType}
+          onAccountCreated={async (account) => {
+            await onAccountCreated(account);
+            setIsConnectBrokerModalOpen(false);
+            setSelectedBrokerType(null);
+          }}
+        />
+      )}
     </div>
   );
 }

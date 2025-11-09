@@ -1,18 +1,15 @@
 'use client';
 
-import { TrashIcon } from '@heroicons/react/24/outline';
 import type { TradingAccount, AccountStats } from '@/types/journal';
 
 interface AccountsOverviewProps {
   accounts: (TradingAccount & { stats: AccountStats })[];
   onSelectAccount: (accountId: string) => void;
-  onDeleteAccount: (accountId: string) => void;
 }
 
 export default function AccountsOverview({
   accounts,
-  onSelectAccount,
-  onDeleteAccount
+  onSelectAccount
 }: AccountsOverviewProps) {
   const getPerformanceColor = (rr: number) => {
     if (rr > 0) return 'text-green-400';
@@ -32,18 +29,6 @@ export default function AccountsOverview({
             key={account.id}
             className="group relative bg-gradient-to-br from-slate-700/50 to-slate-800/50 hover:from-slate-700/70 hover:to-slate-800/70 rounded-lg p-4 border border-slate-600/50 hover:border-blue-400/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10"
           >
-            {/* Delete Button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeleteAccount(account.id);
-              }}
-              className="absolute top-2 right-2 p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100 z-10"
-              title="Delete account"
-            >
-              <TrashIcon className="h-4 w-4" />
-            </button>
-
             {/* Account Card Content */}
             <button
               onClick={() => onSelectAccount(account.id)}

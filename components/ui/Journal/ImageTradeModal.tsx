@@ -28,6 +28,12 @@ export default function ImageTradeModal({
     accountId: accounts.length > 0 ? accounts[0].id : '',
     symbol: '',
     direction: 'long' as 'long' | 'short',
+    // Currency fields
+    entryPrice: '',
+    exitPrice: '',
+    size: '',
+    pnlAmount: '',
+    // RR fields
     rr: '',
     maxAdverse: '',
     date: new Date().toISOString().split('T')[0],
@@ -35,7 +41,8 @@ export default function ImageTradeModal({
     notes: '',
     imageUrl: '',
     riskMultiplier: '1' as '0.5' | '1' | '2',
-    selectedTags: [] as string[]
+    selectedTags: [] as string[],
+    entryMode: 'rr' as 'rr' | 'currency' // Toggle between RR and currency entry
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,12 +105,102 @@ export default function ImageTradeModal({
         throw new Error('Invalid date or time');
       }
 
-      // Parse RR and max adverse
-      const rr = parseFloat(formData.rr);
-      const maxAdverse = parseFloat(formData.maxAdverse);
+      // Get selected account for fixed_risk calculation
+      const selectedAccount = accounts.find(
+        (acc) => acc.id === formData.accountId
+      );
+      if (!selectedAccount) {
+        throw new Error('Selected account not found');
+      }
 
-      if (isNaN(rr)) {
-        throw new Error('RR made must be a valid number');
+      // Parse all fields
+      const entryPrice = formData.entryPrice
+        ? parseFloat(formData.entryPrice)
+        : null;
+      const exitPrice = formData.exitPrice
+        ? parseFloat(formData.exitPrice)
+        : null;
+      const size = formData.size ? parseFloat(formData.size) : null;
+      const pnlAmount = formData.pnlAmount
+        ? parseFloat(formData.pnlAmount)
+        : null;
+      const rr = formData.rr ? parseFloat(formData.rr) : null;
+      const maxAdverse = formData.maxAdverse
+        ? parseFloat(formData.maxAdverse)
+        : null;
+
+      // Calculate missing values
+      let calculatedRR = rr;
+      let calculatedPnL = pnlAmount;
+      let calculatedEntryPrice = entryPrice;
+      let calculatedExitPrice = exitPrice;
+      let calculatedSize = size;
+      let pnlPercentage = null;
+
+      if (formData.entryMode === 'currency') {
+        // Currency mode: calculate RR from currency amounts
+        if (entryPrice && exitPrice && size) {
+          calculatedPnL =
+            formData.direction === 'long'
+              ? (exitPrice - entryPrice) * size
+              : (entryPrice - exitPrice) * size;
+
+          // Calculate RR: PnL / (entryPrice * size * fixed_risk)
+          if (selectedAccount.fixed_risk > 0) {
+            const riskAmount =
+              entryPrice * size * (selectedAccount.fixed_risk / 100);
+            calculatedRR = riskAmount > 0 ? calculatedPnL / riskAmount : null;
+          }
+        } else if (pnlAmount && entryPrice && size) {
+          calculatedPnL = pnlAmount;
+          // Calculate RR from PnL
+          if (selectedAccount.fixed_risk > 0) {
+            const riskAmount =
+              entryPrice * size * (selectedAccount.fixed_risk / 100);
+            calculatedRR = riskAmount > 0 ? calculatedPnL / riskAmount : null;
+          }
+        }
+
+        // Calculate PnL percentage
+        if (calculatedEntryPrice && calculatedSize && calculatedPnL) {
+          pnlPercentage =
+            (calculatedPnL / (calculatedEntryPrice * calculatedSize)) * 100;
+        }
+      } else {
+        // RR mode: calculate currency from RR
+        if (calculatedRR !== null && selectedAccount.fixed_risk > 0) {
+          // Use fixed_risk to calculate PnL from RR
+          // PnL = RR * (entryPrice * size * fixed_risk / 100)
+          // For simplicity, if we don't have entry price/size, we'll use defaults
+          if (!calculatedEntryPrice) calculatedEntryPrice = 1;
+          if (!calculatedSize) calculatedSize = 1;
+          const riskAmount =
+            calculatedEntryPrice *
+            calculatedSize *
+            (selectedAccount.fixed_risk / 100);
+          calculatedPnL = calculatedRR * riskAmount;
+
+          // Calculate exit price from PnL
+          if (calculatedEntryPrice && calculatedSize) {
+            calculatedExitPrice =
+              formData.direction === 'long'
+                ? calculatedEntryPrice + calculatedPnL / calculatedSize
+                : calculatedEntryPrice - calculatedPnL / calculatedSize;
+          }
+
+          // Calculate PnL percentage
+          pnlPercentage =
+            calculatedEntryPrice && calculatedSize
+              ? (calculatedPnL / (calculatedEntryPrice * calculatedSize)) * 100
+              : null;
+        }
+      }
+
+      // Validate we have at least RR or currency amounts
+      if (calculatedRR === null && calculatedPnL === null) {
+        throw new Error(
+          'Please provide either RR or currency amounts (entry/exit price and size)'
+        );
       }
 
       // Save to Supabase
@@ -115,18 +212,19 @@ export default function ImageTradeModal({
           symbol: formData.symbol.toUpperCase(),
           side: formData.direction,
           entry_date: entryDateTime.toISOString(),
-          rr: rr,
-          max_adverse: isNaN(maxAdverse) ? null : maxAdverse,
+          // Currency fields
+          entry_price: calculatedEntryPrice || 0,
+          exit_price: calculatedExitPrice,
+          size: calculatedSize || 1.0,
+          pnl_amount: calculatedPnL,
+          pnl_percentage: pnlPercentage,
+          // RR fields
+          rr: calculatedRR,
+          max_adverse: maxAdverse,
           risk_multiplier: parseFloat(formData.riskMultiplier),
-          status: 'closed', // All manually entered trades are closed
+          status: 'closed',
           notes: formData.notes || null,
-          image_url: formData.imageUrl || null,
-          // Set required fields to defaults since we're using RR instead
-          entry_price: 0, // Required field, but not used in RR-based system
-          exit_price: null,
-          size: 1.0, // Required field, but not used in RR-based system
-          pnl_amount: null,
-          pnl_percentage: null
+          image_url: formData.imageUrl || null
         })
         .select()
         .single();
@@ -164,6 +262,10 @@ export default function ImageTradeModal({
         accountId: accounts.length > 0 ? accounts[0].id : '',
         symbol: '',
         direction: 'long',
+        entryPrice: '',
+        exitPrice: '',
+        size: '',
+        pnlAmount: '',
         rr: '',
         maxAdverse: '',
         date: new Date().toISOString().split('T')[0],
@@ -171,7 +273,8 @@ export default function ImageTradeModal({
         notes: '',
         imageUrl: '',
         riskMultiplier: '1',
-        selectedTags: []
+        selectedTags: [],
+        entryMode: 'rr'
       });
       onClose();
     } catch (err) {
@@ -262,42 +365,161 @@ export default function ImageTradeModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* RR Made */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                RR Made
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.rr}
-                onChange={(e) =>
-                  setFormData({ ...formData, rr: e.target.value })
-                }
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="e.g., 2.5"
-                required
-              />
-            </div>
-
-            {/* Max Adverse */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Max Adverse (optional)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.maxAdverse}
-                onChange={(e) =>
-                  setFormData({ ...formData, maxAdverse: e.target.value })
-                }
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="e.g., 0.5"
-              />
-            </div>
+          {/* Entry Mode Toggle */}
+          <div className="flex items-center space-x-4 p-3 bg-slate-700/50 rounded-lg">
+            <span className="text-sm font-medium text-slate-300">
+              Entry Mode:
+            </span>
+            <button
+              type="button"
+              onClick={() => setFormData({ ...formData, entryMode: 'rr' })}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                formData.entryMode === 'rr'
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+              }`}
+            >
+              RR Based
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setFormData({ ...formData, entryMode: 'currency' })
+              }
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                formData.entryMode === 'currency'
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+              }`}
+            >
+              Currency Based
+            </button>
           </div>
+
+          {formData.entryMode === 'rr' ? (
+            // RR Mode
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  RR Made
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.rr}
+                  onChange={(e) =>
+                    setFormData({ ...formData, rr: e.target.value })
+                  }
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g., 2.5"
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  Currency amounts will be calculated automatically
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Max Adverse (optional)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.maxAdverse}
+                  onChange={(e) =>
+                    setFormData({ ...formData, maxAdverse: e.target.value })
+                  }
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g., 0.5"
+                />
+              </div>
+            </div>
+          ) : (
+            // Currency Mode
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Entry Price
+                  </label>
+                  <input
+                    type="number"
+                    step="0.0001"
+                    value={formData.entryPrice}
+                    onChange={(e) =>
+                      setFormData({ ...formData, entryPrice: e.target.value })
+                    }
+                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., 50000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Exit Price
+                  </label>
+                  <input
+                    type="number"
+                    step="0.0001"
+                    value={formData.exitPrice}
+                    onChange={(e) =>
+                      setFormData({ ...formData, exitPrice: e.target.value })
+                    }
+                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., 51000"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Size / Quantity
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.size}
+                    onChange={(e) =>
+                      setFormData({ ...formData, size: e.target.value })
+                    }
+                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., 1.0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    P&L Amount (optional)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.pnlAmount}
+                    onChange={(e) =>
+                      setFormData({ ...formData, pnlAmount: e.target.value })
+                    }
+                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Auto-calculated if not provided"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">
+                    RR will be calculated automatically
+                  </p>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Max Adverse (optional)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.maxAdverse}
+                  onChange={(e) =>
+                    setFormData({ ...formData, maxAdverse: e.target.value })
+                  }
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g., 0.5"
+                />
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Date */}

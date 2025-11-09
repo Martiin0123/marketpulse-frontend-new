@@ -14,7 +14,7 @@ const TRIAL_PERIOD_DAYS = 0;
 // as it has admin privileges and overwrites RLS policies!
 let supabaseAdmin: ReturnType<typeof createClient<Database>> | null = null;
 
-const getSupabaseAdmin = () => {
+export const getSupabaseAdmin = () => {
   if (!supabaseAdmin) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
