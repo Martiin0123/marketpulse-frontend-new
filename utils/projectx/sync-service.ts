@@ -337,7 +337,7 @@ function mapProjectXTradeToJournal(
   trade: ProjectXTrade,
   accountId: string,
   userId: string,
-  fixedRisk: number
+  riskPerR: number
 ): Partial<TradeEntry> {
   // Determine direction
   const side = trade.side === 'BUY' ? 'long' : 'short';
@@ -504,14 +504,11 @@ function mapProjectXTradeToJournal(
     pnlPercentage = 0;
   }
 
-  // Calculate RR from PnL and fixed risk
-  // RR = PnL / Risk, where Risk = Entry Price * Size * (Fixed Risk % / 100)
+  // Calculate RR from PnL and risk_per_r
+  // RR = PnL / risk_per_r
   let rr: number | null = null;
-  if (fixedRisk > 0 && entryPrice && size && entryPrice * size > 0) {
-    const riskAmount = entryPrice * size * (fixedRisk / 100);
-    if (riskAmount > 0) {
-      rr = pnlAmount / riskAmount;
-    }
+  if (riskPerR > 0 && pnlAmount !== 0) {
+    rr = pnlAmount / riskPerR;
   }
 
   // Store exit levels in exit_levels field if multiple exits exist
@@ -720,10 +717,10 @@ export async function syncProjectXTrades(
       throw new Error('No valid authentication method found for Project X connection');
     }
 
-    // Get trading account to get fixed_risk
+    // Get trading account to get risk_per_r
     const { data: tradingAccount, error: accountError } = await supabase
       .from('trading_accounts' as any)
-      .select('fixed_risk')
+      .select('risk_per_r')
       .eq('id', conn.trading_account_id)
       .single();
 
@@ -731,7 +728,7 @@ export async function syncProjectXTrades(
       throw new Error('Trading account not found');
     }
 
-    const fixedRisk = (tradingAccount as any).fixed_risk || 1; // Default to 1% if not set
+    const riskPerR = (tradingAccount as any).risk_per_r || 100; // Default $100 = 1R
 
     // Get Project X account ID
     const projectXAccountId = conn.broker_account_name;
@@ -886,7 +883,7 @@ export async function syncProjectXTrades(
         trade,
         conn.trading_account_id,
         userId,
-        fixedRisk
+        riskPerR
       );
 
       tradesToInsert.push(tradeData);

@@ -22,7 +22,7 @@ export default function EditAccountModal({
     name: '',
     currency: 'USD',
     initial_balance: '',
-    fixed_risk: ''
+    risk_per_r: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +36,7 @@ export default function EditAccountModal({
         name: account.name || '',
         currency: account.currency || 'USD',
         initial_balance: account.initial_balance?.toString() || '',
-        fixed_risk: account.fixed_risk?.toString() || '1'
+        risk_per_r: (account as any).risk_per_r?.toString() || '100'
       });
     }
   }, [account]);
@@ -64,7 +64,7 @@ export default function EditAccountModal({
           name: formData.name,
           currency: formData.currency,
           initial_balance: parseFloat(formData.initial_balance),
-          fixed_risk: parseFloat(formData.fixed_risk)
+          risk_per_r: parseFloat(formData.risk_per_r)
         })
         .eq('id', account.id)
         .select()
@@ -160,23 +160,22 @@ export default function EditAccountModal({
 
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Fixed Risk (%)
+              Risk per R ({formData.currency})
             </label>
             <input
               type="number"
               step="0.01"
               min="0.01"
-              max="100"
-              value={formData.fixed_risk}
+              value={formData.risk_per_r}
               onChange={(e) =>
-                setFormData({ ...formData, fixed_risk: e.target.value })
+                setFormData({ ...formData, risk_per_r: e.target.value })
               }
               className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="1"
+              placeholder="100"
               required
             />
             <p className="text-xs text-slate-400 mt-1">
-              Percentage of account balance risked per trade (e.g., 1% = 1.00)
+              Dollar amount that equals 1R. Example: If $100 = 1R, then $200 profit = 2R, $50 loss = -0.5R
             </p>
           </div>
 

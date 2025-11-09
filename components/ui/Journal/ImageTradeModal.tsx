@@ -13,7 +13,7 @@ interface ImageTradeModalProps {
     name: string;
     currency: string;
     initial_balance: number;
-    fixed_risk: number;
+    risk_per_r?: number;
   }>;
   onTradeAdded: (trade: TradeEntry) => void;
 }
@@ -116,7 +116,7 @@ export default function ImageTradeModal({
       // Parse all fields
       const entryPrice = formData.entryPrice
         ? parseFloat(formData.entryPrice)
-        : null;
+      : null;
       const exitPrice = formData.exitPrice
         ? parseFloat(formData.exitPrice)
         : null;
@@ -142,22 +142,20 @@ export default function ImageTradeModal({
         if (entryPrice && exitPrice && size) {
           calculatedPnL =
             formData.direction === 'long'
-              ? (exitPrice - entryPrice) * size
-              : (entryPrice - exitPrice) * size;
+          ? (exitPrice - entryPrice) * size
+          : (entryPrice - exitPrice) * size;
 
-          // Calculate RR: PnL / (entryPrice * size * fixed_risk)
-          if (selectedAccount.fixed_risk > 0) {
-            const riskAmount =
-              entryPrice * size * (selectedAccount.fixed_risk / 100);
-            calculatedRR = riskAmount > 0 ? calculatedPnL / riskAmount : null;
+          // Calculate RR: PnL / risk_per_r
+          const riskPerR = selectedAccount.risk_per_r || 100; // Default $100 = 1R
+          if (riskPerR > 0) {
+            calculatedRR = calculatedPnL / riskPerR;
           }
         } else if (pnlAmount && entryPrice && size) {
           calculatedPnL = pnlAmount;
           // Calculate RR from PnL
-          if (selectedAccount.fixed_risk > 0) {
-            const riskAmount =
-              entryPrice * size * (selectedAccount.fixed_risk / 100);
-            calculatedRR = riskAmount > 0 ? calculatedPnL / riskAmount : null;
+          const riskPerR = selectedAccount.risk_per_r || 100; // Default $100 = 1R
+          if (riskPerR > 0) {
+            calculatedRR = calculatedPnL / riskPerR;
           }
         }
 
@@ -168,20 +166,20 @@ export default function ImageTradeModal({
         }
       } else {
         // RR mode: calculate currency from RR
-        if (calculatedRR !== null && selectedAccount.fixed_risk > 0) {
-          // Use fixed_risk to calculate PnL from RR
-          // PnL = RR * (entryPrice * size * fixed_risk / 100)
-          // For simplicity, if we don't have entry price/size, we'll use defaults
+        if (calculatedRR !== null) {
+          // Use risk_per_r to calculate PnL from RR
+          // PnL = RR * risk_per_r
+          const riskPerR = selectedAccount.risk_per_r || 100; // Default $100 = 1R
+          if (riskPerR > 0) {
+            calculatedPnL = calculatedRR * riskPerR;
+          }
+          
+          // For exit price calculation, we still need entry price and size
           if (!calculatedEntryPrice) calculatedEntryPrice = 1;
           if (!calculatedSize) calculatedSize = 1;
-          const riskAmount =
-            calculatedEntryPrice *
-            calculatedSize *
-            (selectedAccount.fixed_risk / 100);
-          calculatedPnL = calculatedRR * riskAmount;
 
           // Calculate exit price from PnL
-          if (calculatedEntryPrice && calculatedSize) {
+          if (calculatedEntryPrice && calculatedSize && calculatedPnL !== null) {
             calculatedExitPrice =
               formData.direction === 'long'
                 ? calculatedEntryPrice + calculatedPnL / calculatedSize
@@ -189,10 +187,10 @@ export default function ImageTradeModal({
           }
 
           // Calculate PnL percentage
-          pnlPercentage =
-            calculatedEntryPrice && calculatedSize
-              ? (calculatedPnL / (calculatedEntryPrice * calculatedSize)) * 100
-              : null;
+          if (calculatedEntryPrice && calculatedSize && calculatedPnL !== null) {
+            pnlPercentage =
+              (calculatedPnL / (calculatedEntryPrice * calculatedSize)) * 100;
+          }
         }
       }
 
@@ -302,13 +300,13 @@ export default function ImageTradeModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Account Selection */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
               Account
-            </label>
-            <select
+                      </label>
+                      <select
               value={formData.accountId}
-              onChange={(e) =>
+                        onChange={(e) =>
                 setFormData({ ...formData, accountId: e.target.value })
               }
               className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -320,19 +318,19 @@ export default function ImageTradeModal({
                   {account.name} ({account.currency})
                 </option>
               ))}
-            </select>
-          </div>
+                      </select>
+                  </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Symbol */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
                 Symbol
-              </label>
-              <input
+                      </label>
+                      <input
                 type="text"
                 value={formData.symbol}
-                onChange={(e) =>
+                        onChange={(e) =>
                   setFormData({
                     ...formData,
                     symbol: e.target.value.toUpperCase()
@@ -340,18 +338,18 @@ export default function ImageTradeModal({
                 }
                 className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="e.g., BTCUSDT, EURUSD"
-                required
-              />
-            </div>
+                        required
+                      />
+                    </div>
 
             {/* Direction */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
                 Direction
-              </label>
-              <select
+                      </label>
+                      <select
                 value={formData.direction}
-                onChange={(e) =>
+                        onChange={(e) =>
                   setFormData({
                     ...formData,
                     direction: e.target.value as 'long' | 'short'
@@ -361,17 +359,17 @@ export default function ImageTradeModal({
               >
                 <option value="long">Long</option>
                 <option value="short">Short</option>
-              </select>
-            </div>
-          </div>
+                      </select>
+                    </div>
+                  </div>
 
           {/* Entry Mode Toggle */}
           <div className="flex items-center space-x-4 p-3 bg-slate-700/50 rounded-lg">
             <span className="text-sm font-medium text-slate-300">
               Entry Mode:
-            </span>
-            <button
-              type="button"
+                            </span>
+                      <button
+                        type="button"
               onClick={() => setFormData({ ...formData, entryMode: 'rr' })}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 formData.entryMode === 'rr'
@@ -380,9 +378,9 @@ export default function ImageTradeModal({
               }`}
             >
               RR Based
-            </button>
-            <button
-              type="button"
+                      </button>
+                      <button
+                        type="button"
               onClick={() =>
                 setFormData({ ...formData, entryMode: 'currency' })
               }
@@ -393,21 +391,21 @@ export default function ImageTradeModal({
               }`}
             >
               Currency Based
-            </button>
-          </div>
+                      </button>
+                </div>
 
           {formData.entryMode === 'rr' ? (
             // RR Mode
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+                  <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   RR Made
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
                   value={formData.rr}
-                  onChange={(e) =>
+                      onChange={(e) =>
                     setFormData({ ...formData, rr: e.target.value })
                   }
                   className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -415,84 +413,84 @@ export default function ImageTradeModal({
                 />
                 <p className="text-xs text-slate-400 mt-1">
                   Currency amounts will be calculated automatically
-                </p>
-              </div>
-              <div>
+                    </p>
+                  </div>
+                  <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Max Adverse (optional)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
                   value={formData.maxAdverse}
-                  onChange={(e) =>
+                      onChange={(e) =>
                     setFormData({ ...formData, maxAdverse: e.target.value })
                   }
                   className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="e.g., 0.5"
-                />
-              </div>
-            </div>
+                    />
+                  </div>
+                </div>
           ) : (
             // Currency Mode
-            <div className="space-y-4">
+                <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                    <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Entry Price
-                  </label>
-                  <input
-                    type="number"
+                        Entry Price
+                      </label>
+                      <input
+                        type="number"
                     step="0.0001"
                     value={formData.entryPrice}
-                    onChange={(e) =>
+                        onChange={(e) =>
                       setFormData({ ...formData, entryPrice: e.target.value })
                     }
                     className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="e.g., 50000"
-                  />
-                </div>
-                <div>
+                      />
+                    </div>
+                    <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     Exit Price
-                  </label>
-                  <input
-                    type="number"
+                      </label>
+                      <input
+                        type="number"
                     step="0.0001"
                     value={formData.exitPrice}
-                    onChange={(e) =>
+                        onChange={(e) =>
                       setFormData({ ...formData, exitPrice: e.target.value })
                     }
                     className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="e.g., 51000"
-                  />
-                </div>
+                      />
+                    </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                    <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     Size / Quantity
-                  </label>
-                  <input
-                    type="number"
+                      </label>
+                      <input
+                        type="number"
                     step="0.01"
                     value={formData.size}
-                    onChange={(e) =>
+                        onChange={(e) =>
                       setFormData({ ...formData, size: e.target.value })
                     }
                     className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="e.g., 1.0"
-                  />
-                </div>
-                <div>
+                      />
+                    </div>
+                    <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     P&L Amount (optional)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
                     value={formData.pnlAmount}
-                    onChange={(e) =>
+                        onChange={(e) =>
                       setFormData({ ...formData, pnlAmount: e.target.value })
                     }
                     className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -502,57 +500,57 @@ export default function ImageTradeModal({
                     RR will be calculated automatically
                   </p>
                 </div>
-              </div>
-              <div>
+                    </div>
+                    <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Max Adverse (optional)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
                   value={formData.maxAdverse}
-                  onChange={(e) =>
+                        onChange={(e) =>
                     setFormData({ ...formData, maxAdverse: e.target.value })
                   }
                   className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="e.g., 0.5"
-                />
-              </div>
-            </div>
+                      />
+                    </div>
+                    </div>
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Date */}
-            <div>
+                    <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Date
-              </label>
-              <input
-                type="date"
+                        Date
+                      </label>
+                      <input
+                        type="date"
                 value={formData.date}
-                onChange={(e) =>
+                        onChange={(e) =>
                   setFormData({ ...formData, date: e.target.value })
-                }
+                        }
                 className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
-              />
-            </div>
+                      />
+                    </div>
 
             {/* Time */}
-            <div>
+                    <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Time
-              </label>
-              <input
-                type="time"
+                        Time
+                      </label>
+                      <input
+                        type="time"
                 value={formData.time}
-                onChange={(e) =>
+                        onChange={(e) =>
                   setFormData({ ...formData, time: e.target.value })
-                }
+                        }
                 className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
-              />
-            </div>
+                      />
+                    </div>
 
             {/* Risk Multiplier */}
             <div>
@@ -573,37 +571,37 @@ export default function ImageTradeModal({
                 <option value="1">1x</option>
                 <option value="2">2x</option>
               </select>
-            </div>
-          </div>
+                </div>
+              </div>
 
           {/* Image URL */}
-          <div>
+                  <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
               Image URL (optional)
-            </label>
+                    </label>
             <input
               type="url"
               value={formData.imageUrl}
-              onChange={(e) =>
+                      onChange={(e) =>
                 setFormData({ ...formData, imageUrl: e.target.value })
-              }
+                      }
               className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="https://example.com/chart-image.png"
-            />
-          </div>
+                    />
+                  </div>
 
           {/* Tags */}
           {tags.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
                 Tags (optional)
-              </label>
-              <div className="flex flex-wrap gap-2">
+                    </label>
+                        <div className="flex flex-wrap gap-2">
                 {tags.map((tag) => (
-                  <button
-                    key={tag.id}
-                    type="button"
-                    onClick={() => {
+                            <button
+                              key={tag.id}
+                              type="button"
+                              onClick={() => {
                       const isSelected = formData.selectedTags.includes(tag.id);
                       setFormData({
                         ...formData,
@@ -614,16 +612,16 @@ export default function ImageTradeModal({
                     }}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                       formData.selectedTags.includes(tag.id)
-                        ? `${tag.color} text-white shadow-lg`
+                                  ? `${tag.color} text-white shadow-lg`
                         : 'bg-slate-700 text-slate-300 hover:bg-slate-600 border border-slate-600'
-                    }`}
-                  >
-                    {tag.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+                              }`}
+                            >
+                              {tag.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
           {/* Notes */}
           <div>
@@ -632,37 +630,37 @@ export default function ImageTradeModal({
             </label>
             <textarea
               value={formData.notes}
-              onChange={(e) =>
+                      onChange={(e) =>
                 setFormData({ ...formData, notes: e.target.value })
               }
               className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               rows={3}
               placeholder="Trade notes, strategy, etc."
             />
-          </div>
+              </div>
 
           {error && (
             <div className="text-red-400 text-sm bg-red-900/20 p-3 rounded-lg">
               {error}
-            </div>
+                </div>
           )}
 
-          <div className="flex space-x-3 pt-4">
-            <button
+              <div className="flex space-x-3 pt-4">
+                <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-            >
+                  className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                >
               Cancel
-            </button>
-            <button
+                </button>
+                <button
               type="submit"
               disabled={isLoading}
-              className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg transition-colors"
-            >
+                  className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg transition-colors"
+                >
               {isLoading ? 'Adding...' : 'Add Trade'}
-            </button>
-          </div>
+                </button>
+              </div>
         </form>
       </div>
     </div>

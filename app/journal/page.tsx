@@ -95,10 +95,10 @@ export default function JournalPage() {
   const calculateAccountStats = async (
     accountId: string
   ): Promise<AccountStats> => {
-    // Get account data to access fixed_risk
+    // Get account data to access risk_per_r
     const { data: accountData } = await supabase
       .from('trading_accounts' as any)
-      .select('fixed_risk')
+      .select('risk_per_r')
       .eq('id', accountId)
       .single();
     try {
@@ -190,28 +190,25 @@ export default function JournalPage() {
         pnlValues.length > 0 ? pnlValues.reduce((sum, pnl) => sum + pnl, 0) : 0;
 
       // Calculate R:R stats - ensure consistency with PnL
-      // If RR exists, use it. If not, calculate from PnL using fixed_risk
-      const fixedRisk = (accountData as any)?.fixed_risk || 1; // Default 1%
+      // If RR exists, use it. If not, calculate from PnL using risk_per_r
+      const riskPerR = (accountData as any)?.risk_per_r || 100; // Default $100 = 1R
       const rrValues = tradesWithData.map((trade) => {
         if (trade.rr !== null && trade.rr !== undefined && !isNaN(trade.rr)) {
           // Use existing RR, but validate it matches PnL sign
           const pnl = trade.pnl_amount || 0;
           // If RR and PnL have opposite signs, something is wrong - recalculate RR
           if (pnl !== 0 && trade.rr > 0 !== pnl > 0) {
-            // Recalculate RR from PnL
-            if (trade.entry_price && trade.size && fixedRisk > 0) {
-              const riskAmount =
-                trade.entry_price * trade.size * (fixedRisk / 100);
-              return riskAmount > 0 ? pnl / riskAmount : 0;
+            // Recalculate RR from PnL using risk_per_r
+            if (riskPerR > 0) {
+              return pnl / riskPerR;
             }
           }
           return trade.rr;
         }
         // Calculate RR from PnL if available
         const pnl = trade.pnl_amount || 0;
-        if (pnl !== 0 && trade.entry_price && trade.size && fixedRisk > 0) {
-          const riskAmount = trade.entry_price * trade.size * (fixedRisk / 100);
-          return riskAmount > 0 ? pnl / riskAmount : 0;
+        if (pnl !== 0 && riskPerR > 0) {
+          return pnl / riskPerR;
         }
         return 0;
       });

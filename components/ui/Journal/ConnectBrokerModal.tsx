@@ -41,7 +41,7 @@ export default function ConnectBrokerModal({
     name: '',
     currency: 'USD',
     initial_balance: '',
-    fixed_risk: '1'
+    risk_per_r: '100'
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +110,7 @@ export default function ConnectBrokerModal({
       name: account.name || `Project X ${account.id.slice(0, 8)}`,
       currency: account.currency || 'USD',
       initial_balance: account.balance?.toString() || '',
-      fixed_risk: '1'
+      risk_per_r: '100'
     });
     setStep('account-details');
   };
@@ -139,7 +139,7 @@ export default function ConnectBrokerModal({
           name: accountDetails.name,
           currency: accountDetails.currency,
           initial_balance: parseFloat(accountDetails.initial_balance) || 0,
-          fixed_risk: parseFloat(accountDetails.fixed_risk) || 1
+          risk_per_r: parseFloat(accountDetails.risk_per_r) || 100
         })
         .select()
         .single();
@@ -237,7 +237,7 @@ export default function ConnectBrokerModal({
         name: '',
         currency: 'USD',
         initial_balance: '',
-        fixed_risk: '1'
+        risk_per_r: '100'
       });
       onClose();
     } catch (err: any) {
@@ -474,24 +474,24 @@ export default function ConnectBrokerModal({
 
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Fixed Risk (%)
+                  Risk per R ({accountDetails.currency})
                 </label>
                 <input
                   type="number"
-                  step="0.1"
-                  value={accountDetails.fixed_risk}
+                  step="0.01"
+                  min="0.01"
+                  value={accountDetails.risk_per_r}
                   onChange={(e) =>
                     setAccountDetails({
                       ...accountDetails,
-                      fixed_risk: e.target.value
+                      risk_per_r: e.target.value
                     })
                   }
                   className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="1"
+                  placeholder="100"
                 />
                 <p className="text-xs text-slate-400 mt-1">
-                  Percentage of account balance to risk per trade (used for RR
-                  calculations)
+                  Dollar amount that equals 1R. Example: If $100 = 1R, then $200 profit = 2R, $50 loss = -0.5R
                 </p>
               </div>
 

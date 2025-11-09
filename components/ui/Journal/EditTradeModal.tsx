@@ -147,10 +147,10 @@ export default function EditTradeModal({
         throw new Error('Invalid date or time');
       }
 
-      // Get trading account for fixed_risk calculation
+      // Get trading account for risk_per_r calculation
       const { data: tradingAccount, error: accountError } = await supabase
         .from('trading_accounts' as any)
-        .select('fixed_risk, currency')
+        .select('risk_per_r, currency')
         .eq('id', trade.account_id)
         .single();
 
@@ -158,7 +158,7 @@ export default function EditTradeModal({
         throw new Error('Trading account not found');
       }
 
-      const fixedRisk = tradingAccount.fixed_risk || 1; // Default to 1% if not set
+      const riskPerR = (tradingAccount as any).risk_per_r || 100; // Default $100 = 1R
 
       // Parse all fields
       const entryPrice = formData.entryPrice
