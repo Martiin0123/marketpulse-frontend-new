@@ -192,17 +192,15 @@ export default function EditTradeModal({
               ? (exitPrice - entryPrice) * size
               : (entryPrice - exitPrice) * size;
 
-          // Calculate RR: PnL / (entryPrice * size * fixed_risk)
-          if (fixedRisk > 0) {
-            const riskAmount = entryPrice * size * (fixedRisk / 100);
-            calculatedRR = riskAmount > 0 ? calculatedPnL / riskAmount : null;
+          // Calculate RR: PnL / risk_per_r
+          if (riskPerR > 0) {
+            calculatedRR = calculatedPnL / riskPerR;
           }
         } else if (pnlAmount && entryPrice && size) {
           calculatedPnL = pnlAmount;
           // Calculate RR from PnL
-          if (fixedRisk > 0) {
-            const riskAmount = entryPrice * size * (fixedRisk / 100);
-            calculatedRR = riskAmount > 0 ? calculatedPnL / riskAmount : null;
+          if (riskPerR > 0) {
+            calculatedRR = calculatedPnL / riskPerR;
           }
         }
 
@@ -213,15 +211,17 @@ export default function EditTradeModal({
         }
       } else {
         // RR mode: calculate currency from RR
-        if (calculatedRR !== null && fixedRisk > 0) {
-          // Use fixed_risk to calculate PnL from RR
-          // For simplicity, if we don't have entry price/size, use existing values or defaults
+        if (calculatedRR !== null) {
+          // Use risk_per_r to calculate PnL from RR
+          // PnL = RR * risk_per_r
+          if (riskPerR > 0) {
+            calculatedPnL = calculatedRR * riskPerR;
+          }
+          
+          // For exit price calculation, we still need entry price and size
           if (!calculatedEntryPrice)
             calculatedEntryPrice = trade.entry_price || 1;
           if (!calculatedSize) calculatedSize = trade.size || 1;
-          const riskAmount =
-            calculatedEntryPrice * calculatedSize * (fixedRisk / 100);
-          calculatedPnL = calculatedRR * riskAmount;
 
           // Calculate exit price from PnL
           if (calculatedEntryPrice && calculatedSize) {
