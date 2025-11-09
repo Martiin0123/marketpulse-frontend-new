@@ -32,13 +32,13 @@ export default function BalanceCurveChart({
   const roundToNiceNumber = (value: number, roundUp: boolean): number => {
     const absValue = Math.abs(value);
     const sign = value >= 0 ? 1 : -1;
-    
+
     if (absValue === 0) return 0;
-    
+
     // Determine the order of magnitude
-    const magnitude = Math.floor(Math.log10(absValue));
+    let magnitude = Math.floor(Math.log10(absValue));
     const normalized = absValue / Math.pow(10, magnitude);
-    
+
     // Round to nice numbers: 1, 2, 5, 10, 20, 50, 100, etc.
     let niceNormalized: number;
     if (roundUp) {
@@ -59,9 +59,9 @@ export default function BalanceCurveChart({
         return sign * 10 * Math.pow(10, prevMagnitude);
       }
     }
-    
+
     let result = sign * niceNormalized * Math.pow(10, magnitude);
-    
+
     // Ensure we actually round down/up correctly
     if (roundUp && result < value) {
       // If we rounded down but need to round up, go to next nice number
@@ -84,7 +84,7 @@ export default function BalanceCurveChart({
       }
       result = sign * niceNormalized * Math.pow(10, magnitude);
     }
-    
+
     return result;
   };
 
@@ -99,7 +99,7 @@ export default function BalanceCurveChart({
     // Round min and max to nice numbers, ensuring min is below actual min and max is above actual max
     let minY = roundToNiceNumber(minBalance - padding, false);
     let maxY = roundToNiceNumber(maxBalance + padding, true);
-    
+
     // Double-check: ensure minY is actually below minBalance and maxY is above maxBalance
     if (minY > minBalance - padding) {
       // If rounded min is still above actual min, round down more aggressively
