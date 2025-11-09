@@ -170,16 +170,21 @@ export default function JournalSidebar({
                         // If account is public, open share link directly
                         // Otherwise, open share settings modal
                         const isPublic = true; // TODO: Get from account data if we add is_public field
-                        
+
                         if (isPublic) {
                           // Generate share URL and open it
                           try {
-                            const shareId = await generateAccountHash(account.id);
+                            const shareId = await generateAccountHash(
+                              account.id
+                            );
                             const baseUrl = window.location.origin;
                             const shareUrl = `${baseUrl}/share/${shareId}`;
                             window.open(shareUrl, '_blank');
                           } catch (error) {
-                            console.error('Error generating share link:', error);
+                            console.error(
+                              'Error generating share link:',
+                              error
+                            );
                             // Fallback: open share settings
                             setShareAccountId(
                               shareAccountId === account.id ? null : account.id

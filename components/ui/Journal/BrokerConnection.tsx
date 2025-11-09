@@ -360,12 +360,17 @@ export default function BrokerConnection({
               <button
                 onClick={handleSync}
                 disabled={isSyncing}
-                className="p-1.5 bg-slate-600 hover:bg-slate-500 text-white rounded transition-colors disabled:opacity-50"
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                  isSyncing
+                    ? 'bg-blue-600/50 text-blue-300 cursor-wait'
+                    : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-600/20 hover:shadow-blue-600/30'
+                } disabled:opacity-50`}
                 title="Sync Now"
               >
                 <ArrowPathIcon
                   className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`}
                 />
+                <span>{isSyncing ? 'Syncing...' : 'Sync'}</span>
               </button>
               <label
                 className="flex items-center cursor-pointer"

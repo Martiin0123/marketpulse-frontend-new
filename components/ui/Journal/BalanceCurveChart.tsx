@@ -99,18 +99,18 @@ export default function BalanceCurveChart({
     // Calculate target min/max with padding
     const targetMin = minBalance - padding;
     const targetMax = maxBalance + padding;
-    
+
     // Round min and max to nice numbers
     let minY = roundToNiceNumber(targetMin, false);
     let maxY = roundToNiceNumber(targetMax, true);
-    
+
     // Ensure minY is actually below targetMin (with some extra margin for safety)
     while (minY >= targetMin) {
       // Calculate step size based on current magnitude
       const step = Math.pow(10, Math.floor(Math.log10(Math.abs(minY) || 1)));
       minY = minY - step;
     }
-    
+
     // Ensure maxY is actually above targetMax (with some extra margin for safety)
     while (maxY <= targetMax) {
       // Calculate step size based on current magnitude

@@ -733,34 +733,35 @@ export async function syncProjectXTrades(
     // Get Project X account ID
     const projectXAccountId = conn.broker_account_name;
 
-    // Get trades - ALWAYS fetch ALL historical trades for now (testing mode)
+    // Calculate date range for sync
     // Add 1 day buffer to endTime to ensure we get all trades including today
     const endTime = new Date();
     endTime.setHours(23, 59, 59, 999); // End of today to include all trades
-    const isFirstSync = !conn.last_sync_at;
     
-    // FOR TESTING: Always fetch ALL historical trades from the beginning
-    // This ensures we get all trades regardless of last_sync_at
-    let startTime = new Date(0); // Start from epoch (1970) to get ALL historical trades
+    // Determine start time based on last sync
+    // If first sync, fetch from 30 days ago to get recent trades
+    // If not first sync, fetch from 7 days before last sync to catch any missed trades
+    let startTime: Date;
+    if (!conn.last_sync_at) {
+      // First sync: fetch last 30 days of trades
+      startTime = new Date();
+      startTime.setDate(startTime.getDate() - 30);
+      startTime.setHours(0, 0, 0, 0);
+      console.log(`📅 First sync: fetching trades from last 30 days`);
+    } else {
+      // Subsequent sync: fetch from 7 days before last sync to catch any missed trades
+      const lastSyncDate = new Date(conn.last_sync_at);
+      startTime = new Date(lastSyncDate);
+      startTime.setDate(startTime.getDate() - 7);
+      startTime.setHours(0, 0, 0, 0);
+      console.log(`📅 Incremental sync: fetching trades from 7 days before last sync`);
+    }
     
     console.log(`📅 Date range for sync: ${startTime.toISOString()} to ${endTime.toISOString()}`);
     console.log(`📅 Last sync was: ${conn.last_sync_at ? new Date(conn.last_sync_at).toISOString() : 'Never (first sync)'}`);
-    console.log(`📅 Fetching ALL historical trades (TESTING MODE - always from epoch)`);
 
-    // FOR TESTING: Delete all existing trades to force full resync
-    // This ensures we always get a clean sync with all trades
-    console.log(`🗑️ Deleting all existing trades for account ${conn.trading_account_id} (TESTING MODE - full resync)`);
-    const { error: deleteError } = await supabase
-      .from('trade_entries' as any)
-      .delete()
-      .eq('account_id', conn.trading_account_id)
-      .eq('sync_source', 'projectx');
-    
-    if (deleteError) {
-      console.error(`❌ Error deleting existing trades:`, deleteError);
-    } else {
-      console.log(`✅ Deleted all existing ProjectX trades for full resync`);
-    }
+    // Don't delete existing trades - only add new ones
+    // We'll check for duplicates using broker_trade_id before inserting
 
     // Fetch executions from Project X
     const executions = await client.getTrades(projectXAccountId, startTime, endTime);
