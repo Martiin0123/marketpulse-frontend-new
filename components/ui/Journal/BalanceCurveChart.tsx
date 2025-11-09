@@ -27,6 +27,34 @@ export default function BalanceCurveChart({
 }: BalanceCurveChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
+  // Helper function to round to nice intervals
+  const roundToNiceNumber = (value: number, roundUp: boolean): number => {
+    const absValue = Math.abs(value);
+    const sign = value >= 0 ? 1 : -1;
+    
+    if (absValue === 0) return 0;
+    
+    // Determine the order of magnitude
+    const magnitude = Math.floor(Math.log10(absValue));
+    const normalized = absValue / Math.pow(10, magnitude);
+    
+    // Round to nice numbers: 1, 2, 5, 10, 20, 50, 100, etc.
+    let niceNormalized: number;
+    if (roundUp) {
+      if (normalized <= 1) niceNormalized = 1;
+      else if (normalized <= 2) niceNormalized = 2;
+      else if (normalized <= 5) niceNormalized = 5;
+      else niceNormalized = 10;
+    } else {
+      if (normalized >= 10) niceNormalized = 10;
+      else if (normalized >= 5) niceNormalized = 5;
+      else if (normalized >= 2) niceNormalized = 2;
+      else niceNormalized = 1;
+    }
+    
+    return sign * niceNormalized * Math.pow(10, magnitude);
+  };
+
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return null;
 
@@ -35,8 +63,9 @@ export default function BalanceCurveChart({
     const range = maxBalance - minBalance;
     const padding = range * 0.15; // 15% padding for better visual
 
-    const minY = minBalance - padding;
-    const maxY = maxBalance + padding;
+    // Round min and max to nice numbers
+    const minY = roundToNiceNumber(minBalance - padding, false);
+    const maxY = roundToNiceNumber(maxBalance + padding, true);
 
     const width = 800;
     const height = 400;

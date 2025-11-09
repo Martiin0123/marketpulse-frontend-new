@@ -21,6 +21,18 @@ import { ShareIcon } from '@heroicons/react/24/outline';
 import { useState, useEffect, useRef } from 'react';
 import ShareButton from './ShareButton';
 
+// Helper function to generate account hash (same as in ShareButton)
+const generateAccountHash = async (accountId: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(accountId + 'marketpulse-share');
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+    .substring(0, 16);
+};
+
 interface JournalSidebarProps {
   currentSection: string;
   onSectionChange: (section: string) => void;
@@ -79,7 +91,10 @@ export default function JournalSidebar({
   // Close share dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (shareRef.current && !shareRef.current.contains(event.target as Node)) {
+      if (
+        shareRef.current &&
+        !shareRef.current.contains(event.target as Node)
+      ) {
         setShareAccountId(null);
       }
     };
@@ -150,11 +165,32 @@ export default function JournalSidebar({
                       </span>
                     )}
                     <button
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
-                        setShareAccountId(
-                          shareAccountId === account.id ? null : account.id
-                        );
+                        // If account is public, open share link directly
+                        // Otherwise, open share settings modal
+                        const isPublic = true; // TODO: Get from account data if we add is_public field
+                        
+                        if (isPublic) {
+                          // Generate share URL and open it
+                          try {
+                            const shareId = await generateAccountHash(account.id);
+                            const baseUrl = window.location.origin;
+                            const shareUrl = `${baseUrl}/share/${shareId}`;
+                            window.open(shareUrl, '_blank');
+                          } catch (error) {
+                            console.error('Error generating share link:', error);
+                            // Fallback: open share settings
+                            setShareAccountId(
+                              shareAccountId === account.id ? null : account.id
+                            );
+                          }
+                        } else {
+                          // Open share settings modal
+                          setShareAccountId(
+                            shareAccountId === account.id ? null : account.id
+                          );
+                        }
                       }}
                       className={`p-1 rounded hover:bg-opacity-20 transition-all ${
                         isSelected
@@ -167,17 +203,20 @@ export default function JournalSidebar({
                     </button>
                   </div>
                 </button>
-              {/* Share dropdown for this account */}
-              {shareAccountId === account.id && (
-                <div ref={shareRef} className="absolute right-0 top-full mt-1 z-50">
-                  <ShareButton
-                    id={`share-${account.id}`}
-                    accountId={account.id}
-                    accountName={account.name}
-                    isPublic={true}
-                  />
-                </div>
-              )}
+                {/* Share dropdown for this account (only shown if not public) */}
+                {shareAccountId === account.id && (
+                  <div
+                    ref={shareRef}
+                    className="absolute right-0 top-full mt-1 z-50"
+                  >
+                    <ShareButton
+                      id={`share-${account.id}`}
+                      accountId={account.id}
+                      accountName={account.name}
+                      isPublic={false}
+                    />
+                  </div>
+                )}
               </div>
             );
           })}
