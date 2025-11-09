@@ -265,7 +265,7 @@ export default function BrokerConnection({
   }
 
   return (
-    <div className="bg-slate-700/30 rounded-lg p-2.5 border border-slate-600/50">
+    <div>
       {!connection ? (
         <>
           {!showApiKeyForm ? (
@@ -278,13 +278,9 @@ export default function BrokerConnection({
                   Not connected
                 </span>
               </div>
-              <button
-                onClick={handleConnect}
-                disabled={isConnecting}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isConnecting ? 'Connecting...' : 'Connect'}
-              </button>
+              <span className="text-xs text-slate-500 italic">
+                Connect when creating account
+              </span>
             </div>
           ) : (
             <div className="space-y-2">

@@ -679,35 +679,6 @@ export default function JournalPage() {
       {/* Main Content */}
       <div className="ml-[calc(16rem+4rem)] mr-8 flex flex-col min-h-screen">
         {/* Top Bar */}
-        <div className="sticky top-20 z-30 bg-slate-800/95 backdrop-blur-lg border border-slate-700/50 rounded-2xl shadow-xl px-6 py-4 mt-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4 flex-1">
-              {/* Account selection moved to sidebar */}
-            </div>
-            <div className="flex items-center gap-2">
-              {currentSection === 'trades' && (
-                <button
-                  onClick={() => setIsAddTradeModalOpen(true)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white rounded-xl text-sm font-medium transition-all shadow-lg shadow-green-600/20 hover:shadow-green-600/30"
-                >
-                  <Plus size={18} weight="bold" />
-                  <span>Add Trade</span>
-                </button>
-              )}
-              {currentSection === 'trades' && (
-                <CSVImportExport
-                  accountId={selectedAccount}
-                  accounts={accounts.map((acc) => ({
-                    id: acc.id,
-                    name: acc.name
-                  }))}
-                  onTradesImported={() => setRefreshKey((prev) => prev + 1)}
-                />
-              )}
-            </div>
-          </div>
-        </div>
-
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-7xl">
