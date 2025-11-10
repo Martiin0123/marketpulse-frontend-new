@@ -219,15 +219,15 @@ export async function POST(request: NextRequest) {
 
         // Check each new order to see if it's already been processed
         for (const order of newOrders) {
-          // ProjectX API format: id, contractId, side (1=BUY, 0=SELL), size, type, limitPrice, stopPrice
+          // ProjectX API format: id, contractId, side (0=BUY/Bid, 1=SELL/Ask), size, type, limitPrice, stopPrice
           const orderId = order.id || order.orderId || order.order_id || 'unknown';
           const orderSymbol = order.contractId || order.contract_id || order.symbol || order.contractName || order.contract_name || 'unknown';
           
-          // Map side: 1 = BUY, 0 = SELL (ProjectX format) or string values
+          // Map side: 0 = BUY (Bid), 1 = SELL (Ask) - CORRECT ProjectX format
           let orderSide = 'unknown';
-          if (order.side === 1 || order.side === '1' || order.side === 'BUY' || order.side === 'buy' || order.side === 'long') {
+          if (order.side === 0 || order.side === '0' || order.side === 'BUY' || order.side === 'buy' || order.side === 'long' || order.side === 'Bid' || order.side === 'bid') {
             orderSide = 'BUY';
-          } else if (order.side === 0 || order.side === '0' || order.side === 'SELL' || order.side === 'sell' || order.side === 'short') {
+          } else if (order.side === 1 || order.side === '1' || order.side === 'SELL' || order.side === 'sell' || order.side === 'short' || order.side === 'Ask' || order.side === 'ask') {
             orderSide = 'SELL';
           } else if (order.direction) {
             orderSide = order.direction.toUpperCase();
@@ -317,10 +317,11 @@ export async function POST(request: NextRequest) {
           const orderSymbol = order.contractId || order.contract_id || order.symbol || order.contractName || order.contract_name || 'unknown';
           
           // Extract side and quantity for matching
+          // Map side: 0 = BUY (Bid), 1 = SELL (Ask) - CORRECT ProjectX format
           let orderSide = 'unknown';
-          if (order.side === 1 || order.side === '1' || order.side === 'BUY' || order.side === 'buy' || order.side === 'long') {
+          if (order.side === 0 || order.side === '0' || order.side === 'BUY' || order.side === 'buy' || order.side === 'long' || order.side === 'Bid' || order.side === 'bid') {
             orderSide = 'BUY';
-          } else if (order.side === 0 || order.side === '0' || order.side === 'SELL' || order.side === 'sell' || order.side === 'short') {
+          } else if (order.side === 1 || order.side === '1' || order.side === 'SELL' || order.side === 'sell' || order.side === 'short' || order.side === 'Ask' || order.side === 'ask') {
             orderSide = 'SELL';
           } else if (order.direction) {
             orderSide = order.direction.toUpperCase();

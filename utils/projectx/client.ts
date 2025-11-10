@@ -994,13 +994,28 @@ export class ProjectXClient {
       };
 
       // Add limitPrice for Limit and StopLimit orders
+      // For BUY Limit orders: limitPrice should be <= current ask (below best ask)
+      // For SELL Limit orders: limitPrice should be >= current bid (above best bid)
       if ((orderData.orderType === 'Limit' || orderData.orderType === 'StopLimit') && orderData.price) {
         requestBody.limitPrice = orderData.price;
       }
 
       // Add stopPrice for Stop and StopLimit orders
+      // For BUY Stop orders: stopPrice should be above current market (triggers when price rises)
+      // For SELL Stop orders: stopPrice should be below current market (triggers when price falls)
       if ((orderData.orderType === 'Stop' || orderData.orderType === 'StopLimit') && orderData.stopPrice) {
         requestBody.stopPrice = orderData.stopPrice;
+      }
+
+      // For StopLimit orders, we need both limitPrice and stopPrice
+      // The stopPrice is the trigger, and limitPrice is the execution price
+      if (orderData.orderType === 'StopLimit') {
+        if (orderData.price) {
+          requestBody.limitPrice = orderData.price;
+        }
+        if (orderData.stopPrice) {
+          requestBody.stopPrice = orderData.stopPrice;
+        }
       }
 
       console.log(`📤 Placing order with body:`, JSON.stringify(requestBody, null, 2));
