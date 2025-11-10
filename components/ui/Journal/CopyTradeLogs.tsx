@@ -120,16 +120,18 @@ export default function CopyTradeLogs({
   };
 
   const handleClearLogs = async () => {
-    if (!confirm('Are you sure you want to clear all copy trade logs? This action cannot be undone.')) {
+    if (
+      !confirm(
+        'Are you sure you want to clear all copy trade logs? This action cannot be undone.'
+      )
+    ) {
       return;
     }
 
     try {
       setIsClearing(true);
 
-      let query = supabase
-        .from('copy_trade_logs' as any)
-        .delete();
+      let query = supabase.from('copy_trade_logs' as any).delete();
 
       if (configId) {
         query = query.eq('copy_trade_config_id', configId);
@@ -215,9 +217,7 @@ export default function CopyTradeLogs({
     filled: logs.filter((l) => l.order_status === 'filled').length,
     cancelled: logs.filter((l) => l.order_status === 'cancelled').length,
     error: logs.filter(
-      (l) =>
-        l.order_status === 'error' ||
-        l.order_status === 'rejected'
+      (l) => l.order_status === 'error' || l.order_status === 'rejected'
     ).length
   };
 
@@ -298,8 +298,16 @@ export default function CopyTradeLogs({
 
       {/* Filters */}
       <div className="flex gap-2 mb-4">
-      {(['all', 'pending', 'submitted', 'filled', 'cancelled', 'error'] as const).map(
-        (f) => (
+        {(
+          [
+            'all',
+            'pending',
+            'submitted',
+            'filled',
+            'cancelled',
+            'error'
+          ] as const
+        ).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
@@ -311,8 +319,7 @@ export default function CopyTradeLogs({
           >
             {f.charAt(0).toUpperCase() + f.slice(1)}
           </button>
-        )
-      )}
+        ))}
       </div>
 
       {/* Logs List */}

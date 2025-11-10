@@ -421,9 +421,19 @@ export async function POST(request: NextRequest) {
 
                     if (client) {
                       // Get the account ID from the broker connection
-                      const accountId = destConnection.broker_account_name || destConnection.trading_account_id;
+                      // broker_account_name should be the ProjectX account ID (numeric)
+                      // broker_user_id might also be available as a fallback
+                      const accountId = destConnection.broker_account_name || 
+                                       destConnection.broker_user_id || 
+                                       destConnection.trading_account_id;
                       
-                      console.log(`  🚫 Attempting to cancel destination order ${log.order_id} on ${destConnection.broker_account_name} (Account: ${accountId})`);
+                      console.log(`  🚫 Attempting to cancel destination order ${log.order_id} on ${destConnection.broker_account_name}`);
+                      console.log(`     Account ID: ${accountId}, Order ID: ${log.order_id}`);
+                      console.log(`     Connection details:`, {
+                        broker_account_name: destConnection.broker_account_name,
+                        broker_user_id: destConnection.broker_user_id,
+                        trading_account_id: destConnection.trading_account_id
+                      });
                       
                       const cancelResult = await client.cancelOrder({
                         accountId: accountId,

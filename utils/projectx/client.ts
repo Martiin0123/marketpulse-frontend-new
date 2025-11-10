@@ -1097,83 +1097,83 @@ export class ProjectXClient {
   /**
    * Cancel an order
    * API URL: POST https://api.alphaticks.projectx.com/api/Order/cancel
+   * ProjectX Gateway API: POST /api/Order/cancel
    */
   async cancelOrder(orderData: {
-    accountId: string;
-    orderId: string;
+    accountId: string | number;
+    orderId: string | number;
   }): Promise<{ success: boolean; error?: string }> {
     try {
       await this.ensureValidAuth();
 
-      // Try different endpoint patterns for order cancellation
-      const endpoints = [
-        '/api/Order/cancel',
-        '/api/Order/cancelOrder',
-        '/api/Order/remove',
-        '/api/order/cancel',
-        '/api/order/cancelOrder',
-        '/api/order/remove'
-      ];
-
       // ProjectX API format (from docs):
-      // - accountId: integer
-      // - orderId: integer or string
+      // - accountId: integer (required)
+      // - orderId: integer (required)
+      // Response: { success: true, errorCode: 0, errorMessage: null }
 
-      const requestBody: any = {
-        accountId: parseInt(orderData.accountId) || orderData.accountId,
-        orderId: parseInt(orderData.orderId) || orderData.orderId
+      // Ensure accountId and orderId are integers
+      const accountId = typeof orderData.accountId === 'number' 
+        ? orderData.accountId 
+        : parseInt(orderData.accountId);
+      const orderId = typeof orderData.orderId === 'number' 
+        ? orderData.orderId 
+        : parseInt(orderData.orderId);
+
+      if (isNaN(accountId)) {
+        throw new Error(`Invalid accountId: ${orderData.accountId} (must be a number)`);
+      }
+      if (isNaN(orderId)) {
+        throw new Error(`Invalid orderId: ${orderData.orderId} (must be a number)`);
+      }
+
+      const requestBody = {
+        accountId: accountId,
+        orderId: orderId
       };
 
       console.log(`🚫 Cancelling order with body:`, JSON.stringify(requestBody, null, 2));
+      console.log(`🔍 Using endpoint: /api/Order/cancel`);
 
-      for (const endpoint of endpoints) {
-        try {
-          console.log(`🔍 Trying order cancellation endpoint: ${endpoint}`);
-          
-          const response = await this.apiRequest(endpoint, {
-            method: 'POST',
-            body: JSON.stringify(requestBody),
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          }) as any;
+      // Use the exact endpoint from the documentation
+      const response = await this.apiRequest('/api/Order/cancel', {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': 'text/plain'
+        },
+      }) as any;
 
-          console.log(`📥 Order cancellation response from ${endpoint}:`, response);
+      console.log(`📥 Order cancellation response:`, response);
 
-          // Check for error in response
-          if (response?.errorCode !== undefined && response.errorCode !== 0) {
-            throw new Error(response.errorMessage || `API returned error code ${response.errorCode}`);
-          }
-
-          // Check for success (API returns { success: true, errorCode: 0 })
-          if (response && response.success === true) {
-            console.log(`✅ Order cancelled successfully: ${orderData.orderId}`);
-            return { success: true };
-          }
-
-          // Also check if success is implied by no error code
-          if (response && (response.errorCode === undefined || response.errorCode === 0)) {
-            console.log(`✅ Order cancelled successfully: ${orderData.orderId}`);
-            return { success: true };
-          }
-
-          // If we got here, the response format is unexpected
-          console.warn(`⚠️ Unexpected response format from ${endpoint}:`, JSON.stringify(response, null, 2));
-        } catch (error: any) {
-          console.log(`⚠️ Endpoint ${endpoint} failed:`, error.message);
-          if (error.stack) {
-            console.log(`Stack:`, error.stack);
-          }
-          // Continue to next endpoint if it's a 404 or similar
-          if (error.message?.includes('404') || error.message?.includes('Not Found')) {
-            continue;
-          }
-          // For other errors, try next endpoint
-          continue;
-        }
+      // Check for error in response (API returns { success: true/false, errorCode: 0/non-zero, errorMessage: string/null })
+      if (response?.errorCode !== undefined && response.errorCode !== 0) {
+        const errorMsg = response.errorMessage || `API returned error code ${response.errorCode}`;
+        console.error(`❌ Order cancellation failed: ${errorMsg}`);
+        return {
+          success: false,
+          error: errorMsg
+        };
       }
 
-      throw new Error(`Failed to cancel order. Tried endpoints: ${endpoints.join(', ')}`);
+      // Check for success (API returns { success: true, errorCode: 0 })
+      if (response && response.success === true) {
+        console.log(`✅ Order cancelled successfully: ${orderId}`);
+        return { success: true };
+      }
+
+      // If success is not explicitly true but errorCode is 0, consider it successful
+      if (response && (response.errorCode === undefined || response.errorCode === 0)) {
+        console.log(`✅ Order cancelled successfully (implied): ${orderId}`);
+        return { success: true };
+      }
+
+      // If we got here, the response format is unexpected
+      console.warn(`⚠️ Unexpected response format:`, JSON.stringify(response, null, 2));
+      return {
+        success: false,
+        error: `Unexpected response format: ${JSON.stringify(response)}`
+      };
     } catch (error: any) {
       console.error('❌ Error cancelling order:', error);
       return {
