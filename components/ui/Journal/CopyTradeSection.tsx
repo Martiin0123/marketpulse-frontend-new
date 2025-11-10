@@ -89,6 +89,16 @@ export default function CopyTradeSection({
         const data = await response.json();
         const connections = data.connections || [];
 
+        console.log('📡 SignalR connection response:', {
+          connectionsCount: connections.length,
+          connections: connections.map((c: any) => ({
+            connectionId: c.connectionId,
+            accountId: c.accountId,
+            hubUrl: c.hubUrl,
+            hasToken: !!c.jwtToken
+          }))
+        });
+
         if (connections.length === 0) {
           console.log('⚠️ No SignalR connections available');
           return;
@@ -241,7 +251,9 @@ export default function CopyTradeSection({
       }
     };
 
-    setupSignalRConnections();
+    setupSignalRConnections().catch((error) => {
+      console.error('❌ Error in setupSignalRConnections:', error);
+    });
 
     // Cleanup: disconnect all SignalR clients on unmount or when configs change
     return () => {

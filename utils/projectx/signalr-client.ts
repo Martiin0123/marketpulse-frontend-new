@@ -164,31 +164,29 @@ export class ProjectXSignalRClient {
         tokenLength: this.jwtToken?.length
       });
       
+      console.log('🚀 Starting SignalR connection...');
       await this.connection.start();
       this.isConnected = true;
       this.reconnectAttempts = 0;
       console.log('✅ SignalR connected successfully', {
         connectionId: this.connection.connectionId,
-        state: this.connection.state
+        state: this.connection.state,
+        url: connectionUrl
       });
 
       // Subscribe to updates
       await this.subscribe();
 
-      // Handle reconnection
-      this.connection.onreconnected((connectionId) => {
-        console.log(`🔄 SignalR reconnected (connection ID: ${connectionId})`);
-        this.isConnected = true;
-        this.reconnectAttempts = 0;
-        this.subscribe(); // Re-subscribe after reconnection
-      });
-
-      this.connection.onclose((error) => {
-        console.warn('⚠️ SignalR connection closed', error);
-        this.isConnected = false;
-      });
+      // Handle reconnection (moved to setupEventHandlers to avoid duplicate)
     } catch (error: any) {
       console.error('❌ Error connecting to SignalR:', error);
+      console.error('  Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        url: connectionUrl,
+        accountId: this.accountId
+      });
       this.isConnected = false;
       throw error;
     }
@@ -226,7 +224,7 @@ export class ProjectXSignalRClient {
 
     // Handle position updates
     this.connection.on('GatewayUserPosition', (data: ProjectXPositionUpdate) => {
-      console.log('📥 Received position update:', data);
+      console.log('📥 [SignalR] Received GatewayUserPosition event:', data);
       this.onPositionUpdateCallbacks.forEach(callback => {
         try {
           callback(data);
@@ -238,7 +236,7 @@ export class ProjectXSignalRClient {
 
     // Handle trade updates
     this.connection.on('GatewayUserTrade', (data: ProjectXTradeUpdate) => {
-      console.log('📥 Received trade update:', data);
+      console.log('📥 [SignalR] Received GatewayUserTrade event:', data);
       this.onTradeUpdateCallbacks.forEach(callback => {
         try {
           callback(data);
@@ -246,6 +244,17 @@ export class ProjectXSignalRClient {
           console.error('❌ Error in trade update callback:', error);
         }
       });
+    });
+
+    // Add error handler
+    this.connection.onclose((error) => {
+      console.warn('⚠️ [SignalR] Connection closed', error);
+      this.isConnected = false;
+    });
+
+    // Log all incoming messages for debugging
+    this.connection.onreconnecting((error) => {
+      console.log('🔄 [SignalR] Reconnecting...', error);
     });
   }
 
