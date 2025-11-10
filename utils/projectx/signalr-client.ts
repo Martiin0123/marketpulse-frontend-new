@@ -165,12 +165,12 @@ export class ProjectXSignalRClient {
 
     let connectionUrl: string;
     try {
-      // According to the docs, we can use access_token in the URL OR accessTokenFactory
-      // Let's use just the base URL and provide token via accessTokenFactory (cleaner)
-      connectionUrl = this.userHubUrl;
+      // According to the docs example, we should include access_token in the URL
+      // Format: https://rtc.alphaticks.projectx.com/hubs/user?access_token=YOUR_JWT_TOKEN
+      connectionUrl = `${this.userHubUrl}?access_token=${encodeURIComponent(this.jwtToken)}`;
       
       console.log('🔌 Building SignalR connection:', {
-        url: connectionUrl,
+        url: connectionUrl.substring(0, 100) + '...', // Log partial URL to avoid exposing full token
         hubUrl: this.userHubUrl,
         accountId: this.accountId,
         hasToken: !!this.jwtToken
@@ -181,7 +181,7 @@ export class ProjectXSignalRClient {
           skipNegotiation: true,
           transport: signalR.HttpTransportType.WebSockets,
           accessTokenFactory: () => {
-            console.log('🔑 Using accessTokenFactory to provide JWT token');
+            // Also provide via factory as shown in docs
             return this.jwtToken;
           },
           timeout: 10000
