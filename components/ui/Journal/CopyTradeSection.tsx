@@ -12,7 +12,8 @@ import type { TradingAccount } from '@/types/journal';
 import CopyTradeLogs from './CopyTradeLogs';
 import {
   ProjectXSignalRClient,
-  ProjectXOrderUpdate
+  ProjectXOrderUpdate,
+  ProjectXTradeUpdate
 } from '@/utils/projectx/signalr-client';
 
 interface CopyTradeConfig {
@@ -163,8 +164,9 @@ export default function CopyTradeSection({
 
               // Status: 0=None, 1=Open, 2=Filled, 3=Cancelled, 4=Expired, 5=Rejected, 6=Pending
 
-              // Process new/open orders (status 1=Open, 6=Pending)
-              if (order.status === 1 || order.status === 6) {
+              // Process new/open orders (status 1=Open, 6=Pending) AND filled orders (status 2=Filled)
+              // Filled orders need to be copied immediately
+              if (order.status === 1 || order.status === 6 || order.status === 2) {
                 try {
                   const response = await fetch(
                     '/api/copy-trade/process-order-update',
@@ -251,6 +253,57 @@ export default function CopyTradeSection({
                     error
                   );
                 }
+              }
+            });
+
+            // Handle trade updates (executed trades)
+            signalRClient.onTradeUpdate(async (trade: ProjectXTradeUpdate) => {
+              console.log(`📥 [CopyTrade] Real-time trade update received:`, {
+                tradeId: trade.id,
+                accountId: trade.accountId,
+                contractId: trade.contractId,
+                side: trade.side,
+                size: trade.size,
+                price: trade.price,
+                fullTrade: trade
+              });
+
+              // Process executed trades immediately
+              try {
+                const response = await fetch(
+                  '/api/copy-trade/process-order-update',
+                  {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                      connectionId: conn.connectionId,
+                      tradingAccountId: conn.tradingAccountId,
+                      order: {
+                        id: trade.id?.toString() || trade.orderId?.toString() || '',
+                        symbol: trade.contractId,
+                        side: trade.side === 0 ? 'BUY' : 'SELL',
+                        quantity: trade.size,
+                        orderType: 'Market', // Trades are typically market orders
+                        price: trade.price,
+                        status: 2 // Filled
+                      },
+                      action: 'new_or_modified'
+                    })
+                  }
+                );
+
+                if (response.ok) {
+                  const result = await response.json();
+                  if (result.executed > 0) {
+                    console.log(
+                      `✅ Executed ${result.executed} copy trade(s) from trade update`
+                    );
+                  }
+                }
+              } catch (error) {
+                console.error('❌ Error processing trade update:', error);
               }
             });
 
