@@ -133,14 +133,20 @@ export async function POST(request: NextRequest) {
 
         console.log(`  ✅ ProjectX client initialized successfully`);
 
-        // Fetch recent orders (pending/submitted) for immediate detection
+        // Fetch recent orders for immediate detection
         // We check orders instead of executions to catch trades as soon as they're placed
+        // Also check for cancelled orders
         console.log(`  🔍 Fetching orders for ${conn.broker_account_name}...`);
         
-        const orders = await client.getOrders(
+        // Fetch open orders (for new orders)
+        const openOrders = await client.getOrders(
           conn.broker_account_name,
-          'All' // Get all orders (pending, submitted, filled) to catch new ones
+          'All' // Get all orders to catch new ones and cancelled ones
         );
+
+        // Also try to fetch cancelled orders if the API supports it
+        // For now, we'll check status in the openOrders response
+        const orders = openOrders;
 
         console.log(`📊 Fetched ${orders.length} total order(s) from API`);
 
@@ -313,24 +319,37 @@ export async function POST(request: NextRequest) {
           console.log(`  🚫 Checking for cancelled order: ${orderSymbol} (ID: ${orderId})`);
 
           // Find copy trade logs for this order that are still pending/submitted
+          // Match by symbol, side, and quantity (since we don't have a direct source order ID)
           const { data: activeLogs, error: logsError } = await adminSupabase
             .from('copy_trade_logs' as any)
-            .select('id, order_id, order_status, destination_broker_connection_id')
+            .select('id, order_id, order_status, destination_broker_connection_id, source_side, source_quantity')
             .eq('source_account_id', conn.trading_account_id)
             .eq('source_symbol', orderSymbol)
             .in('order_status', ['pending', 'submitted'])
             .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()); // Last 24 hours
+
+          // Filter logs to match the cancelled order's side and quantity more closely
+          // This helps when multiple orders exist for the same symbol
+          const matchingLogs = activeLogs?.filter((log: any) => {
+            // Try to match by side and quantity (within reasonable range)
+            const sideMatch = log.source_side === orderSide || 
+                             (orderSide === 'SELL' && log.source_side === '0') ||
+                             (orderSide === 'BUY' && log.source_side === '1');
+            const qtyMatch = Math.abs(log.source_quantity - orderQty) < 0.01; // Allow small floating point differences
+            
+            return sideMatch && qtyMatch;
+          }) || [];
 
           if (logsError) {
             console.warn(`  ⚠️ Error checking logs for cancelled order:`, logsError);
             continue;
           }
 
-          if (activeLogs && activeLogs.length > 0) {
-            console.log(`  🔄 Found ${activeLogs.length} active copy trade log(s) to cancel for order ${orderId}`);
+          if (matchingLogs && matchingLogs.length > 0) {
+            console.log(`  🔄 Found ${matchingLogs.length} active copy trade log(s) to cancel for order ${orderId}`);
 
             // Update logs to cancelled status
-            for (const log of activeLogs) {
+            for (const log of matchingLogs) {
               // Try to cancel the destination order if we have an order_id
               if (log.order_id && log.destination_broker_connection_id) {
                 try {
