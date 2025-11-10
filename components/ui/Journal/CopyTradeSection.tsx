@@ -338,7 +338,7 @@ export default function CopyTradeSection({
             console.log(
               `  ✅ Connected to SignalR for account ${conn.accountId}`
             );
-            
+
             // Update connection status after connecting
             updateConnectionStatus();
           } catch (error: any) {
@@ -358,16 +358,23 @@ export default function CopyTradeSection({
     // Function to update connection status
     const updateConnectionStatus = () => {
       const clients = Array.from(signalRClientsRef.current.values());
-      const statuses = clients.map(client => client.getConnectionStatus());
-      const connectedCount = statuses.filter(s => s.connected).length;
-      const allConnected = connectedCount === clients.length && clients.length > 0;
-      const anyConnecting = statuses.some(s => s.state === 'Connecting' || s.state === 'Reconnecting');
-      
+      const statuses = clients.map((client) => client.getConnectionStatus());
+      const connectedCount = statuses.filter((s) => s.connected).length;
+      const allConnected =
+        connectedCount === clients.length && clients.length > 0;
+      const anyConnecting = statuses.some(
+        (s) => s.state === 'Connecting' || s.state === 'Reconnecting'
+      );
+
       setConnectionStatus({
         connected: allConnected,
-        state: allConnected ? 'Connected' : 
-               anyConnecting ? 'Connecting' : 
-               clients.length > 0 ? 'Disconnected' : 'No Active Configs',
+        state: allConnected
+          ? 'Connected'
+          : anyConnecting
+            ? 'Connecting'
+            : clients.length > 0
+              ? 'Disconnected'
+              : 'No Active Configs',
         activeConnections: connectedCount
       });
     };
@@ -574,9 +581,10 @@ export default function CopyTradeSection({
                 className={`h-3 w-3 rounded-full ${
                   connectionStatus.connected
                     ? 'bg-green-500 animate-pulse'
-                    : connectionStatus.state === 'Connecting' || connectionStatus.state === 'Reconnecting'
-                    ? 'bg-yellow-500 animate-pulse'
-                    : 'bg-red-500'
+                    : connectionStatus.state === 'Connecting' ||
+                        connectionStatus.state === 'Reconnecting'
+                      ? 'bg-yellow-500 animate-pulse'
+                      : 'bg-red-500'
                 }`}
                 title={`Status: ${connectionStatus.state} (${connectionStatus.activeConnections} active)`}
               />
@@ -584,9 +592,10 @@ export default function CopyTradeSection({
                 className={`text-sm font-medium ${
                   connectionStatus.connected
                     ? 'text-green-400'
-                    : connectionStatus.state === 'Connecting' || connectionStatus.state === 'Reconnecting'
-                    ? 'text-yellow-400'
-                    : 'text-red-400'
+                    : connectionStatus.state === 'Connecting' ||
+                        connectionStatus.state === 'Reconnecting'
+                      ? 'text-yellow-400'
+                      : 'text-red-400'
                 }`}
               >
                 {connectionStatus.state}
@@ -598,8 +607,9 @@ export default function CopyTradeSection({
           </p>
           <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
             <p className="text-sm text-amber-400">
-              ⚠️ <strong>Important:</strong> Copy trading only works when this page is open. 
-              The connection must remain active for real-time trade copying to function.
+              ⚠️ <strong>Important:</strong> Copy trading only works when this
+              page is open. The connection must remain active for real-time
+              trade copying to function.
             </p>
           </div>
         </div>

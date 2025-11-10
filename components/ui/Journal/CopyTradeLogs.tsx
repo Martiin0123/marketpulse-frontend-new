@@ -222,172 +222,147 @@ export default function CopyTradeLogs({
   };
 
   return (
-    <div className={`bg-slate-800 rounded-lg p-6 ${className}`}>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h3 className="text-xl font-semibold text-white mb-1">
-            Copy Trade Activity
-          </h3>
-          <p className="text-sm text-slate-400">
-            Real-time execution logs and order status
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="rounded"
-            />
-            Auto-refresh
-          </label>
-          <button
-            onClick={loadLogs}
-            className="px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors flex items-center gap-2"
-          >
-            <ArrowPathIcon className="h-4 w-4" />
-            Refresh
-          </button>
-          <button
-            onClick={handleClearLogs}
-            disabled={isClearing || logs.length === 0}
-            className="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded transition-colors flex items-center gap-2"
-          >
-            <TrashIcon className="h-4 w-4" />
-            {isClearing ? 'Clearing...' : 'Clear Logs'}
-          </button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-6 gap-4 mb-6">
-        <div className="bg-slate-700/50 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-white">{stats.total}</div>
-          <div className="text-xs text-slate-400 mt-1">Total</div>
-        </div>
-        <div className="bg-yellow-500/10 rounded-lg p-3 text-center border border-yellow-500/20">
-          <div className="text-2xl font-bold text-yellow-500">
-            {stats.pending}
+    <div className={`bg-slate-800/50 rounded-xl border border-slate-700 ${className}`}>
+      <div className="p-4 border-b border-slate-700">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h3 className="text-lg font-semibold text-white">
+              Recent Activity
+            </h3>
+            {/* Compact Stats */}
+            <div className="flex items-center gap-3 text-xs">
+              <span className="text-slate-400">
+                <span className="text-white font-medium">{stats.total}</span> total
+              </span>
+              <span className="text-green-400">
+                <span className="font-medium">{stats.filled}</span> filled
+              </span>
+              <span className="text-yellow-400">
+                <span className="font-medium">{stats.pending}</span> pending
+              </span>
+              {stats.error > 0 && (
+                <span className="text-red-400">
+                  <span className="font-medium">{stats.error}</span> errors
+                </span>
+              )}
+            </div>
           </div>
-          <div className="text-xs text-yellow-500/70 mt-1">Pending</div>
-        </div>
-        <div className="bg-blue-500/10 rounded-lg p-3 text-center border border-blue-500/20">
-          <div className="text-2xl font-bold text-blue-500">
-            {stats.submitted}
-          </div>
-          <div className="text-xs text-blue-500/70 mt-1">Submitted</div>
-        </div>
-        <div className="bg-green-500/10 rounded-lg p-3 text-center border border-green-500/20">
-          <div className="text-2xl font-bold text-green-500">
-            {stats.filled}
-          </div>
-          <div className="text-xs text-green-500/70 mt-1">Filled</div>
-        </div>
-        <div className="bg-orange-500/10 rounded-lg p-3 text-center border border-orange-500/20">
-          <div className="text-2xl font-bold text-orange-500">
-            {stats.cancelled}
-          </div>
-          <div className="text-xs text-orange-500/70 mt-1">Cancelled</div>
-        </div>
-        <div className="bg-red-500/10 rounded-lg p-3 text-center border border-red-500/20">
-          <div className="text-2xl font-bold text-red-500">{stats.error}</div>
-          <div className="text-xs text-red-500/70 mt-1">Errors</div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex gap-2 mb-4">
-        {(
-          [
-            'all',
-            'pending',
-            'submitted',
-            'filled',
-            'cancelled',
-            'error'
-          ] as const
-        ).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-              filter === f
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
-          >
-            {f.charAt(0).toUpperCase() + f.slice(1)}
-          </button>
-        ))}
-      </div>
-
-      {/* Logs List */}
-      <div className="space-y-2 max-h-96 overflow-y-auto">
-        {isLoading ? (
-          <div className="text-center py-8 text-slate-400">Loading logs...</div>
-        ) : logs.length === 0 ? (
-          <div className="text-center py-8 text-slate-400">No logs found</div>
-        ) : (
-          logs.map((log) => (
-            <div
-              key={log.id}
-              className={`bg-slate-700/50 rounded-lg p-4 border ${getStatusColor(log.order_status)}`}
+          <div className="flex items-center gap-2">
+            {/* Compact Filters */}
+            <div className="flex gap-1">
+              {(['all', 'filled', 'pending', 'error'] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                    filter === f
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  {f.charAt(0).toUpperCase() + f.slice(1)}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={loadLogs}
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+              title="Refresh"
             >
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3 flex-1">
-                  <div className="mt-0.5">
-                    {getStatusIcon(log.order_status)}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="font-semibold text-white">
-                        {log.source_symbol} {log.source_side.toUpperCase()}
-                      </span>
-                      <span className="text-slate-400">→</span>
-                      <span className="font-semibold text-white">
-                        {log.destination_symbol}{' '}
-                        {log.destination_side.toUpperCase()}
-                      </span>
-                      <span className="text-xs text-slate-400">
-                        {log.source_quantity} × {log.multiplier.toFixed(2)} ={' '}
-                        {log.destination_quantity}
+              <ArrowPathIcon className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Compact Table View */}
+      <div className="overflow-x-auto">
+        {isLoading ? (
+          <div className="text-center py-8 text-slate-400 text-sm">Loading...</div>
+        ) : logs.length === 0 ? (
+          <div className="text-center py-8 text-slate-400 text-sm">No activity yet</div>
+        ) : (
+          <table className="w-full">
+            <thead className="bg-slate-700/30">
+              <tr className="text-left text-xs text-slate-400">
+                <th className="px-4 py-2 font-medium">Status</th>
+                <th className="px-4 py-2 font-medium">Symbol</th>
+                <th className="px-4 py-2 font-medium">Side</th>
+                <th className="px-4 py-2 font-medium">Quantity</th>
+                <th className="px-4 py-2 font-medium">Price</th>
+                <th className="px-4 py-2 font-medium">Time</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/50">
+              {logs.map((log) => (
+                <tr
+                  key={log.id}
+                  className={`hover:bg-slate-700/30 transition-colors ${
+                    log.order_status === 'filled' ? 'bg-green-500/5' :
+                    log.order_status === 'error' || log.order_status === 'rejected' ? 'bg-red-500/5' :
+                    ''
+                  }`}
+                >
+                  <td className="px-4 py-2">
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(log.order_status)}
+                      <span className="text-xs text-slate-300 capitalize">
+                        {log.order_status}
                       </span>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-slate-400">
-                      <span>
-                        {log.source_account?.name || 'Source'} →{' '}
-                        {log.destination_account?.name || 'Destination'}
+                  </td>
+                  <td className="px-4 py-2">
+                    <div className="text-sm text-white font-medium">
+                      {log.source_symbol}
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      {log.source_account?.name || 'Source'}
+                    </div>
+                  </td>
+                  <td className="px-4 py-2">
+                    <span className={`text-sm font-medium ${
+                      log.source_side.toUpperCase() === 'BUY' || log.source_side.toUpperCase() === 'LONG'
+                        ? 'text-green-400'
+                        : 'text-red-400'
+                    }`}>
+                      {log.source_side.toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2">
+                    <div className="text-sm text-white">
+                      {log.source_quantity}
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      ×{log.multiplier.toFixed(1)} = {log.destination_quantity}
+                    </div>
+                  </td>
+                  <td className="px-4 py-2">
+                    {log.filled_price ? (
+                      <span className="text-sm text-green-400 font-medium">
+                        {log.filled_price}
                       </span>
-                      {log.order_id && (
-                        <span className="text-xs">
-                          Order ID: {log.order_id}
-                        </span>
-                      )}
-                      {log.filled_price && (
-                        <span className="text-green-400">
-                          Filled @ {log.filled_price}
-                        </span>
-                      )}
+                    ) : log.order_price ? (
+                      <span className="text-sm text-slate-300">
+                        {log.order_price}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-500">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2">
+                    <div className="text-xs text-slate-400">
+                      {formatTime(log.created_at)}
                     </div>
                     {log.error_message && (
-                      <div className="mt-2 text-sm text-red-400">
-                        Error: {log.error_message}
+                      <div className="text-xs text-red-400 mt-1 truncate max-w-[150px]" title={log.error_message}>
+                        {log.error_message}
                       </div>
                     )}
-                  </div>
-                </div>
-                <div className="text-right text-xs text-slate-400">
-                  <div>{formatTime(log.created_at)}</div>
-                  {log.filled_at && (
-                    <div className="text-green-400 mt-1">
-                      Filled {formatTime(log.filled_at)}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </div>
