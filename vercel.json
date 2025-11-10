@@ -21,7 +21,7 @@
     },
     {
       "path": "/api/cron/sync-brokers",
-      "schedule": "*/10 * * * *"
+      "schedule": "*/1 * * * *"
     }
   ],
   "rewrites": [

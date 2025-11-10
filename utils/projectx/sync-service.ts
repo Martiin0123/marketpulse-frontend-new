@@ -839,6 +839,67 @@ export async function syncProjectXTrades(
       }
     }
 
+    // IMPORTANT: Check for NEW opening executions BEFORE grouping
+    // Opening executions (PnL=0) should trigger copy trades immediately
+    // We need to check raw executions, not grouped trades
+    const newOpeningExecutions: any[] = [];
+    
+    for (const exec of filledExecutions) {
+      // Check if this execution already exists in database
+      const { data: existingExec } = await supabase
+        .from('trade_entries' as any)
+        .select('id')
+        .eq('broker_trade_id', `projectx_${exec.id}`)
+        .single();
+      
+      // If it's a NEW opening execution (PnL=0 and doesn't exist yet), trigger copy trade
+      if (!existingExec && (!exec.pnl || exec.pnl === 0)) {
+        newOpeningExecutions.push({
+          symbol: exec.symbol,
+          side: exec.side,
+          quantity: exec.quantity || (exec as any).size || 1,
+          timestamp: exec.timestamp,
+          executionId: exec.id
+        });
+        console.log(`🔄 NEW opening execution detected: ${exec.symbol} ${exec.side} ${exec.quantity || (exec as any).size || 1} (ID: ${exec.id})`);
+      }
+    }
+    
+    // Execute copy trades for NEW opening executions IMMEDIATELY (before grouping)
+    if (newOpeningExecutions.length > 0) {
+      console.log(`🚀 Executing copy trades for ${newOpeningExecutions.length} NEW opening execution(s) immediately...`);
+      try {
+        const { processCopyTradeExecution } = await import('@/utils/copy-trade/executor');
+        
+        for (const execution of newOpeningExecutions) {
+          try {
+            const copyResult = await processCopyTradeExecution(
+              conn.trading_account_id,
+              {
+                symbol: execution.symbol,
+                side: execution.side,
+                quantity: execution.quantity,
+                orderType: 'Market' // Default to market order for copy trades
+              },
+              userId
+            );
+            
+            if (copyResult.copied > 0) {
+              console.log(`✅ Executed ${copyResult.copied} copy trade(s) for ${execution.symbol} ${execution.side} ${execution.quantity}`);
+            }
+            if (copyResult.errors.length > 0) {
+              console.warn(`⚠️ Copy trade errors:`, copyResult.errors);
+            }
+          } catch (execError) {
+            console.error(`❌ Error executing copy trade for ${execution.symbol}:`, execError);
+          }
+        }
+      } catch (copyError) {
+        // Don't fail the sync if copy execution fails
+        console.error('Error in copy trade execution:', copyError);
+      }
+    }
+    
     // Group executions into round-trip trades
     // TopStep API: PnL=0/null means opening, PnL!=0 means closing
     // Multiple closes can belong to the same opening position
@@ -863,7 +924,6 @@ export async function syncProjectXTrades(
     // IMPORTANT: This sync only ADDS new trades. It never deletes or modifies existing trades.
     // Existing trades are identified by broker_trade_id and skipped.
     const tradesToInsert: any[] = [];
-    const newExecutions: any[] = []; // Track new executions for copy trade
 
     for (const trade of allTrades) {
       // Check if trade already exists (deduplication)
@@ -878,21 +938,6 @@ export async function syncProjectXTrades(
         // Trade already exists - skip it (never delete or modify)
         result.tradesSkipped++;
         continue;
-      }
-
-      // This is a NEW trade - check if it's an opening execution (PnL = 0)
-      // Opening executions should trigger copy trade immediately
-      const isOpeningExecution = !trade.pnl || trade.pnl === 0;
-      
-      if (isOpeningExecution) {
-        // Store for copy trade execution after we insert the trade
-        newExecutions.push({
-          symbol: trade.symbol,
-          side: trade.side,
-          quantity: trade.quantity || (trade as any).size || 1,
-          timestamp: trade.timestamp
-        });
-        console.log(`🔄 New opening execution detected: ${trade.symbol} ${trade.side} ${trade.quantity || (trade as any).size || 1}`);
       }
 
       // Map trade to journal entry
@@ -921,41 +966,6 @@ export async function syncProjectXTrades(
       } else {
         result.tradesSynced = tradesToInsert.length;
         console.log(`✅ Successfully inserted ${result.tradesSynced} trades`);
-        
-        // Execute copy trades for NEW opening executions (real-time trade copying)
-        if (newExecutions.length > 0) {
-          console.log(`🚀 Executing copy trades for ${newExecutions.length} new opening execution(s)...`);
-          try {
-            const { processCopyTradeExecution } = await import('@/utils/copy-trade/executor');
-            
-            for (const execution of newExecutions) {
-              try {
-                const copyResult = await processCopyTradeExecution(
-                  conn.trading_account_id,
-                  {
-                    symbol: execution.symbol,
-                    side: execution.side,
-                    quantity: execution.quantity,
-                    orderType: 'Market' // Default to market order for copy trades
-                  },
-                  userId
-                );
-                
-                if (copyResult.copied > 0) {
-                  console.log(`✅ Executed ${copyResult.copied} copy trade(s) for ${execution.symbol} ${execution.side} ${execution.quantity}`);
-                }
-                if (copyResult.errors.length > 0) {
-                  console.warn(`⚠️ Copy trade errors:`, copyResult.errors);
-                }
-              } catch (execError) {
-                console.error(`❌ Error executing copy trade for ${execution.symbol}:`, execError);
-              }
-            }
-          } catch (copyError) {
-            // Don't fail the sync if copy execution fails
-            console.error('Error in copy trade execution:', copyError);
-          }
-        }
 
         // Also copy completed trades to journal (for record-keeping)
         // This happens after trades are closed and synced
