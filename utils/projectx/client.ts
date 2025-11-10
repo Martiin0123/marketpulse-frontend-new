@@ -108,7 +108,7 @@ export class ProjectXClient {
   /**
    * Get OAuth authorization URL
    */
-  static getAuthorizationUrl(redirectUri: string, state?: string): string {
+  static getAuthorizationUrl(redirectUri: string, state?: string, baseUrl?: string): string {
     const clientId = process.env.NEXT_PUBLIC_PROJECTX_CLIENT_ID;
     if (!clientId) {
       throw new Error('NEXT_PUBLIC_PROJECTX_CLIENT_ID not configured. Please set this environment variable. See BROKER_SETUP.md for instructions.');
@@ -122,8 +122,8 @@ export class ProjectXClient {
       ...(state && { state }),
     });
 
-    // Use baseUrl for OAuth (should be set based on service type)
-    const oauthBase = this.baseUrl || 'https://api.topstepx.com';
+    // Use provided baseUrl or default to TopStepX
+    const oauthBase = baseUrl || process.env.PROJECTX_API_URL || 'https://api.topstepx.com';
     return `${oauthBase}/v1/oauth/authorize?${params.toString()}`;
   }
 
