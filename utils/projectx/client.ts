@@ -958,33 +958,52 @@ export class ProjectXClient {
         '/api/order/create'
       ];
 
-      const requestBody: any = {
-        accountId: parseInt(orderData.accountId) || orderData.accountId,
-        symbol: orderData.symbol,
-        side: orderData.side,
-        quantity: orderData.quantity,
-        orderType: orderData.orderType || 'Market'
-      };
+      // ProjectX API format (from docs):
+      // - contractId: string (not symbol)
+      // - type: integer (1=Limit, 2=Market, 4=Stop, 5=TrailingStop, 6=JoinBid, 7=JoinAsk)
+      // - side: integer (0=Bid/buy, 1=Ask/sell)
+      // - size: integer
+      // - limitPrice: decimal (optional, for Limit/StopLimit)
+      // - stopPrice: decimal (optional, for Stop/StopLimit)
 
-      // Add price for Limit orders
-      if (orderData.orderType === 'Limit' && orderData.price) {
-        requestBody.price = orderData.price;
+      // Map order type to numeric value
+      let orderTypeNum = 2; // Default to Market
+      if (orderData.orderType === 'Limit') {
+        orderTypeNum = 1;
+      } else if (orderData.orderType === 'Stop') {
+        orderTypeNum = 4;
+      } else if (orderData.orderType === 'StopLimit') {
+        orderTypeNum = 4; // StopLimit uses type 4 with both limitPrice and stopPrice
+      } else if (orderData.orderType === 'Market') {
+        orderTypeNum = 2;
       }
 
-      // Add stop price for Stop orders
-      if (orderData.orderType === 'Stop' && orderData.stopPrice) {
+      // Map side: BUY -> 0, SELL -> 1
+      const sideNum = orderData.side === 'BUY' ? 0 : 1;
+
+      const requestBody: any = {
+        accountId: parseInt(orderData.accountId) || orderData.accountId,
+        contractId: orderData.symbol, // Use contractId, not symbol
+        type: orderTypeNum,
+        side: sideNum,
+        size: Math.round(orderData.quantity),
+        limitPrice: null,
+        stopPrice: null,
+        trailPrice: null,
+        customTag: null
+      };
+
+      // Add limitPrice for Limit and StopLimit orders
+      if ((orderData.orderType === 'Limit' || orderData.orderType === 'StopLimit') && orderData.price) {
+        requestBody.limitPrice = orderData.price;
+      }
+
+      // Add stopPrice for Stop and StopLimit orders
+      if ((orderData.orderType === 'Stop' || orderData.orderType === 'StopLimit') && orderData.stopPrice) {
         requestBody.stopPrice = orderData.stopPrice;
       }
 
-      // Add both price and stopPrice for StopLimit orders
-      if (orderData.orderType === 'StopLimit') {
-        if (orderData.price) {
-          requestBody.price = orderData.price;
-        }
-        if (orderData.stopPrice) {
-          requestBody.stopPrice = orderData.stopPrice;
-        }
-      }
+      console.log(`📤 Placing order with body:`, JSON.stringify(requestBody, null, 2));
 
       for (const endpoint of endpoints) {
         try {
