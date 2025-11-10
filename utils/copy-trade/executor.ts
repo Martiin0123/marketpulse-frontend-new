@@ -55,13 +55,16 @@ export async function executeCopyTrade(
     console.log('🚀 Executing copy trade:', {
       symbol: sourceTrade.symbol,
       side: sourceTrade.side,
-      quantity: sourceTrade.quantity,
+      sourceQuantity: sourceTrade.quantity,
       multiplier,
+      calculatedQuantity: sourceTrade.quantity * multiplier,
       destinationAccount: destinationConnection.broker_account_name
     });
 
     // Calculate destination quantity with multiplier
     const destinationQuantity = Math.round(sourceTrade.quantity * multiplier);
+    
+    console.log(`📊 Quantity calculation: ${sourceTrade.quantity} × ${multiplier} = ${destinationQuantity}`);
     
     if (destinationQuantity <= 0) {
       return { success: false, error: 'Calculated quantity is 0 or negative' };

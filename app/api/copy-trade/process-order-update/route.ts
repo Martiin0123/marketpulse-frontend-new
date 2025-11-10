@@ -35,16 +35,25 @@ export async function POST(request: NextRequest) {
 
     // Handle order cancellation
     if (action === 'cancelled' && order?.id) {
-      console.log(`🚫 Processing real-time order cancellation: ${order.id}`);
+      console.log(`🚫 Processing real-time order cancellation: ${order.id} for account ${tradingAccountId}`);
 
-      // Find the copy trade log for this order (check all active statuses, not just pending/submitted)
-      const { data: log } = await adminSupabase
+      // Find the copy trade log for this order (check all statuses except already cancelled)
+      const { data: log, error: logError } = await adminSupabase
         .from('copy_trade_logs' as any)
-        .select('id, order_id, order_status, destination_broker_connection_id, destination_account_id')
+        .select('id, order_id, order_status, destination_broker_connection_id, destination_account_id, source_order_id')
         .eq('source_account_id', tradingAccountId)
         .eq('source_order_id', order.id.toString())
-        .in('order_status', ['pending', 'submitted', 'open', 'filled']) // Include all active statuses
+        .neq('order_status', 'cancelled') // Don't try to cancel already cancelled orders
         .maybeSingle();
+
+      console.log(`🔍 Cancellation lookup result:`, {
+        found: !!log,
+        logId: log?.id,
+        orderId: log?.order_id,
+        status: log?.order_status,
+        sourceOrderId: log?.source_order_id,
+        error: logError
+      });
 
       if (log && log.order_id && log.destination_broker_connection_id) {
         // Get destination broker connection
@@ -134,18 +143,34 @@ export async function POST(request: NextRequest) {
         existingLog.order_status !== 'rejected' &&
         existingLog.order_status !== 'error') {
       
+      console.log(`🔍 Checking for modifications:`, {
+        existingPrice: existingLog.order_price,
+        newPrice: order.price,
+        existingStopPrice: existingLog.order_stop_price,
+        newStopPrice: order.stopPrice
+      });
+      
       // Check if limit price changed (for limit orders)
-      const limitPriceChanged = order.price !== undefined && existingLog.order_price !== null && 
+      const limitPriceChanged = order.price !== undefined && order.price !== null && 
+          existingLog.order_price !== null && 
           Math.abs(Number(existingLog.order_price) - Number(order.price)) > 0.01;
       
       // Check if stop price changed (for stop orders)
-      const stopPriceChanged = order.stopPrice !== undefined && existingLog.order_stop_price !== null && 
+      const stopPriceChanged = order.stopPrice !== undefined && order.stopPrice !== null && 
+          existingLog.order_stop_price !== null && 
           Math.abs(Number(existingLog.order_stop_price) - Number(order.stopPrice)) > 0.01;
       
       // Also check if stop price was added/changed when it didn't exist before
-      const stopPriceAdded = order.stopPrice !== undefined && 
+      const stopPriceAdded = order.stopPrice !== undefined && order.stopPrice !== null && 
           (existingLog.order_stop_price === null || existingLog.order_stop_price === undefined) && 
           order.stopPrice > 0;
+      
+      console.log(`🔍 Modification detection:`, {
+        limitPriceChanged,
+        stopPriceChanged,
+        stopPriceAdded,
+        willModify: limitPriceChanged || stopPriceChanged || stopPriceAdded
+      });
       
       if (limitPriceChanged || stopPriceChanged || stopPriceAdded) {
         const priceChange = limitPriceChanged ? `${existingLog.order_price} → ${order.price}` : '';
