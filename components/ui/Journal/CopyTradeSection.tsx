@@ -125,13 +125,16 @@ export default function CopyTradeSection({
           }
 
           try {
-            console.log(`  🔧 Creating SignalR client for account ${conn.accountId}...`, {
-              connectionId: conn.connectionId,
-              accountId: conn.accountId,
-              hubUrl: conn.hubUrl,
-              hasToken: !!conn.jwtToken,
-              tokenLength: conn.jwtToken?.length
-            });
+            console.log(
+              `  🔧 Creating SignalR client for account ${conn.accountId}...`,
+              {
+                connectionId: conn.connectionId,
+                accountId: conn.accountId,
+                hubUrl: conn.hubUrl,
+                hasToken: !!conn.jwtToken,
+                tokenLength: conn.jwtToken?.length
+              }
+            );
 
             const signalRClient = new ProjectXSignalRClient(
               conn.jwtToken,
@@ -139,7 +142,9 @@ export default function CopyTradeSection({
               conn.hubUrl
             );
 
-            console.log(`  ✅ SignalR client created for account ${conn.accountId}`);
+            console.log(
+              `  ✅ SignalR client created for account ${conn.accountId}`
+            );
 
             // Handle order updates (new orders, modifications, cancellations)
             signalRClient.onOrderUpdate(async (order: ProjectXOrderUpdate) => {

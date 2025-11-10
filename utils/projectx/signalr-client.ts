@@ -163,15 +163,17 @@ export class ProjectXSignalRClient {
       return;
     }
 
+    let connectionUrl: string;
     try {
-      // Build connection URL - try both with and without access_token in query
-      // Some SignalR implementations prefer it in the URL, others use accessTokenFactory
-      const connectionUrl = `${this.userHubUrl}?access_token=${encodeURIComponent(this.jwtToken)}`;
+      // According to the docs, we can use access_token in the URL OR accessTokenFactory
+      // Let's use just the base URL and provide token via accessTokenFactory (cleaner)
+      connectionUrl = this.userHubUrl;
       
       console.log('🔌 Building SignalR connection:', {
         url: connectionUrl,
         hubUrl: this.userHubUrl,
-        accountId: this.accountId
+        accountId: this.accountId,
+        hasToken: !!this.jwtToken
       });
       
       this.connection = new signalR.HubConnectionBuilder()
@@ -216,10 +218,13 @@ export class ProjectXSignalRClient {
         url: connectionUrl
       });
 
+      // Wait a bit before subscribing to ensure connection is stable
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       // Subscribe to updates
       await this.subscribe();
-
-      // Handle reconnection (moved to setupEventHandlers to avoid duplicate)
+      
+      console.log('✅ SignalR subscription completed');
     } catch (error: any) {
       console.error('❌ Error connecting to SignalR:', error);
       console.error('  Error details:', {
@@ -288,15 +293,15 @@ export class ProjectXSignalRClient {
       });
     });
 
-    // Add error handler
-    this.connection.onclose((error) => {
-      console.warn('⚠️ [SignalR] Connection closed', error);
-      this.isConnected = false;
-    });
-
-    // Log all incoming messages for debugging
-    this.connection.onreconnecting((error) => {
-      console.log('🔄 [SignalR] Reconnecting...', error);
+    // Handle reconnection
+    this.connection.onreconnected((connectionId) => {
+      console.log(`🔄 [SignalR] Reconnected (connection ID: ${connectionId})`);
+      this.isConnected = true;
+      this.reconnectAttempts = 0;
+      // Re-subscribe after reconnection
+      this.subscribe().catch((err) => {
+        console.error('❌ Error re-subscribing after reconnect:', err);
+      });
     });
   }
 
