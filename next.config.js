@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
-  // Remove standalone output for Vercel (use default serverless)
+  // Don't use 'standalone' output for Vercel - it uses serverless functions by default
+  // output: 'standalone', // Only for Docker/Railway deployments
   experimental: {
     serverComponentsExternalPackages: ['@supabase/ssr'],
   },
