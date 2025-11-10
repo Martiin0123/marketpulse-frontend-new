@@ -27,7 +27,13 @@ interface CopyTradeLog {
   destination_quantity: number;
   multiplier: number;
   order_id?: string;
-  order_status: 'pending' | 'submitted' | 'filled' | 'rejected' | 'cancelled' | 'error';
+  order_status:
+    | 'pending'
+    | 'submitted'
+    | 'filled'
+    | 'rejected'
+    | 'cancelled'
+    | 'error';
   order_type: string;
   order_price?: number;
   filled_quantity?: number;
@@ -51,7 +57,9 @@ export default function CopyTradeLogs({
 }: CopyTradeLogsProps) {
   const [logs, setLogs] = useState<CopyTradeLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'submitted' | 'filled' | 'error'>('all');
+  const [filter, setFilter] = useState<
+    'all' | 'pending' | 'submitted' | 'filled' | 'error'
+  >('all');
   const [autoRefresh, setAutoRefresh] = useState(true);
 
   const supabase = createClient();
@@ -73,14 +81,16 @@ export default function CopyTradeLogs({
   const loadLogs = async () => {
     try {
       setIsLoading(true);
-      
+
       let query = supabase
         .from('copy_trade_logs' as any)
-        .select(`
+        .select(
+          `
           *,
           source_account:trading_accounts!copy_trade_logs_source_account_id_fkey(name),
           destination_account:trading_accounts!copy_trade_logs_destination_account_id_fkey(name)
-        `)
+        `
+        )
         .order('created_at', { ascending: false })
         .limit(100);
 
@@ -162,18 +172,27 @@ export default function CopyTradeLogs({
 
   const stats = {
     total: logs.length,
-    pending: logs.filter(l => l.order_status === 'pending').length,
-    submitted: logs.filter(l => l.order_status === 'submitted').length,
-    filled: logs.filter(l => l.order_status === 'filled').length,
-    error: logs.filter(l => l.order_status === 'error' || l.order_status === 'rejected' || l.order_status === 'cancelled').length
+    pending: logs.filter((l) => l.order_status === 'pending').length,
+    submitted: logs.filter((l) => l.order_status === 'submitted').length,
+    filled: logs.filter((l) => l.order_status === 'filled').length,
+    error: logs.filter(
+      (l) =>
+        l.order_status === 'error' ||
+        l.order_status === 'rejected' ||
+        l.order_status === 'cancelled'
+    ).length
   };
 
   return (
     <div className={`bg-slate-800 rounded-lg p-6 ${className}`}>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="text-xl font-semibold text-white mb-1">Copy Trade Activity</h3>
-          <p className="text-sm text-slate-400">Real-time execution logs and order status</p>
+          <h3 className="text-xl font-semibold text-white mb-1">
+            Copy Trade Activity
+          </h3>
+          <p className="text-sm text-slate-400">
+            Real-time execution logs and order status
+          </p>
         </div>
         <div className="flex items-center gap-4">
           <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
@@ -201,15 +220,21 @@ export default function CopyTradeLogs({
           <div className="text-xs text-slate-400 mt-1">Total</div>
         </div>
         <div className="bg-yellow-500/10 rounded-lg p-3 text-center border border-yellow-500/20">
-          <div className="text-2xl font-bold text-yellow-500">{stats.pending}</div>
+          <div className="text-2xl font-bold text-yellow-500">
+            {stats.pending}
+          </div>
           <div className="text-xs text-yellow-500/70 mt-1">Pending</div>
         </div>
         <div className="bg-blue-500/10 rounded-lg p-3 text-center border border-blue-500/20">
-          <div className="text-2xl font-bold text-blue-500">{stats.submitted}</div>
+          <div className="text-2xl font-bold text-blue-500">
+            {stats.submitted}
+          </div>
           <div className="text-xs text-blue-500/70 mt-1">Submitted</div>
         </div>
         <div className="bg-green-500/10 rounded-lg p-3 text-center border border-green-500/20">
-          <div className="text-2xl font-bold text-green-500">{stats.filled}</div>
+          <div className="text-2xl font-bold text-green-500">
+            {stats.filled}
+          </div>
           <div className="text-xs text-green-500/70 mt-1">Filled</div>
         </div>
         <div className="bg-red-500/10 rounded-lg p-3 text-center border border-red-500/20">
@@ -220,19 +245,21 @@ export default function CopyTradeLogs({
 
       {/* Filters */}
       <div className="flex gap-2 mb-4">
-        {(['all', 'pending', 'submitted', 'filled', 'error'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-              filter === f
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
-          >
-            {f.charAt(0).toUpperCase() + f.slice(1)}
-          </button>
-        ))}
+        {(['all', 'pending', 'submitted', 'filled', 'error'] as const).map(
+          (f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+                filter === f
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              }`}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          )
+        )}
       </div>
 
       {/* Logs List */}
@@ -249,7 +276,9 @@ export default function CopyTradeLogs({
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3 flex-1">
-                  <div className="mt-0.5">{getStatusIcon(log.order_status)}</div>
+                  <div className="mt-0.5">
+                    {getStatusIcon(log.order_status)}
+                  </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <span className="font-semibold text-white">
@@ -257,21 +286,28 @@ export default function CopyTradeLogs({
                       </span>
                       <span className="text-slate-400">→</span>
                       <span className="font-semibold text-white">
-                        {log.destination_symbol} {log.destination_side.toUpperCase()}
+                        {log.destination_symbol}{' '}
+                        {log.destination_side.toUpperCase()}
                       </span>
                       <span className="text-xs text-slate-400">
-                        {log.source_quantity} × {log.multiplier.toFixed(2)} = {log.destination_quantity}
+                        {log.source_quantity} × {log.multiplier.toFixed(2)} ={' '}
+                        {log.destination_quantity}
                       </span>
                     </div>
                     <div className="flex items-center gap-4 text-sm text-slate-400">
                       <span>
-                        {log.source_account?.name || 'Source'} → {log.destination_account?.name || 'Destination'}
+                        {log.source_account?.name || 'Source'} →{' '}
+                        {log.destination_account?.name || 'Destination'}
                       </span>
                       {log.order_id && (
-                        <span className="text-xs">Order ID: {log.order_id}</span>
+                        <span className="text-xs">
+                          Order ID: {log.order_id}
+                        </span>
                       )}
                       {log.filled_price && (
-                        <span className="text-green-400">Filled @ {log.filled_price}</span>
+                        <span className="text-green-400">
+                          Filled @ {log.filled_price}
+                        </span>
                       )}
                     </div>
                     {log.error_message && (
@@ -297,4 +333,3 @@ export default function CopyTradeLogs({
     </div>
   );
 }
-

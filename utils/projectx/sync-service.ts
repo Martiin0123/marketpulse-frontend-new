@@ -863,6 +863,7 @@ export async function syncProjectXTrades(
     // IMPORTANT: This sync only ADDS new trades. It never deletes or modifies existing trades.
     // Existing trades are identified by broker_trade_id and skipped.
     const tradesToInsert: any[] = [];
+    const newExecutions: any[] = []; // Track new executions for copy trade
 
     for (const trade of allTrades) {
       // Check if trade already exists (deduplication)
@@ -879,6 +880,21 @@ export async function syncProjectXTrades(
         continue;
       }
 
+      // This is a NEW trade - check if it's an opening execution (PnL = 0)
+      // Opening executions should trigger copy trade immediately
+      const isOpeningExecution = !trade.pnl || trade.pnl === 0;
+      
+      if (isOpeningExecution) {
+        // Store for copy trade execution after we insert the trade
+        newExecutions.push({
+          symbol: trade.symbol,
+          side: trade.side,
+          quantity: trade.quantity || (trade as any).size || 1,
+          timestamp: trade.timestamp
+        });
+        console.log(`🔄 New opening execution detected: ${trade.symbol} ${trade.side} ${trade.quantity || (trade as any).size || 1}`);
+      }
+
       // Map trade to journal entry
       const tradeData = mapProjectXTradeToJournal(
         trade,
@@ -888,27 +904,6 @@ export async function syncProjectXTrades(
       );
 
       tradesToInsert.push(tradeData);
-
-      // Check if this is a new trade execution (not a completed trade) and trigger copy trade execution
-      // Only trigger for opening executions (PnL = 0 or no PnL yet)
-      if (!trade.pnl || trade.pnl === 0) {
-        try {
-          const { processCopyTradeExecution } = await import('@/utils/copy-trade/executor');
-          await processCopyTradeExecution(
-            conn.trading_account_id,
-            {
-              symbol: trade.symbol,
-              side: trade.side,
-              quantity: trade.quantity || (trade as any).size || 1,
-              orderType: 'Market' // Default to market order for copy trades
-            },
-            userId
-          );
-        } catch (copyError) {
-          // Don't fail the sync if copy execution fails
-          console.error('Error executing copy trade:', copyError);
-        }
-      }
     }
 
     // Insert trades in batch
@@ -927,8 +922,43 @@ export async function syncProjectXTrades(
         result.tradesSynced = tradesToInsert.length;
         console.log(`✅ Successfully inserted ${result.tradesSynced} trades`);
         
-        // Copy trades to destination accounts if copy trade configs exist
-        // Fetch the inserted trades to get their IDs, then copy them
+        // Execute copy trades for NEW opening executions (real-time trade copying)
+        if (newExecutions.length > 0) {
+          console.log(`🚀 Executing copy trades for ${newExecutions.length} new opening execution(s)...`);
+          try {
+            const { processCopyTradeExecution } = await import('@/utils/copy-trade/executor');
+            
+            for (const execution of newExecutions) {
+              try {
+                const copyResult = await processCopyTradeExecution(
+                  conn.trading_account_id,
+                  {
+                    symbol: execution.symbol,
+                    side: execution.side,
+                    quantity: execution.quantity,
+                    orderType: 'Market' // Default to market order for copy trades
+                  },
+                  userId
+                );
+                
+                if (copyResult.copied > 0) {
+                  console.log(`✅ Executed ${copyResult.copied} copy trade(s) for ${execution.symbol} ${execution.side} ${execution.quantity}`);
+                }
+                if (copyResult.errors.length > 0) {
+                  console.warn(`⚠️ Copy trade errors:`, copyResult.errors);
+                }
+              } catch (execError) {
+                console.error(`❌ Error executing copy trade for ${execution.symbol}:`, execError);
+              }
+            }
+          } catch (copyError) {
+            // Don't fail the sync if copy execution fails
+            console.error('Error in copy trade execution:', copyError);
+          }
+        }
+
+        // Also copy completed trades to journal (for record-keeping)
+        // This happens after trades are closed and synced
         try {
           const { copyTradeToDestinationAccounts } = await import('@/utils/copy-trade/service');
           
@@ -945,26 +975,31 @@ export async function syncProjectXTrades(
               .eq('account_id', conn.trading_account_id);
             
             if (insertedTrades && insertedTrades.length > 0) {
-              let totalCopied = 0;
-              for (const trade of insertedTrades) {
-                const copyResult = await copyTradeToDestinationAccounts(
-                  trade as any,
-                  conn.trading_account_id,
-                  userId
-                );
-                totalCopied += copyResult.copied;
-                if (copyResult.errors.length > 0) {
-                  console.warn('⚠️ Some copy trades failed:', copyResult.errors);
+              // Only copy completed trades (with PnL) to journal, not opening executions
+              const completedTrades = insertedTrades.filter((t: any) => t.pnl_amount && t.pnl_amount !== 0);
+              
+              if (completedTrades.length > 0) {
+                let totalCopied = 0;
+                for (const trade of completedTrades) {
+                  const copyResult = await copyTradeToDestinationAccounts(
+                    trade as any,
+                    conn.trading_account_id,
+                    userId
+                  );
+                  totalCopied += copyResult.copied;
+                  if (copyResult.errors.length > 0) {
+                    console.warn('⚠️ Some copy trades failed:', copyResult.errors);
+                  }
                 }
-              }
-              if (totalCopied > 0) {
-                console.log(`✅ Copied ${totalCopied} trades to destination accounts`);
+                if (totalCopied > 0) {
+                  console.log(`✅ Copied ${totalCopied} completed trades to destination accounts (journal entries)`);
+                }
               }
             }
           }
         } catch (copyError) {
           // Don't fail the sync if copy fails
-          console.error('Error copying trades:', copyError);
+          console.error('Error copying completed trades to journal:', copyError);
         }
       }
     } else {
