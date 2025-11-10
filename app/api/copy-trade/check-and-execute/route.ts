@@ -184,12 +184,38 @@ export async function POST(request: NextRequest) {
 
         // Check each new order to see if it's already been processed
         for (const order of newOrders) {
+          // ProjectX API format: id, contractId, side (1=BUY, 0=SELL), size, type, limitPrice, stopPrice
           const orderId = order.id || order.orderId || order.order_id || 'unknown';
-          const orderSymbol = order.symbol || order.contractName || order.contract_name || 'unknown';
-          const orderSide = order.side || order.direction || 'unknown';
-          const orderQty = order.quantity || order.size || order.qty || 1;
-          const orderType = order.orderType || order.order_type || order.type || 'Market';
-          const orderPrice = order.price || order.limitPrice || order.limit_price;
+          const orderSymbol = order.contractId || order.contract_id || order.symbol || order.contractName || order.contract_name || 'unknown';
+          
+          // Map side: 1 = BUY, 0 = SELL (ProjectX format) or string values
+          let orderSide = 'unknown';
+          if (order.side === 1 || order.side === '1' || order.side === 'BUY' || order.side === 'buy' || order.side === 'long') {
+            orderSide = 'BUY';
+          } else if (order.side === 0 || order.side === '0' || order.side === 'SELL' || order.side === 'sell' || order.side === 'short') {
+            orderSide = 'SELL';
+          } else if (order.direction) {
+            orderSide = order.direction.toUpperCase();
+          } else if (order.side) {
+            orderSide = order.side.toString().toUpperCase();
+          }
+          
+          const orderQty = order.size || order.quantity || order.qty || 1;
+          
+          // Map order type: type (number) or orderType (string)
+          // ProjectX: type 4 = Stop, 1 = Market, 2 = Limit, etc.
+          let orderType = 'Market';
+          if (order.type === 4 || order.type === '4') {
+            orderType = order.limitPrice ? 'StopLimit' : 'Stop';
+          } else if (order.type === 2 || order.type === '2') {
+            orderType = 'Limit';
+          } else if (order.type === 1 || order.type === '1') {
+            orderType = 'Market';
+          } else if (order.orderType || order.order_type) {
+            orderType = order.orderType || order.order_type;
+          }
+          
+          const orderPrice = order.limitPrice || order.limit_price || order.price;
           const orderStopPrice = order.stopPrice || order.stop_price || order.triggerPrice || order.trigger_price;
           
           console.log(`  📋 Checking order: ${orderSymbol} ${orderSide} ${orderQty} (ID: ${orderId}, Type: ${orderType})`);
