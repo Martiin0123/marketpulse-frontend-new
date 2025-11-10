@@ -3,16 +3,40 @@
  * Connects to the ProjectX Gateway API real-time hub to receive instant order updates
  */
 
-// Dynamic import for SignalR to handle SSR
+// Dynamic import for SignalR - will be loaded when needed
 let signalR: any = null;
+let signalRLoadPromise: Promise<any> | null = null;
 
-// Load SignalR only on client side
-if (typeof window !== 'undefined') {
-  try {
-    signalR = require('@microsoft/signalr');
-  } catch (error) {
-    console.error('❌ Failed to load SignalR:', error);
+// Load SignalR dynamically (for Next.js client-side)
+async function loadSignalR(): Promise<any> {
+  if (signalR) {
+    return signalR;
   }
+
+  if (signalRLoadPromise) {
+    return signalRLoadPromise;
+  }
+
+  signalRLoadPromise = (async () => {
+    if (typeof window === 'undefined') {
+      throw new Error('SignalR can only be loaded on the client side');
+    }
+
+    try {
+      console.log('📦 Loading SignalR library...');
+      // Use dynamic import for Next.js
+      const signalRModule = await import('@microsoft/signalr');
+      signalR = signalRModule;
+      console.log('✅ SignalR library loaded successfully');
+      return signalR;
+    } catch (error) {
+      console.error('❌ Failed to load SignalR:', error);
+      signalRLoadPromise = null;
+      throw error;
+    }
+  })();
+
+  return signalRLoadPromise;
 }
 
 export interface ProjectXOrderUpdate {
@@ -128,10 +152,10 @@ export class ProjectXSignalRClient {
    * Connect to the SignalR hub
    */
   async connect(): Promise<void> {
-    // Check if SignalR is loaded
+    // Load SignalR if not already loaded
     if (!signalR) {
-      console.error('❌ SignalR is not loaded. Make sure @microsoft/signalr is installed.');
-      throw new Error('SignalR library not available');
+      console.log('📦 SignalR not loaded yet, loading now...');
+      await loadSignalR();
     }
 
     if (this.connection && this.isConnected) {

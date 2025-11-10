@@ -52,6 +52,7 @@ export default function CopyTradeSection({
   const supabase = createClient();
 
   useEffect(() => {
+    console.log('🔄 CopyTradeSection: loadConfigs useEffect triggered');
     loadConfigs();
   }, [refreshKey]);
 
@@ -124,11 +125,21 @@ export default function CopyTradeSection({
           }
 
           try {
+            console.log(`  🔧 Creating SignalR client for account ${conn.accountId}...`, {
+              connectionId: conn.connectionId,
+              accountId: conn.accountId,
+              hubUrl: conn.hubUrl,
+              hasToken: !!conn.jwtToken,
+              tokenLength: conn.jwtToken?.length
+            });
+
             const signalRClient = new ProjectXSignalRClient(
               conn.jwtToken,
               conn.accountId,
               conn.hubUrl
             );
+
+            console.log(`  ✅ SignalR client created for account ${conn.accountId}`);
 
             // Handle order updates (new orders, modifications, cancellations)
             signalRClient.onOrderUpdate(async (order: ProjectXOrderUpdate) => {
@@ -271,6 +282,7 @@ export default function CopyTradeSection({
   }, [configs]);
 
   const loadConfigs = async () => {
+    console.log('🔄 CopyTradeSection: loadConfigs called');
     try {
       setIsLoading(true);
       const {
