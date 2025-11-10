@@ -116,6 +116,102 @@ export const getProducts = cache(async (supabase: SupabaseClient) => {
   return products;
 });
 
+/**
+ * Helper function to check if a product is a signals product
+ */
+export function isSignalsProduct(product: any): boolean {
+  const metadata = product.metadata as any;
+  const productType = metadata?.product_type || metadata?.category;
+  const productName = (product.name || '').toLowerCase();
+
+  return (
+    productType === 'signals' ||
+    productName.includes('signal') ||
+    (productName.includes('premium') && !productName.includes('journal')) ||
+    (productName.includes('vip') && !productName.includes('journal'))
+  );
+}
+
+/**
+ * Helper function to check if a product is a journal product
+ */
+export function isJournalProduct(product: any): boolean {
+  const metadata = product.metadata as any;
+  const productType = metadata?.product_type || metadata?.category;
+  const productName = (product.name || '').toLowerCase();
+
+  return (
+    productType === 'journal' ||
+    productName.includes('journal') ||
+    productName.includes('tradesyncer') ||
+    productName.includes('copy trade')
+  );
+}
+
+/**
+ * Check if user has access to signals product
+ */
+export async function hasSignalsAccess(
+  supabase: SupabaseClient
+): Promise<boolean> {
+  const { data: user } = await supabase.auth.getUser();
+  if (!user.user?.id) return false;
+
+  const { data: subscriptions } = await supabase
+    .from('subscriptions')
+    .select(`
+      status,
+      prices:price_id (
+        products:product_id (
+          id,
+          name,
+          metadata
+        )
+      )
+    `)
+    .eq('user_id', user.user.id)
+    .in('status', ['active', 'trialing']);
+
+  if (!subscriptions || subscriptions.length === 0) return false;
+
+  return subscriptions.some((sub: any) => {
+    const product = sub.prices?.products;
+    return product && isSignalsProduct(product);
+  });
+}
+
+/**
+ * Check if user has access to journal product
+ */
+export async function hasJournalAccess(
+  supabase: SupabaseClient
+): Promise<boolean> {
+  const { data: user } = await supabase.auth.getUser();
+  if (!user.user?.id) return false;
+
+  const { data: subscriptions } = await supabase
+    .from('subscriptions')
+    .select(`
+      status,
+      prices:price_id (
+        products:product_id (
+          id,
+          name,
+          metadata
+        )
+      )
+    `)
+    .eq('user_id', user.user.id)
+    .in('status', ['active', 'trialing']);
+
+  if (!subscriptions || subscriptions.length === 0) return false;
+
+  return subscriptions.some((sub: any) => {
+    const product = sub.prices?.products;
+    return product && isJournalProduct(product);
+  });
+}
+
 // Custom type for user details from auth.users
 export type UserDetails = {
   id: string;
