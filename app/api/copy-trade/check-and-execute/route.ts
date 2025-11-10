@@ -350,28 +350,10 @@ export async function POST(request: NextRequest) {
           if (log.order_status === 'pending' || log.order_status === 'submitted') {
             console.log(`  🔄 Order ${sourceOrderId} was tracked but is no longer open. Cancelling follower order ${log.order_id}...`);
 
-            // Get the full log details including destination connection
-            const { data: fullLog, error: logError } = await adminSupabase
-              .from('copy_trade_logs' as any)
-              .select('id, order_id, order_status, destination_broker_connection_id, source_order_id')
-              .eq('id', log.id)
-              .single();
-
-            if (logError || !fullLog) {
-              console.warn(`  ⚠️ Error fetching full log details:`, logError);
-              continue;
-            }
-
-            const matchingLogs = [fullLog];
-
-            if (matchingLogs && matchingLogs.length > 0) {
-              console.log(`  🔄 Found ${matchingLogs.length} copy trade log(s) to cancel for missing order ${sourceOrderId}`);
-
             // Update logs to cancelled status and cancel destination orders
-            for (const log of matchingLogs) {
-              // Try to cancel the destination order if we have an order_id
-              let cancellationSuccess = false;
-              if (log.order_id && log.destination_broker_connection_id) {
+            // We already have all the log details we need from the query above
+            let cancellationSuccess = false;
+            if (log.order_id && log.destination_broker_connection_id) {
                 try {
                   // Get broker connection to cancel order
                   const { data: destConnection } = await adminSupabase
@@ -442,19 +424,20 @@ export async function POST(request: NextRequest) {
                 console.log(`  ⏭️ Skipping cancellation - no order_id (${log.order_id}) or broker connection (${log.destination_broker_connection_id})`);
               }
 
-              // Update log status to cancelled (regardless of whether we successfully cancelled the destination order)
-              // The source order was cancelled, so the log should reflect that
-              await adminSupabase
-                .from('copy_trade_logs' as any)
-                .update({ 
-                  order_status: 'cancelled',
-                  updated_at: new Date().toISOString(),
-                  error_message: cancellationSuccess ? null : (log.order_id ? 'Failed to cancel destination order' : 'No destination order ID to cancel')
-                })
-                .eq('id', log.id);
+            // Update log status to cancelled (regardless of whether we successfully cancelled the destination order)
+            // The source order is no longer open, so the log should reflect that
+            await adminSupabase
+              .from('copy_trade_logs' as any)
+              .update({ 
+                order_status: 'cancelled',
+                updated_at: new Date().toISOString(),
+                error_message: cancellationSuccess ? null : (log.order_id ? 'Failed to cancel destination order' : 'No destination order ID to cancel')
+              })
+              .eq('id', log.id);
 
-              console.log(`  ✅ Updated copy trade log ${log.id} to cancelled status${cancellationSuccess ? ' (destination order cancelled)' : ' (destination order cancellation failed or not attempted)'}`);
-            }
+            console.log(`  ✅ Updated copy trade log ${log.id} to cancelled status${cancellationSuccess ? ' (destination order cancelled)' : ' (destination order cancellation failed or not attempted)'}`);
+          } else {
+            console.log(`  ⏭️ Skipping cancellation - destination order status is ${log.order_status} (not pending/submitted)`);
           }
         }
       } catch (error: any) {
