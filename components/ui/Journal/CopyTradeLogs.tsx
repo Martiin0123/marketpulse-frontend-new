@@ -244,9 +244,18 @@ export default function CopyTradeLogs({
           </label>
           <button
             onClick={loadLogs}
-            className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded transition-colors"
+            className="px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors flex items-center gap-2"
           >
+            <ArrowPathIcon className="h-4 w-4" />
             Refresh
+          </button>
+          <button
+            onClick={handleClearLogs}
+            disabled={isClearing || logs.length === 0}
+            className="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded transition-colors flex items-center gap-2"
+          >
+            <TrashIcon className="h-4 w-4" />
+            {isClearing ? 'Clearing...' : 'Clear Logs'}
           </button>
         </div>
       </div>
