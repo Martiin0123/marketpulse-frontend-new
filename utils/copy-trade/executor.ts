@@ -391,6 +391,7 @@ async function logCopyTradeExecution(
       order_status: status,
       order_type: tradeExecution.orderType || 'Market',
       order_price: tradeExecution.price || null,
+      order_stop_price: tradeExecution.stopPrice || null,
     };
 
     // Store source order ID if available (for tracking cancellations)
