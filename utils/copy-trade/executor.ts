@@ -326,24 +326,62 @@ export async function processCopyTradeExecution(
 
         // Update log with execution result
         if (logId) {
-          await updateCopyTradeLog(
-            supabase,
-            logId,
-            executionResult.success ? 'submitted' : 'error',
-            executionResult.orderId,
-            undefined,
-            undefined,
-            undefined,
-            executionResult.error
-          );
+          if (executionResult.success) {
+            await updateCopyTradeLog(
+              supabase,
+              logId,
+              'submitted',
+              executionResult.orderId
+            );
+          } else if (executionResult.retryable) {
+            // Retryable error - update log with error and increment retry count
+            await updateCopyTradeLog(
+              supabase,
+              logId,
+              'error',
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              executionResult.error
+            );
+            // Get current retry count and increment
+            const { data: existingLog } = await supabase
+              .from('copy_trade_logs' as any)
+              .select('retry_count')
+              .eq('id', logId)
+              .single();
+            
+            await supabase
+              .from('copy_trade_logs' as any)
+              .update({ retry_count: (existingLog?.retry_count || 0) + 1 })
+              .eq('id', logId);
+            
+            console.warn(`⚠️ Retryable error (retry count: ${(existingLog?.retry_count || 0) + 1}): ${executionResult.error}`);
+          } else {
+            // Non-retryable error
+            await updateCopyTradeLog(
+              supabase,
+              logId,
+              'error',
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              executionResult.error
+            );
+          }
         }
 
         if (executionResult.success) {
           result.copied++;
           console.log(`✅ Successfully executed copy trade on ${brokerConnection.broker_account_name}`);
         } else {
+          const errorMsg = executionResult.retryable 
+            ? `[Retryable] ${executionResult.error}`
+            : executionResult.error;
           result.errors.push(
-            `Failed to execute copy trade on ${brokerConnection.broker_account_name}: ${executionResult.error}`
+            `Failed to execute copy trade on ${brokerConnection.broker_account_name}: ${errorMsg}`
           );
         }
       } catch (error: any) {

@@ -14,8 +14,8 @@
 
 ## ⚠️ Partially Implemented
 
-1. **Quantity Changes** - Works in check-and-execute but not in real-time updates
-2. **Order Rejection** - Tracked but not automatically retried
+1. **Quantity Changes** - ✅ Now works in real-time updates (just added)
+2. **Order Rejection** - Tracked with retry detection, but automatic retry logic not yet implemented
 
 ## ❌ Missing Critical Features
 
