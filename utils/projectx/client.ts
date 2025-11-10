@@ -266,9 +266,21 @@ export class ProjectXClient {
           success: data.success,
           hasToken: !!data.token,
           errorMessage: data.errorMessage,
-          fullResponse: data
+          fullResponse: data,
+          serviceType: this.serviceType,
+          baseUrl: this.baseUrl
         });
-        throw new Error(data.errorMessage || `Authentication failed: errorCode=${data.errorCode}, success=${data.success}`);
+        
+        // Provide helpful error message based on error code
+        let errorMsg = data.errorMessage;
+        if (!errorMsg) {
+          if (data.errorCode === 3) {
+            errorMsg = `Invalid credentials (errorCode=3). ${this.serviceType === 'alphaticks' ? 'If AlphaTicks uses a different API URL, please provide it in the Custom API URL field.' : 'Please check your username and API key.'}`;
+          } else {
+            errorMsg = `Authentication failed: errorCode=${data.errorCode}, success=${data.success}`;
+          }
+        }
+        throw new Error(errorMsg);
       }
 
       // Store session token
