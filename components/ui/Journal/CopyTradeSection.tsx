@@ -121,7 +121,6 @@ export default function CopyTradeSection({
 
             // Handle order updates (new orders, modifications, cancellations)
             signalRClient.onOrderUpdate(async (order: ProjectXOrderUpdate) => {
-
               // Status: 0=None, 1=Open, 2=Filled, 3=Cancelled, 4=Expired, 5=Rejected, 6=Pending
               // Order Types: 1=Limit, 2=Market, 4=Stop, 5=TrailingStop
               // Note: Stop Loss (SL) orders are typically type 4 (Stop)
@@ -215,7 +214,6 @@ export default function CopyTradeSection({
 
             // Handle trade updates (executed trades)
             signalRClient.onTradeUpdate(async (trade: ProjectXTradeUpdate) => {
-
               // Process executed trades immediately
               try {
                 const response = await fetch(
@@ -489,59 +487,63 @@ export default function CopyTradeSection({
     <div className="space-y-6">
       {/* Connection Status Banner */}
       <div
-        className={`rounded-xl border-2 p-4 ${
+        className={`rounded-lg border p-4 transition-all ${
           connectionStatus.connected
-            ? 'bg-green-500/10 border-green-500/50'
+            ? 'bg-green-500/10 border-green-500/30'
             : connectionStatus.state === 'Connecting' ||
                 connectionStatus.state === 'Reconnecting'
-              ? 'bg-yellow-500/10 border-yellow-500/50'
-              : 'bg-red-500/10 border-red-500/50'
+              ? 'bg-yellow-500/10 border-yellow-500/30'
+              : 'bg-red-500/10 border-red-500/30'
         }`}
       >
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
+            <div className="relative">
               <div
-                className={`h-5 w-5 rounded-full ${
+                className={`h-3 w-3 rounded-full ${
                   connectionStatus.connected
-                    ? 'bg-green-500 animate-pulse shadow-lg shadow-green-500/50'
+                    ? 'bg-green-500 shadow-lg shadow-green-500/50'
                     : connectionStatus.state === 'Connecting' ||
                         connectionStatus.state === 'Reconnecting'
-                      ? 'bg-yellow-500 animate-pulse shadow-lg shadow-yellow-500/50'
+                      ? 'bg-yellow-500 shadow-lg shadow-yellow-500/50'
                       : 'bg-red-500 shadow-lg shadow-red-500/50'
                 }`}
               />
-              <div>
-                <div
-                  className={`text-lg font-bold ${
-                    connectionStatus.connected
-                      ? 'text-green-400'
-                      : connectionStatus.state === 'Connecting' ||
-                          connectionStatus.state === 'Reconnecting'
-                        ? 'text-yellow-400'
-                        : 'text-red-400'
-                  }`}
-                >
-                  {connectionStatus.connected
-                    ? '🟢 Connected'
+              {connectionStatus.connected && (
+                <div className="absolute inset-0 h-3 w-3 rounded-full bg-green-500 animate-ping opacity-75" />
+              )}
+            </div>
+            <div>
+              <div
+                className={`text-base font-semibold ${
+                  connectionStatus.connected
+                    ? 'text-green-400'
                     : connectionStatus.state === 'Connecting' ||
                         connectionStatus.state === 'Reconnecting'
-                      ? '🟡 Connecting...'
-                      : '🔴 Disconnected'}
-                </div>
-                <div className="text-sm text-slate-400 mt-0.5">
-                  {connectionStatus.connected
-                    ? `Real-time copy trading active (${connectionStatus.activeConnections} connection${connectionStatus.activeConnections !== 1 ? 's' : ''})`
-                    : connectionStatus.state === 'No Active Configs'
-                      ? 'No active copy trade configurations'
-                      : 'Copy trading is not active'}
-                </div>
+                      ? 'text-yellow-400'
+                      : 'text-red-400'
+                }`}
+              >
+                {connectionStatus.connected
+                  ? 'Connected'
+                  : connectionStatus.state === 'Connecting' ||
+                      connectionStatus.state === 'Reconnecting'
+                    ? 'Connecting...'
+                    : 'Disconnected'}
+              </div>
+              <div className="text-xs text-slate-400 mt-0.5">
+                {connectionStatus.connected
+                  ? `Real-time copy trading active${connectionStatus.activeConnections > 1 ? ` (${connectionStatus.activeConnections} connections)` : ''}`
+                  : connectionStatus.state === 'No Active Configs'
+                    ? 'No active copy trade configurations'
+                    : 'Copy trading is not active'}
               </div>
             </div>
           </div>
           {!connectionStatus.connected && (
-            <div className="text-xs text-slate-400">
-              ⚠️ Keep this page open for copy trading
+            <div className="text-xs text-slate-400 flex items-center gap-1">
+              <span>⚠️</span>
+              <span>Keep this page open</span>
             </div>
           )}
         </div>
