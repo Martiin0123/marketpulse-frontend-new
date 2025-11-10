@@ -195,7 +195,8 @@ export default function CopyTradeSection({
                                 : order.type === 4
                                   ? 'Stop'
                                   : 'Limit',
-                          price: order.limitPrice,
+                          // For stop orders, the trigger price is in stopPrice, not limitPrice
+                          price: order.type === 4 ? order.stopPrice : order.limitPrice,
                           stopPrice: order.stopPrice,
                           status: order.status
                         },

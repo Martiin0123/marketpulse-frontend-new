@@ -150,15 +150,23 @@ export async function POST(request: NextRequest) {
         newStopPrice: order.stopPrice
       });
       
+      // For stop orders (type 4), the price is in stopPrice, not limitPrice
       // Check if limit price changed (for limit orders)
       const limitPriceChanged = order.price !== undefined && order.price !== null && 
           existingLog.order_price !== null && 
           Math.abs(Number(existingLog.order_price) - Number(order.price)) > 0.01;
       
       // Check if stop price changed (for stop orders)
+      // For stop orders, we compare stopPrice with order_price (since stop orders store price in order_price)
+      const isStopOrder = order.orderType === 'Stop' || order.orderType === 'StopLimit';
       const stopPriceChanged = order.stopPrice !== undefined && order.stopPrice !== null && 
           existingLog.order_stop_price !== null && 
           Math.abs(Number(existingLog.order_stop_price) - Number(order.stopPrice)) > 0.01;
+      
+      // For stop orders, also check if the order_price (which contains stop price) changed
+      const stopOrderPriceChanged = isStopOrder && order.price !== undefined && order.price !== null &&
+          existingLog.order_price !== null &&
+          Math.abs(Number(existingLog.order_price) - Number(order.price)) > 0.01;
       
       // Also check if stop price was added/changed when it didn't exist before
       const stopPriceAdded = order.stopPrice !== undefined && order.stopPrice !== null && 
@@ -166,13 +174,15 @@ export async function POST(request: NextRequest) {
           order.stopPrice > 0;
       
       console.log(`🔍 Modification detection:`, {
+        isStopOrder,
         limitPriceChanged,
         stopPriceChanged,
+        stopOrderPriceChanged,
         stopPriceAdded,
-        willModify: limitPriceChanged || stopPriceChanged || stopPriceAdded
+        willModify: limitPriceChanged || stopPriceChanged || stopOrderPriceChanged || stopPriceAdded
       });
       
-      if (limitPriceChanged || stopPriceChanged || stopPriceAdded) {
+      if (limitPriceChanged || stopPriceChanged || stopOrderPriceChanged || stopPriceAdded) {
         const priceChange = limitPriceChanged ? `${existingLog.order_price} → ${order.price}` : '';
         const stopChange = stopPriceChanged ? `stop: ${existingLog.order_stop_price} → ${order.stopPrice}` : 
                           stopPriceAdded ? `stop: added ${order.stopPrice}` : '';
@@ -210,12 +220,31 @@ export async function POST(request: NextRequest) {
                                destConnection.broker_user_id || 
                                destConnection.trading_account_id;
               
-              const modifyResult = await client.modifyOrder({
+              // For stop orders, modify stopPrice; for limit orders, modify limitPrice
+              const modifyParams: any = {
                 accountId: accountId,
-                orderId: existingLog.order_id,
-                limitPrice: order.price || undefined, // Only include if present
-                stopPrice: order.stopPrice || undefined // Only include if present
-              });
+                orderId: existingLog.order_id
+              };
+              
+              if (isStopOrder) {
+                // For stop orders, the price is the stop price
+                if (stopOrderPriceChanged || stopPriceChanged || stopPriceAdded) {
+                  modifyParams.stopPrice = order.price || order.stopPrice;
+                }
+              } else {
+                // For limit orders, modify limit price
+                if (limitPriceChanged && order.price) {
+                  modifyParams.limitPrice = order.price;
+                }
+                // Stop price can also be set on limit orders (stop-limit orders)
+                if ((stopPriceChanged || stopPriceAdded) && order.stopPrice) {
+                  modifyParams.stopPrice = order.stopPrice;
+                }
+              }
+              
+              console.log(`✏️ Modifying order with params:`, modifyParams);
+              
+              const modifyResult = await client.modifyOrder(modifyParams);
 
               if (modifyResult.success) {
                 const updateData: any = {

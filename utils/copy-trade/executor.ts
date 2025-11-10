@@ -262,6 +262,12 @@ export async function processCopyTradeExecution(
     // Process each copy trade config
     for (const config of configs as CopyTradeConfig[]) {
       try {
+        console.log(`🔍 Processing config ${config.id}:`, {
+          destinationAccount: config.destination_account_id,
+          multiplier: config.multiplier,
+          enabled: config.enabled
+        });
+        
         // Check filters
         if (!shouldExecuteCopyTrade(tradeExecution, config)) {
           console.log(`⏭️ Skipping copy trade execution due to filters:`, {
@@ -276,6 +282,8 @@ export async function processCopyTradeExecution(
           console.log(`⏭️ No broker connection found for destination account ${config.destination_account_id}`);
           continue;
         }
+
+        console.log(`✅ Config ${config.id} passed filters, executing with multiplier ${config.multiplier}x`);
 
         // Log the copy trade attempt
         const logId = await logCopyTradeExecution(
