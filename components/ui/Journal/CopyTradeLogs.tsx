@@ -164,7 +164,7 @@ export default function CopyTradeLogs({
 
       // Clear local state
       setLogs([]);
-      
+
       console.log('✅ Successfully cleared copy trade logs');
     } catch (error: any) {
       console.error('Error in handleClearLogs:', error);
@@ -235,12 +235,12 @@ export default function CopyTradeLogs({
     const symbol = log.source_symbol;
     const side = log.source_side.toUpperCase();
     const quantity = log.destination_quantity;
-    
+
     // Check if order was modified (updated_at is significantly different from created_at)
     const createdTime = new Date(log.created_at).getTime();
     const updatedTime = new Date(log.updated_at).getTime();
     const wasModified = updatedTime - createdTime > 5000; // More than 5 seconds difference
-    
+
     switch (log.order_status) {
       case 'pending':
         return `Opening ${side} order for ${quantity} ${symbol} on ${destAccount}`;
@@ -274,7 +274,9 @@ export default function CopyTradeLogs({
   };
 
   return (
-    <div className={`bg-slate-800/50 rounded-xl border border-slate-700 ${className}`}>
+    <div
+      className={`bg-slate-800/50 rounded-xl border border-slate-700 ${className}`}
+    >
       <div className="p-4 border-b border-slate-700">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -284,7 +286,8 @@ export default function CopyTradeLogs({
             {/* Compact Stats */}
             <div className="flex items-center gap-3 text-xs">
               <span className="text-slate-400">
-                <span className="text-white font-medium">{stats.total}</span> total
+                <span className="text-white font-medium">{stats.total}</span>{' '}
+                total
               </span>
               <span className="text-green-400">
                 <span className="font-medium">{stats.filled}</span> filled
@@ -348,9 +351,13 @@ export default function CopyTradeLogs({
       {/* Compact Table View */}
       <div className="overflow-x-auto">
         {isLoading ? (
-          <div className="text-center py-8 text-slate-400 text-sm">Loading...</div>
+          <div className="text-center py-8 text-slate-400 text-sm">
+            Loading...
+          </div>
         ) : logs.length === 0 ? (
-          <div className="text-center py-8 text-slate-400 text-sm">No activity yet</div>
+          <div className="text-center py-8 text-slate-400 text-sm">
+            No activity yet
+          </div>
         ) : (
           <table className="w-full">
             <thead className="bg-slate-700/30">
@@ -367,10 +374,14 @@ export default function CopyTradeLogs({
                 <tr
                   key={log.id}
                   className={`hover:bg-slate-700/30 transition-colors ${
-                    log.order_status === 'filled' ? 'bg-green-500/5' :
-                    log.order_status === 'error' || log.order_status === 'rejected' ? 'bg-red-500/5' :
-                    log.order_status === 'cancelled' ? 'bg-orange-500/5' :
-                    ''
+                    log.order_status === 'filled'
+                      ? 'bg-green-500/5'
+                      : log.order_status === 'error' ||
+                          log.order_status === 'rejected'
+                        ? 'bg-red-500/5'
+                        : log.order_status === 'cancelled'
+                          ? 'bg-orange-500/5'
+                          : ''
                   }`}
                 >
                   <td className="px-4 py-2">
@@ -383,10 +394,14 @@ export default function CopyTradeLogs({
                           {getActionDescription(log)}
                         </div>
                         <div className="text-xs text-slate-400 mt-1">
-                          From {log.source_account?.name || 'Source'} → {log.destination_account?.name || 'Destination'}
+                          From {log.source_account?.name || 'Source'} →{' '}
+                          {log.destination_account?.name || 'Destination'}
                         </div>
                         {log.error_message && (
-                          <div className="text-xs text-red-400 mt-1" title={log.error_message}>
+                          <div
+                            className="text-xs text-red-400 mt-1"
+                            title={log.error_message}
+                          >
                             {log.error_message}
                           </div>
                         )}
@@ -397,11 +412,14 @@ export default function CopyTradeLogs({
                     <div className="text-sm text-white font-medium">
                       {log.source_symbol}
                     </div>
-                    <span className={`text-xs font-medium ${
-                      log.source_side.toUpperCase() === 'BUY' || log.source_side.toUpperCase() === 'LONG'
-                        ? 'text-green-400'
-                        : 'text-red-400'
-                    }`}>
+                    <span
+                      className={`text-xs font-medium ${
+                        log.source_side.toUpperCase() === 'BUY' ||
+                        log.source_side.toUpperCase() === 'LONG'
+                          ? 'text-green-400'
+                          : 'text-red-400'
+                      }`}
+                    >
                       {log.source_side.toUpperCase()}
                     </span>
                   </td>

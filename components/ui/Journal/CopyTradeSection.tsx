@@ -571,47 +571,72 @@ export default function CopyTradeSection({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold text-white">Copy Trading</h2>
-            {/* Connection Status Indicator */}
-            <div className="flex items-center gap-2">
+      {/* Connection Status Banner */}
+      <div
+        className={`rounded-xl border-2 p-4 ${
+          connectionStatus.connected
+            ? 'bg-green-500/10 border-green-500/50'
+            : connectionStatus.state === 'Connecting' ||
+                connectionStatus.state === 'Reconnecting'
+              ? 'bg-yellow-500/10 border-yellow-500/50'
+              : 'bg-red-500/10 border-red-500/50'
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <div
-                className={`h-3 w-3 rounded-full ${
+                className={`h-5 w-5 rounded-full ${
                   connectionStatus.connected
-                    ? 'bg-green-500 animate-pulse'
+                    ? 'bg-green-500 animate-pulse shadow-lg shadow-green-500/50'
                     : connectionStatus.state === 'Connecting' ||
                         connectionStatus.state === 'Reconnecting'
-                      ? 'bg-yellow-500 animate-pulse'
-                      : 'bg-red-500'
+                      ? 'bg-yellow-500 animate-pulse shadow-lg shadow-yellow-500/50'
+                      : 'bg-red-500 shadow-lg shadow-red-500/50'
                 }`}
-                title={`Status: ${connectionStatus.state} (${connectionStatus.activeConnections} active)`}
               />
-              <span
-                className={`text-sm font-medium ${
-                  connectionStatus.connected
-                    ? 'text-green-400'
+              <div>
+                <div
+                  className={`text-lg font-bold ${
+                    connectionStatus.connected
+                      ? 'text-green-400'
+                      : connectionStatus.state === 'Connecting' ||
+                          connectionStatus.state === 'Reconnecting'
+                        ? 'text-yellow-400'
+                        : 'text-red-400'
+                  }`}
+                >
+                  {connectionStatus.connected
+                    ? '🟢 Connected'
                     : connectionStatus.state === 'Connecting' ||
                         connectionStatus.state === 'Reconnecting'
-                      ? 'text-yellow-400'
-                      : 'text-red-400'
-                }`}
-              >
-                {connectionStatus.state}
-              </span>
+                      ? '🟡 Connecting...'
+                      : '🔴 Disconnected'}
+                </div>
+                <div className="text-sm text-slate-400 mt-0.5">
+                  {connectionStatus.connected
+                    ? `Real-time copy trading active (${connectionStatus.activeConnections} connection${connectionStatus.activeConnections !== 1 ? 's' : ''})`
+                    : connectionStatus.state === 'No Active Configs'
+                      ? 'No active copy trade configurations'
+                      : 'Copy trading is not active'}
+                </div>
+              </div>
             </div>
           </div>
+          {!connectionStatus.connected && (
+            <div className="text-xs text-slate-400">
+              ⚠️ Keep this page open for copy trading
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Copy Trading</h2>
           <p className="text-slate-400 mt-1">
             Automatically copy trades from one account to another
           </p>
-          <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-            <p className="text-sm text-amber-400">
-              ⚠️ <strong>Important:</strong> Copy trading only works when this
-              page is open. The connection must remain active for real-time
-              trade copying to function.
-            </p>
-          </div>
         </div>
         <button
           onClick={() => {
