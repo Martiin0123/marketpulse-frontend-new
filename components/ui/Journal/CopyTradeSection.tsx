@@ -54,9 +54,13 @@ export default function CopyTradeSection({
   // Real-time monitoring: Poll continuously for new trades and execute copy trades
   useEffect(() => {
     // Only poll if there are active configs
-    if (configs.length === 0 || !configs.some((c) => c.enabled)) {
+    const activeConfigs = configs.filter((c) => c.enabled);
+    if (activeConfigs.length === 0) {
+      console.log('⏸️ Copy trade polling paused: No active configs');
       return;
     }
+
+    console.log(`🔄 Starting copy trade polling with ${activeConfigs.length} active config(s)`);
 
     let isPolling = true;
 
@@ -78,6 +82,12 @@ export default function CopyTradeSection({
               `✅ Executed ${data.executed} copy trade(s) in real-time`
             );
           }
+          if (data.checked > 0 || data.executed > 0) {
+            console.log(`📊 Copy trade check: ${data.checked} checked, ${data.executed} executed`);
+          }
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          console.warn('⚠️ Copy trade check failed:', errorData);
         }
       } catch (error) {
         // Silently fail - don't spam console

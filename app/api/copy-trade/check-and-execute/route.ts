@@ -62,9 +62,12 @@ export async function POST(request: NextRequest) {
     let totalExecuted = 0;
     const errors: string[] = [];
 
+    console.log(`🔍 Checking ${brokerConnections.length} broker connection(s) for new opening executions`);
+
     // Check each broker connection for new opening executions
     for (const conn of brokerConnections) {
       try {
+        console.log(`\n📡 Processing broker connection: ${conn.broker_account_name} (Account ID: ${conn.trading_account_id})`);
         // Initialize ProjectX client
         const authMethod = conn.auth_method || 'api_key';
         const serviceType = (conn.api_service_type as 'topstepx' | 'alphaticks') || 'topstepx';
@@ -103,11 +106,15 @@ export async function POST(request: NextRequest) {
         const startTime = new Date();
         startTime.setSeconds(startTime.getSeconds() - 30); // Check last 30 seconds for immediate response
 
+        console.log(`🔍 Fetching executions for ${conn.broker_account_name} from ${startTime.toISOString()} to ${endTime.toISOString()}`);
+        
         const executions = await client.getTrades(
           conn.broker_account_name,
           startTime,
           endTime
         );
+
+        console.log(`📊 Fetched ${executions.length} total execution(s) from API`);
 
         // Filter to only filled executions with PnL=0 (opening executions)
         const openingExecutions = executions.filter(exec => {
@@ -116,48 +123,84 @@ export async function POST(request: NextRequest) {
                           status === 'CLOSED' || 
                           status === 'COMPLETED' || 
                           status === 'EXECUTED' ||
-                          status === 'FILL';
+                          status === 'FILL' ||
+                          !status; // Some APIs might not return status
           const isOpening = !exec.pnl || exec.pnl === 0;
-          return isFilled && isOpening;
+          const result = isFilled && isOpening;
+          
+          if (!result && exec.pnl === 0) {
+            console.log(`  ⏭️ Skipping execution: status=${status}, pnl=${exec.pnl}, isFilled=${isFilled}`);
+          }
+          
+          return result;
         });
+
+        console.log(`📈 Found ${openingExecutions.length} opening execution(s) (PnL=0, filled)`);
 
         totalChecked += openingExecutions.length;
 
+        console.log(`🔍 Checking ${openingExecutions.length} opening execution(s) for account ${conn.broker_account_name}`);
+
         // Check each opening execution to see if it's new
         for (const exec of openingExecutions) {
-          // Check if this execution was already processed
-          const { data: existingLog } = await adminSupabase
-            .from('copy_trade_logs' as any)
-            .select('id')
-            .eq('source_account_id', conn.trading_account_id)
-            .eq('order_status', 'submitted')
-            .or(`order_status.eq.filled,order_status.eq.error`)
-            .gte('created_at', startTime.toISOString())
-            .single();
+          const execId = exec.id || (exec as any).executionId || 'unknown';
+          const execSymbol = exec.symbol || 'unknown';
+          const execSide = exec.side || 'unknown';
+          const execQty = exec.quantity || (exec as any).size || 1;
+          
+          console.log(`  📋 Checking execution: ${execSymbol} ${execSide} ${execQty} (ID: ${execId})`);
 
-          // Check if execution exists in trade_entries
-          const { data: existingTrade } = await adminSupabase
+          // Check if this execution was already processed (using maybeSingle to avoid errors)
+          const { data: existingLog, error: logError } = await adminSupabase
+            .from('copy_trade_logs' as any)
+            .select('id, order_status, created_at')
+            .eq('source_account_id', conn.trading_account_id)
+            .eq('source_symbol', execSymbol)
+            .eq('source_side', execSide)
+            .eq('source_quantity', execQty)
+            .gte('created_at', startTime.toISOString())
+            .maybeSingle();
+
+          if (logError) {
+            console.warn(`  ⚠️ Error checking logs:`, logError);
+          }
+
+          // Check if execution exists in trade_entries (using maybeSingle)
+          const { data: existingTrade, error: tradeError } = await adminSupabase
             .from('trade_entries' as any)
             .select('id')
-            .eq('broker_trade_id', `projectx_${exec.id}`)
-            .single();
+            .eq('broker_trade_id', `projectx_${execId}`)
+            .maybeSingle();
+
+          if (tradeError) {
+            console.warn(`  ⚠️ Error checking trades:`, tradeError);
+          }
 
           // If it's a new execution (not in logs and not in trades), execute copy trade
           if (!existingLog && !existingTrade) {
-            console.log(`🔄 NEW opening execution detected: ${exec.symbol} ${exec.side} ${exec.quantity || (exec as any).size || 1}`);
+            console.log(`  🔄 NEW opening execution detected: ${execSymbol} ${execSide} ${execQty} (ID: ${execId})`);
 
             // Extract order type and prices from execution
             const orderType = (exec as any).orderType || 'Market';
             const price = exec.price;
             const stopPrice = (exec as any).stopPrice;
 
+            console.log(`  🚀 Executing copy trade with params:`, {
+              symbol: execSymbol,
+              side: execSide,
+              quantity: execQty,
+              orderType,
+              price,
+              stopPrice
+            });
+
             // Execute copy trade for this source account
             const copyResult = await processCopyTradeExecution(
               conn.trading_account_id,
               {
-                symbol: exec.symbol,
-                side: exec.side,
-                quantity: exec.quantity || (exec as any).size || 1,
+                symbol: execSymbol,
+                side: execSide,
+                quantity: execQty,
                 orderType: orderType,
                 price: price,
                 stopPrice: stopPrice
@@ -167,10 +210,18 @@ export async function POST(request: NextRequest) {
 
             if (copyResult.copied > 0) {
               totalExecuted += copyResult.copied;
-              console.log(`✅ Executed ${copyResult.copied} copy trade(s) for ${exec.symbol}`);
+              console.log(`  ✅ Executed ${copyResult.copied} copy trade(s) for ${execSymbol}`);
             }
             if (copyResult.errors.length > 0) {
+              console.error(`  ❌ Copy trade errors:`, copyResult.errors);
               errors.push(...copyResult.errors);
+            }
+          } else {
+            if (existingLog) {
+              console.log(`  ⏭️ Execution already logged (status: ${existingLog.order_status})`);
+            }
+            if (existingTrade) {
+              console.log(`  ⏭️ Execution already in trade_entries`);
             }
           }
         }
@@ -179,6 +230,13 @@ export async function POST(request: NextRequest) {
         errors.push(`Error checking ${conn.broker_account_name}: ${error.message}`);
       }
     }
+
+    console.log(`\n📊 Check-and-execute summary:`, {
+      checked: totalChecked,
+      executed: totalExecuted,
+      errors: errors.length,
+      timestamp: new Date().toISOString()
+    });
 
     return NextResponse.json({
       checked: totalChecked,
