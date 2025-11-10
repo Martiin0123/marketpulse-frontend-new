@@ -153,23 +153,6 @@ export default function CopyTradeLogs({
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
-      case 'submitted':
-        return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
-      case 'filled':
-        return 'bg-green-500/10 text-green-500 border-green-500/20';
-      case 'rejected':
-      case 'cancelled':
-      case 'error':
-        return 'bg-red-500/10 text-red-500 border-red-500/20';
-      default:
-        return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
-    }
-  };
-
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
