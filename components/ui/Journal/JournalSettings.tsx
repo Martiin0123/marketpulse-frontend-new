@@ -7,6 +7,7 @@ import { Plus } from '@phosphor-icons/react';
 import SettingsModal from './SettingsModal';
 import CreateAccountModal from './CreateAccountModal';
 import EditAccountModal from './EditAccountModal';
+import ConnectBrokerModal from './ConnectBrokerModal';
 import BrokerConnection from './BrokerConnection';
 import type { TradingAccount } from '@/types/journal';
 
@@ -32,6 +33,11 @@ export default function JournalSettings({
     null
   );
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isConnectBrokerModalOpen, setIsConnectBrokerModalOpen] =
+    useState(false);
+  const [selectedBrokerType, setSelectedBrokerType] = useState<
+    'projectx' | null
+  >(null);
 
   const handleDeleteAccount = async (accountId: string) => {
     const account = accounts.find((acc) => acc.id === accountId);
@@ -98,13 +104,25 @@ export default function JournalSettings({
           <h3 className="text-lg font-semibold text-white">
             Account Management
           </h3>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            <Plus size={18} weight="bold" />
-            <span>Create Manual Account</span>
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => {
+                setSelectedBrokerType('projectx');
+                setIsConnectBrokerModalOpen(true);
+              }}
+              className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              <Plus size={18} weight="bold" />
+              <span>Connect Project X</span>
+            </button>
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              <Plus size={18} weight="bold" />
+              <span>Create Manual Account</span>
+            </button>
+          </div>
         </div>
         <div className="space-y-3">
           {accounts.length === 0 ? (
