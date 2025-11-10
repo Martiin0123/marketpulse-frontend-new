@@ -6,8 +6,8 @@ import {
   ChartBarIcon,
   ClockIcon,
   CalendarIcon,
-  TrendingUpIcon,
-  TrendingDownIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
   FireIcon,
   StarIcon,
   TrophyIcon,
@@ -583,7 +583,7 @@ export default function AdvancedPerformanceAnalysis({
           { id: 'overview', label: 'Overview', icon: ChartBarIcon },
           { id: 'monthly', label: 'Monthly', icon: CalendarIcon },
           { id: 'duration', label: 'Duration', icon: ClockIcon },
-          { id: 'distribution', label: 'Distribution', icon: TrendingUpIcon },
+          { id: 'distribution', label: 'Distribution', icon: ArrowTrendingUpIcon },
           { id: 'risk', label: 'Risk Metrics', icon: ExclamationTriangleIcon }
         ].map((tab) => {
           const Icon = tab.icon;
@@ -625,7 +625,7 @@ export default function AdvancedPerformanceAnalysis({
             <MetricCard
               label="Total RR"
               value={formatRR(overviewStats.totalRR)}
-              icon={TrendingUpIcon}
+              icon={ArrowTrendingUpIcon}
               color={overviewStats.totalRR >= 0 ? 'emerald' : 'red'}
             />
             <MetricCard
@@ -641,7 +641,7 @@ export default function AdvancedPerformanceAnalysis({
             <MetricCard
               label="Expectancy"
               value={formatRR(overviewStats.expectancy)}
-              icon={TrendingUpIcon}
+              icon={ArrowTrendingUpIcon}
               color={overviewStats.expectancy >= 0 ? 'emerald' : 'red'}
             />
             <MetricCard
@@ -816,7 +816,7 @@ export default function AdvancedPerformanceAnalysis({
               </div>
             </PerformanceCard>
 
-            <PerformanceCard title="Drawdown" icon={TrendingDownIcon}>
+            <PerformanceCard title="Drawdown" icon={ArrowTrendingDownIcon}>
               <div className="space-y-2">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-red-400 mb-1">
