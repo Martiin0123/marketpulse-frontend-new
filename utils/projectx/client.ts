@@ -242,14 +242,33 @@ export class ProjectXClient {
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('❌ Authentication response error:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorText,
+          url: loginUrl
+        });
         throw new Error(`Authentication failed: ${response.status} ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('🔍 Authentication response:', {
+        hasToken: !!data.token,
+        errorCode: data.errorCode,
+        success: data.success,
+        errorMessage: data.errorMessage
+      });
       
       // Check if success (errorCode 0)
       if (data.errorCode !== 0 || !data.success || !data.token) {
-        throw new Error(data.errorMessage || 'Authentication failed');
+        console.error('❌ Authentication validation failed:', {
+          errorCode: data.errorCode,
+          success: data.success,
+          hasToken: !!data.token,
+          errorMessage: data.errorMessage,
+          fullResponse: data
+        });
+        throw new Error(data.errorMessage || `Authentication failed: errorCode=${data.errorCode}, success=${data.success}`);
       }
 
       // Store session token
