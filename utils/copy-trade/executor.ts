@@ -50,7 +50,7 @@ export async function executeCopyTrade(
   sourceTrade: TradeExecution,
   destinationConnection: BrokerConnection,
   multiplier: number
-): Promise<{ success: boolean; error?: string; orderId?: string }> {
+): Promise<{ success: boolean; error?: string; orderId?: string; retryable?: boolean }> {
   try {
     console.log('🚀 Executing copy trade:', {
       symbol: sourceTrade.symbol,
@@ -162,7 +162,26 @@ async function executeProjectXOrder(
       console.log('✅ Order placed successfully:', orderResult.orderId);
       return { success: true, orderId: orderResult.orderId };
     } else {
-      return { success: false, error: orderResult.error || 'Failed to place order' };
+      // Check if error is retryable (network errors, temporary API issues)
+      const retryableErrors = [
+        'timeout',
+        'network',
+        'connection',
+        '503',
+        '502',
+        '504',
+        'rate limit',
+        'too many requests'
+      ];
+      
+      const errorLower = (orderResult.error || '').toLowerCase();
+      const isRetryable = retryableErrors.some(err => errorLower.includes(err));
+      
+      return { 
+        success: false, 
+        error: orderResult.error || 'Failed to place order',
+        retryable: isRetryable
+      };
     }
   } catch (error: any) {
     console.error('❌ Error placing ProjectX order:', error);

@@ -257,8 +257,29 @@ export async function POST(request: NextRequest) {
         existingPrice: existingLog.order_price,
         newPrice: order.price,
         existingStopPrice: existingLog.order_stop_price,
-        newStopPrice: order.stopPrice
+        newStopPrice: order.stopPrice,
+        existingQuantity: existingLog.destination_quantity,
+        newQuantity: order.quantity
       });
+      
+      // Get multiplier first to properly calculate destination quantity for comparison
+      const { data: config } = await adminSupabase
+        .from('copy_trade_configs' as any)
+        .select('multiplier')
+        .eq('source_account_id', tradingAccountId)
+        .eq('destination_account_id', existingLog.destination_account_id)
+        .maybeSingle();
+      
+      const multiplier = config?.multiplier || 1;
+      
+      // Check if quantity changed (compare destination quantities)
+      const newDestinationQuantity = order.quantity !== undefined && order.quantity !== null
+        ? Math.round(order.quantity * multiplier)
+        : null;
+      
+      const quantityChanged = newDestinationQuantity !== null &&
+          existingLog.destination_quantity !== null &&
+          Math.abs(Number(existingLog.destination_quantity) - Number(newDestinationQuantity)) > 0.01;
       
       // For stop orders (type 4), the price is in stopPrice, not limitPrice
       // Check if limit price changed (for limit orders)
@@ -285,14 +306,15 @@ export async function POST(request: NextRequest) {
       
       console.log(`🔍 Modification detection:`, {
         isStopOrder,
+        quantityChanged,
         limitPriceChanged,
         stopPriceChanged,
         stopOrderPriceChanged,
         stopPriceAdded,
-        willModify: limitPriceChanged || stopPriceChanged || stopOrderPriceChanged || stopPriceAdded
+        willModify: quantityChanged || limitPriceChanged || stopPriceChanged || stopOrderPriceChanged || stopPriceAdded
       });
       
-      if (limitPriceChanged || stopPriceChanged || stopOrderPriceChanged || stopPriceAdded) {
+      if (quantityChanged || limitPriceChanged || stopPriceChanged || stopOrderPriceChanged || stopPriceAdded) {
         const priceChange = limitPriceChanged ? `${existingLog.order_price} → ${order.price}` : '';
         const stopChange = stopPriceChanged ? `stop: ${existingLog.order_stop_price} → ${order.stopPrice}` : 
                           stopPriceAdded ? `stop: added ${order.stopPrice}` : '';
@@ -330,11 +352,21 @@ export async function POST(request: NextRequest) {
                                destConnection.broker_user_id || 
                                destConnection.trading_account_id;
               
+              // Use multiplier already calculated above
+              const newDestinationQuantity = quantityChanged && order.quantity 
+                ? Math.round(order.quantity * multiplier)
+                : undefined;
+              
               // For stop orders, modify stopPrice; for limit orders, modify limitPrice
               const modifyParams: any = {
                 accountId: accountId,
                 orderId: existingLog.order_id
               };
+              
+              // Add quantity if it changed
+              if (quantityChanged && newDestinationQuantity) {
+                modifyParams.quantity = newDestinationQuantity;
+              }
               
               if (isStopOrder) {
                 // For stop orders, the price is the stop price
@@ -356,25 +388,31 @@ export async function POST(request: NextRequest) {
               
               const modifyResult = await client.modifyOrder(modifyParams);
 
-              if (modifyResult.success) {
-                const updateData: any = {
-                  updated_at: new Date().toISOString()
-                };
-                
-                // Update limit price if it changed
-                if (limitPriceChanged && order.price) {
-                  updateData.order_price = order.price;
-                }
-                
-                // Update stop price if it changed
-                if ((stopPriceChanged || stopPriceAdded) && order.stopPrice) {
-                  updateData.order_stop_price = order.stopPrice;
-                }
-                
-                await adminSupabase
-                  .from('copy_trade_logs' as any)
-                  .update(updateData)
-                  .eq('id', existingLog.id);
+                  if (modifyResult.success) {
+                    const updateData: any = {
+                      updated_at: new Date().toISOString()
+                    };
+                    
+                    // Update quantity if it changed
+                    if (quantityChanged && newDestinationQuantity) {
+                      updateData.destination_quantity = newDestinationQuantity;
+                      updateData.source_quantity = order.quantity;
+                    }
+                    
+                    // Update limit price if it changed
+                    if (limitPriceChanged && order.price) {
+                      updateData.order_price = order.price;
+                    }
+                    
+                    // Update stop price if it changed
+                    if ((stopPriceChanged || stopPriceAdded) && order.stopPrice) {
+                      updateData.order_stop_price = order.stopPrice;
+                    }
+                    
+                    await adminSupabase
+                      .from('copy_trade_logs' as any)
+                      .update(updateData)
+                      .eq('id', existingLog.id);
 
                 return NextResponse.json({
                   modified: 1,
