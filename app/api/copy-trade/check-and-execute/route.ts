@@ -101,128 +101,102 @@ export async function POST(request: NextRequest) {
           continue; // Skip if no valid auth
         }
 
-        // Fetch recent executions (last 30 seconds for immediate detection)
-        const endTime = new Date();
-        const startTime = new Date();
-        startTime.setSeconds(startTime.getSeconds() - 30); // Check last 30 seconds for immediate response
-
-        console.log(`🔍 Fetching executions for ${conn.broker_account_name} from ${startTime.toISOString()} to ${endTime.toISOString()}`);
+        // Fetch recent orders (pending/submitted) for immediate detection
+        // We check orders instead of executions to catch trades as soon as they're placed
+        console.log(`🔍 Fetching orders for ${conn.broker_account_name}`);
         
-        const executions = await client.getTrades(
+        const orders = await client.getOrders(
           conn.broker_account_name,
-          startTime,
-          endTime
+          'All' // Get all orders (pending, submitted, filled) to catch new ones
         );
 
-        console.log(`📊 Fetched ${executions.length} total execution(s) from API`);
+        console.log(`📊 Fetched ${orders.length} total order(s) from API`);
 
-        // Filter to only filled executions with PnL=0 (opening executions)
-        const openingExecutions = executions.filter(exec => {
-          const status = (exec.status || '').toUpperCase();
-          const isFilled = status === 'FILLED' || 
-                          status === 'CLOSED' || 
-                          status === 'COMPLETED' || 
-                          status === 'EXECUTED' ||
-                          status === 'FILL' ||
-                          !status; // Some APIs might not return status
-          const isOpening = !exec.pnl || exec.pnl === 0;
-          const result = isFilled && isOpening;
+        // Filter to only new/pending/submitted orders (not filled or cancelled)
+        // These are orders that were just placed and need to be copied
+        const newOrders = orders.filter(order => {
+          const status = (order.status || order.orderStatus || '').toUpperCase();
+          const isNew = status === 'PENDING' || 
+                        status === 'SUBMITTED' || 
+                        status === 'NEW' ||
+                        status === 'OPEN' ||
+                        status === 'ACTIVE' ||
+                        !status; // If no status, assume it's new
           
-          if (!result && exec.pnl === 0) {
-            console.log(`  ⏭️ Skipping execution: status=${status}, pnl=${exec.pnl}, isFilled=${isFilled}`);
-          }
-          
-          return result;
+          return isNew;
         });
 
-        console.log(`📈 Found ${openingExecutions.length} opening execution(s) (PnL=0, filled)`);
+        console.log(`📈 Found ${newOrders.length} new order(s) (pending/submitted)`);
 
-        totalChecked += openingExecutions.length;
+        totalChecked += newOrders.length;
 
-        console.log(`🔍 Checking ${openingExecutions.length} opening execution(s) for account ${conn.broker_account_name}`);
+        console.log(`🔍 Checking ${newOrders.length} new order(s) for account ${conn.broker_account_name}`);
 
-        // Check each opening execution to see if it's new
-        for (const exec of openingExecutions) {
-          const execId = exec.id || (exec as any).executionId || 'unknown';
-          const execSymbol = exec.symbol || 'unknown';
-          const execSide = exec.side || 'unknown';
-          const execQty = exec.quantity || (exec as any).size || 1;
+        // Check each new order to see if it's already been processed
+        for (const order of newOrders) {
+          const orderId = order.id || order.orderId || order.order_id || 'unknown';
+          const orderSymbol = order.symbol || order.contractName || order.contract_name || 'unknown';
+          const orderSide = order.side || order.direction || 'unknown';
+          const orderQty = order.quantity || order.size || order.qty || 1;
+          const orderType = order.orderType || order.order_type || order.type || 'Market';
+          const orderPrice = order.price || order.limitPrice || order.limit_price;
+          const orderStopPrice = order.stopPrice || order.stop_price || order.triggerPrice || order.trigger_price;
           
-          console.log(`  📋 Checking execution: ${execSymbol} ${execSide} ${execQty} (ID: ${execId})`);
+          console.log(`  📋 Checking order: ${orderSymbol} ${orderSide} ${orderQty} (ID: ${orderId}, Type: ${orderType})`);
 
-          // Check if this execution was already processed (using maybeSingle to avoid errors)
+          // Check if this order was already processed (using maybeSingle to avoid errors)
+          // We check by order ID from the broker
           const { data: existingLog, error: logError } = await adminSupabase
             .from('copy_trade_logs' as any)
             .select('id, order_status, created_at')
             .eq('source_account_id', conn.trading_account_id)
-            .eq('source_symbol', execSymbol)
-            .eq('source_side', execSide)
-            .eq('source_quantity', execQty)
-            .gte('created_at', startTime.toISOString())
+            .eq('source_symbol', orderSymbol)
+            .eq('source_side', orderSide)
+            .eq('source_quantity', orderQty)
+            .gte('created_at', new Date(Date.now() - 60000).toISOString()) // Check last minute
             .maybeSingle();
 
           if (logError) {
             console.warn(`  ⚠️ Error checking logs:`, logError);
           }
 
-          // Check if execution exists in trade_entries (using maybeSingle)
-          const { data: existingTrade, error: tradeError } = await adminSupabase
-            .from('trade_entries' as any)
-            .select('id')
-            .eq('broker_trade_id', `projectx_${execId}`)
-            .maybeSingle();
-
-          if (tradeError) {
-            console.warn(`  ⚠️ Error checking trades:`, tradeError);
-          }
-
-          // If it's a new execution (not in logs and not in trades), execute copy trade
-          if (!existingLog && !existingTrade) {
-            console.log(`  🔄 NEW opening execution detected: ${execSymbol} ${execSide} ${execQty} (ID: ${execId})`);
-
-            // Extract order type and prices from execution
-            const orderType = (exec as any).orderType || 'Market';
-            const price = exec.price;
-            const stopPrice = (exec as any).stopPrice;
+          // If it's a new order (not in logs), execute copy trade
+          if (!existingLog) {
+            console.log(`  🔄 NEW order detected: ${orderSymbol} ${orderSide} ${orderQty} (ID: ${orderId})`);
 
             console.log(`  🚀 Executing copy trade with params:`, {
-              symbol: execSymbol,
-              side: execSide,
-              quantity: execQty,
+              symbol: orderSymbol,
+              side: orderSide,
+              quantity: orderQty,
               orderType,
-              price,
-              stopPrice
+              price: orderPrice,
+              stopPrice: orderStopPrice
             });
 
             // Execute copy trade for this source account
             const copyResult = await processCopyTradeExecution(
               conn.trading_account_id,
               {
-                symbol: execSymbol,
-                side: execSide,
-                quantity: execQty,
+                symbol: orderSymbol,
+                side: orderSide,
+                quantity: orderQty,
                 orderType: orderType,
-                price: price,
-                stopPrice: stopPrice
+                price: orderPrice,
+                stopPrice: orderStopPrice
               },
               user.id
             );
 
             if (copyResult.copied > 0) {
               totalExecuted += copyResult.copied;
-              console.log(`  ✅ Executed ${copyResult.copied} copy trade(s) for ${execSymbol}`);
+              console.log(`  ✅ Executed ${copyResult.copied} copy trade(s) for ${orderSymbol}`);
             }
             if (copyResult.errors.length > 0) {
               console.error(`  ❌ Copy trade errors:`, copyResult.errors);
               errors.push(...copyResult.errors);
             }
           } else {
-            if (existingLog) {
-              console.log(`  ⏭️ Execution already logged (status: ${existingLog.order_status})`);
-            }
-            if (existingTrade) {
-              console.log(`  ⏭️ Execution already in trade_entries`);
-            }
+            console.log(`  ⏭️ Order already processed (status: ${existingLog.order_status})`);
           }
         }
       } catch (error: any) {

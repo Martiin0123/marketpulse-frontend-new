@@ -500,6 +500,77 @@ export class ProjectXClient {
   }
 
   /**
+   * Get orders (open/pending orders) for an account
+   * ProjectX Gateway API: POST /api/Order/search or similar
+   * This is used for real-time copy trading to detect new orders immediately
+   */
+  async getOrders(
+    accountId: string,
+    status?: 'Pending' | 'Submitted' | 'Filled' | 'Cancelled' | 'All'
+  ): Promise<any[]> {
+    // Ensure we're authenticated
+    await this.ensureValidAuth();
+    
+    // Try different endpoint patterns based on Gateway API structure
+    const endpoints = [
+      '/api/Order/search',  // Most likely for orders
+      '/api/Order/list',
+      '/api/Order/open',
+      '/api/Order/pending',
+      '/api/orders',
+      '/api/order/search',
+      '/api/order/list'
+    ];
+
+    // Build request body (Gateway API uses POST with body)
+    const requestBody: any = {
+      accountId: parseInt(accountId) || accountId,
+    };
+    
+    if (status && status !== 'All') {
+      requestBody.status = status;
+    }
+
+    console.log(`🔍 Fetching orders from ProjectX API:`, {
+      accountId,
+      status: status || 'All',
+      baseUrl: this.baseUrl,
+      endpoints: endpoints
+    });
+
+    for (const endpoint of endpoints) {
+      try {
+        const response = await this.apiRequest(endpoint, {
+          method: 'POST',
+          body: JSON.stringify(requestBody),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response && Array.isArray(response)) {
+          console.log(`✅ Successfully fetched ${response.length} order(s) from ${endpoint}`);
+          return response;
+        } else if (response && response.orders && Array.isArray(response.orders)) {
+          console.log(`✅ Successfully fetched ${response.orders.length} order(s) from ${endpoint}`);
+          return response.orders;
+        } else if (response && response.data && Array.isArray(response.data)) {
+          console.log(`✅ Successfully fetched ${response.data.length} order(s) from ${endpoint}`);
+          return response.data;
+        }
+      } catch (error: any) {
+        // Continue to next endpoint if this one fails
+        console.log(`⚠️ Endpoint ${endpoint} failed:`, error.message);
+        continue;
+      }
+    }
+
+    // If all endpoints failed, return empty array
+    console.warn(`❌ Failed to fetch orders from all endpoints. Tried: ${endpoints.join(', ')}`);
+    return [];
+  }
+
+  /**
    * Get trades (executions) for an account
    * ProjectX Gateway API: POST /api/Execution/search or similar
    * Need to check API docs for exact endpoint

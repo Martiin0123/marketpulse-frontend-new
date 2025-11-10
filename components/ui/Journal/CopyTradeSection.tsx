@@ -60,7 +60,9 @@ export default function CopyTradeSection({
       return;
     }
 
-    console.log(`🔄 Starting copy trade polling with ${activeConfigs.length} active config(s)`);
+    console.log(
+      `🔄 Starting copy trade polling with ${activeConfigs.length} active config(s)`
+    );
 
     let isPolling = true;
 
@@ -83,7 +85,9 @@ export default function CopyTradeSection({
             );
           }
           if (data.checked > 0 || data.executed > 0) {
-            console.log(`📊 Copy trade check: ${data.checked} checked, ${data.executed} executed`);
+            console.log(
+              `📊 Copy trade check: ${data.checked} checked, ${data.executed} executed`
+            );
           }
         } else {
           const errorData = await response.json().catch(() => ({}));
