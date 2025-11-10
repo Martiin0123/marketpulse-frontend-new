@@ -10,6 +10,8 @@ import { processCopyTradeExecution } from '@/utils/copy-trade/executor';
  * POST /api/copy-trade/check-and-execute
  */
 export async function POST(request: NextRequest) {
+  console.log('🚀 Copy trade check-and-execute endpoint called');
+  
   try {
     // Verify user is authenticated
     const supabase = createClient();
@@ -19,19 +21,28 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
+      console.log('❌ Unauthorized - no user');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    console.log(`✅ User authenticated: ${user.id}`);
 
     const adminSupabase = getSupabaseAdmin();
 
     // Get all active copy trade configs for this user
+    console.log('🔍 Fetching copy trade configs...');
     const { data: configs, error: configError } = await adminSupabase
       .from('copy_trade_configs' as any)
       .select('*, source_account:trading_accounts!copy_trade_configs_source_account_id_fkey(id, name)')
       .eq('user_id', user.id)
       .eq('enabled', true);
 
+    if (configError) {
+      console.error('❌ Error fetching configs:', configError);
+    }
+
     if (configError || !configs || configs.length === 0) {
+      console.log('⚠️ No active copy trade configurations found');
       return NextResponse.json({
         checked: 0,
         executed: 0,
@@ -39,10 +50,13 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    console.log(`✅ Found ${configs.length} active copy trade config(s)`);
+
     // Get unique source account IDs
     const sourceAccountIds = [...new Set(configs.map((c: any) => c.source_account_id))];
 
     // Get broker connections for source accounts
+    console.log(`🔍 Fetching broker connections for ${sourceAccountIds.length} source account(s)...`);
     const { data: brokerConnections, error: connError } = await adminSupabase
       .from('broker_connections' as any)
       .select('*')
@@ -50,7 +64,12 @@ export async function POST(request: NextRequest) {
       .eq('broker_type', 'projectx')
       .eq('enabled', true);
 
+    if (connError) {
+      console.error('❌ Error fetching broker connections:', connError);
+    }
+
     if (connError || !brokerConnections || brokerConnections.length === 0) {
+      console.log('⚠️ No active broker connections found for source accounts');
       return NextResponse.json({
         checked: 0,
         executed: 0,
@@ -58,16 +77,27 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    console.log(`✅ Found ${brokerConnections.length} active broker connection(s)`);
+
     let totalChecked = 0;
     let totalExecuted = 0;
     const errors: string[] = [];
 
-    console.log(`🔍 Checking ${brokerConnections.length} broker connection(s) for new opening executions`);
+    console.log(`\n🔍 Checking ${brokerConnections.length} broker connection(s) for new orders`);
 
-    // Check each broker connection for new opening executions
+    // Check each broker connection for new orders
     for (const conn of brokerConnections) {
       try {
         console.log(`\n📡 Processing broker connection: ${conn.broker_account_name} (Account ID: ${conn.trading_account_id})`);
+        console.log(`   Connection details:`, {
+          id: conn.id,
+          broker_type: conn.broker_type,
+          auth_method: conn.auth_method,
+          api_service_type: conn.api_service_type,
+          has_api_key: !!conn.api_key,
+          has_api_username: !!conn.api_username
+        });
+        
         // Initialize ProjectX client
         const authMethod = conn.auth_method || 'api_key';
         const serviceType = (conn.api_service_type as 'topstepx' | 'alphaticks') || 'topstepx';
@@ -98,12 +128,15 @@ export async function POST(request: NextRequest) {
             conn.token_expires_at ? new Date(conn.token_expires_at) : undefined
           );
         } else {
+          console.log(`  ⚠️ Skipping connection - no valid authentication`);
           continue; // Skip if no valid auth
         }
 
+        console.log(`  ✅ ProjectX client initialized successfully`);
+
         // Fetch recent orders (pending/submitted) for immediate detection
         // We check orders instead of executions to catch trades as soon as they're placed
-        console.log(`🔍 Fetching orders for ${conn.broker_account_name}`);
+        console.log(`  🔍 Fetching orders for ${conn.broker_account_name}...`);
         
         const orders = await client.getOrders(
           conn.broker_account_name,
