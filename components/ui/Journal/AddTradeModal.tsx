@@ -97,24 +97,9 @@ export default function AddTradeModal({
         throw new Error('No data returned from database');
       }
 
-      // Trigger copy trade if enabled
-      try {
-        const { copyTradeToDestinationAccounts } = await import('@/utils/copy-trade/service');
-        const copyResult = await copyTradeToDestinationAccounts(
-          data as unknown as TradeEntryType,
-          accountId,
-          user.id
-        );
-        if (copyResult.copied > 0) {
-          console.log(`✅ Copied trade to ${copyResult.copied} destination account(s)`);
-        }
-        if (copyResult.errors.length > 0) {
-          console.warn('⚠️ Some copy trades failed:', copyResult.errors);
-        }
-      } catch (copyError) {
-        // Don't fail the trade creation if copy fails
-        console.error('Error copying trade:', copyError);
-      }
+      // Note: Copy trading now only executes orders on destination accounts
+      // It doesn't create journal entries - those come from syncing destination accounts
+      // Real-time copy trade execution is handled by the polling mechanism
 
       onTradeAdded(data);
       setFormData({

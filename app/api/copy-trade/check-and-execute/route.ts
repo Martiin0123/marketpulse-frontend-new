@@ -98,10 +98,10 @@ export async function POST(request: NextRequest) {
           continue; // Skip if no valid auth
         }
 
-        // Fetch recent executions (last 2 minutes for real-time detection)
+        // Fetch recent executions (last 30 seconds for immediate detection)
         const endTime = new Date();
         const startTime = new Date();
-        startTime.setMinutes(startTime.getMinutes() - 2); // Check last 2 minutes
+        startTime.setSeconds(startTime.getSeconds() - 30); // Check last 30 seconds for immediate response
 
         const executions = await client.getTrades(
           conn.broker_account_name,

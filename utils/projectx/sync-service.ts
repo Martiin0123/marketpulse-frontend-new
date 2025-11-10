@@ -977,50 +977,9 @@ export async function syncProjectXTrades(
         result.tradesSynced = tradesToInsert.length;
         console.log(`✅ Successfully inserted ${result.tradesSynced} trades`);
 
-        // Also copy completed trades to journal (for record-keeping)
-        // This happens after trades are closed and synced
-        try {
-          const { copyTradeToDestinationAccounts } = await import('@/utils/copy-trade/service');
-          
-          // Fetch the trades we just inserted (using broker_trade_id to identify them)
-          const brokerTradeIds = tradesToInsert
-            .map((t: any) => t.broker_trade_id)
-            .filter((id: any) => id);
-          
-          if (brokerTradeIds.length > 0) {
-            const { data: insertedTrades } = await supabase
-              .from('trade_entries' as any)
-              .select('*')
-              .in('broker_trade_id', brokerTradeIds)
-              .eq('account_id', conn.trading_account_id);
-            
-            if (insertedTrades && insertedTrades.length > 0) {
-              // Only copy completed trades (with PnL) to journal, not opening executions
-              const completedTrades = insertedTrades.filter((t: any) => t.pnl_amount && t.pnl_amount !== 0);
-              
-              if (completedTrades.length > 0) {
-                let totalCopied = 0;
-                for (const trade of completedTrades) {
-                  const copyResult = await copyTradeToDestinationAccounts(
-                    trade as any,
-                    conn.trading_account_id,
-                    userId
-                  );
-                  totalCopied += copyResult.copied;
-                  if (copyResult.errors.length > 0) {
-                    console.warn('⚠️ Some copy trades failed:', copyResult.errors);
-                  }
-                }
-                if (totalCopied > 0) {
-                  console.log(`✅ Copied ${totalCopied} completed trades to destination accounts (journal entries)`);
-                }
-              }
-            }
-          }
-        } catch (copyError) {
-          // Don't fail the sync if copy fails
-          console.error('Error copying completed trades to journal:', copyError);
-        }
+        // Note: We don't copy trades to journal here anymore
+        // Copy trading only executes orders on destination accounts
+        // Journal entries will be created when syncing the destination accounts
       }
     } else {
       console.log(`ℹ️ No new trades to insert (all ${filledExecutions.length} trades already exist)`);

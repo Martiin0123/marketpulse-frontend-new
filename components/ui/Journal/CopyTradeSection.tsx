@@ -51,14 +51,18 @@ export default function CopyTradeSection({
     loadConfigs();
   }, [refreshKey]);
 
-  // Real-time monitoring: Poll for new trades and execute copy trades
+  // Real-time monitoring: Poll continuously for new trades and execute copy trades
   useEffect(() => {
     // Only poll if there are active configs
     if (configs.length === 0 || !configs.some((c) => c.enabled)) {
       return;
     }
 
-    const pollInterval = setInterval(async () => {
+    let isPolling = true;
+
+    const poll = async () => {
+      if (!isPolling) return;
+
       try {
         const response = await fetch('/api/copy-trade/check-and-execute', {
           method: 'POST',
@@ -73,16 +77,25 @@ export default function CopyTradeSection({
             console.log(
               `✅ Executed ${data.executed} copy trade(s) in real-time`
             );
-            // Optionally refresh logs or show notification
           }
         }
       } catch (error) {
         // Silently fail - don't spam console
         console.debug('Copy trade check error:', error);
       }
-    }, 5000); // Poll every 5 seconds
 
-    return () => clearInterval(pollInterval);
+      // Poll again immediately after response (continuous polling)
+      if (isPolling) {
+        setTimeout(poll, 1000); // Check every 1 second for immediate response
+      }
+    };
+
+    // Start polling immediately
+    poll();
+
+    return () => {
+      isPolling = false;
+    };
   }, [configs]);
 
   const loadConfigs = async () => {

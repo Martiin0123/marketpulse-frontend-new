@@ -561,35 +561,9 @@ export default function JournalPage() {
   const handleTradeAdded = async (trade: TradeEntry) => {
     console.log('Trade added:', trade);
 
-    // Trigger copy trade if enabled
-    try {
-      const { copyTradeToDestinationAccounts } = await import(
-        '@/utils/copy-trade/service'
-      );
-      const {
-        data: { user }
-      } = await supabase.auth.getUser();
-      if (user) {
-        const copyResult = await copyTradeToDestinationAccounts(
-          trade,
-          trade.account_id,
-          trade.user_id || user.id
-        );
-        if (copyResult.copied > 0) {
-          console.log(
-            `✅ Copied trade to ${copyResult.copied} destination account(s)`
-          );
-          // Refresh the page to show copied trades
-          setRefreshKey((prev) => prev + 1);
-        }
-        if (copyResult.errors.length > 0) {
-          console.warn('⚠️ Some copy trades failed:', copyResult.errors);
-        }
-      }
-    } catch (copyError) {
-      // Don't fail the trade creation if copy fails
-      console.error('Error copying trade:', copyError);
-    }
+    // Note: Copy trading now only executes orders on destination accounts
+    // It doesn't create journal entries - those come from syncing destination accounts
+    // Real-time copy trade execution is handled by the polling mechanism in CopyTradeSection
 
     // Recalculate stats for the account that received the new trade
     const updatedStats = await calculateAccountStats(trade.account_id);
