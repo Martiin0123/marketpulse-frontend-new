@@ -87,10 +87,11 @@ export class ProjectXClient {
                      process.env.PROJECTX_TOPSTEPX_API_URL || 
                      'https://api.topstepx.com';
     } else if (this.serviceType === 'alphaticks') {
-      // AlphaTicks - may use same or different base
-      this.baseUrl = process.env.PROJECTX_API_URL || 
-                     process.env.PROJECTX_ALPHATICKS_API_URL || 
-                     'https://api.projectx.com';
+      // AlphaTicks - uses same API infrastructure as TopStepX
+      // Users can override with custom URL if needed
+      this.baseUrl = process.env.PROJECTX_ALPHATICKS_API_URL || 
+                     process.env.PROJECTX_API_URL || 
+                     'https://api.topstepx.com';
     } else {
       // Fallback
       this.baseUrl = process.env.PROJECTX_API_URL || 'https://api.topstepx.com';
@@ -121,7 +122,9 @@ export class ProjectXClient {
       ...(state && { state }),
     });
 
-    return `https://api.projectx.com/v1/oauth/authorize?${params.toString()}`;
+    // Use baseUrl for OAuth (should be set based on service type)
+    const oauthBase = this.baseUrl || 'https://api.topstepx.com';
+    return `${oauthBase}/v1/oauth/authorize?${params.toString()}`;
   }
 
   /**
@@ -138,7 +141,8 @@ export class ProjectXClient {
       throw new Error('Project X OAuth credentials not configured');
     }
 
-    const response = await fetch('https://api.projectx.com/v1/oauth/token', {
+    const oauthBase = this.baseUrl || 'https://api.topstepx.com';
+    const response = await fetch(`${oauthBase}/v1/oauth/token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -175,7 +179,8 @@ export class ProjectXClient {
       throw new Error('Project X OAuth credentials not configured');
     }
 
-    const response = await fetch('https://api.projectx.com/v1/oauth/token', {
+    const oauthBase = this.baseUrl || 'https://api.topstepx.com';
+    const response = await fetch(`${oauthBase}/v1/oauth/token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
