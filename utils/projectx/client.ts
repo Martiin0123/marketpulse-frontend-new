@@ -1182,5 +1182,121 @@ export class ProjectXClient {
       };
     }
   }
+
+  /**
+   * Modify an order
+   * API URL: POST https://api.alphaticks.projectx.com/api/Order/modify
+   * ProjectX Gateway API: POST /api/Order/modify
+   */
+  async modifyOrder(orderData: {
+    accountId: string | number;
+    orderId: string | number;
+    limitPrice?: number;
+    stopPrice?: number;
+    quantity?: number;
+  }): Promise<{ success: boolean; error?: string }> {
+    try {
+      await this.ensureValidAuth();
+
+      // ProjectX API format (from docs):
+      // - accountId: integer (required)
+      // - orderId: integer (required)
+      // - limitPrice: decimal (optional, for Limit/StopLimit orders)
+      // - stopPrice: decimal (optional, for Stop/StopLimit orders)
+      // - size: integer (optional, quantity)
+
+      // Ensure accountId and orderId are integers
+      const accountId = typeof orderData.accountId === 'number' 
+        ? orderData.accountId 
+        : parseInt(orderData.accountId);
+      const orderId = typeof orderData.orderId === 'number' 
+        ? orderData.orderId 
+        : parseInt(orderData.orderId);
+
+      if (isNaN(accountId)) {
+        throw new Error(`Invalid accountId: ${orderData.accountId} (must be a number)`);
+      }
+      if (isNaN(orderId)) {
+        throw new Error(`Invalid orderId: ${orderData.orderId} (must be a number)`);
+      }
+
+      const requestBody: any = {
+        accountId: accountId,
+        orderId: orderId
+      };
+
+      // Add optional fields if provided (API expects null for fields that aren't being changed)
+      // According to docs: size, limitPrice, stopPrice, trailPrice are all optional
+      if (orderData.quantity !== undefined) {
+        requestBody.size = Math.round(orderData.quantity);
+      } else {
+        requestBody.size = null; // Don't change size
+      }
+      
+      if (orderData.limitPrice !== undefined) {
+        requestBody.limitPrice = orderData.limitPrice;
+      } else {
+        requestBody.limitPrice = null; // Don't change limit price
+      }
+      
+      if (orderData.stopPrice !== undefined) {
+        requestBody.stopPrice = orderData.stopPrice;
+      } else {
+        requestBody.stopPrice = null; // Don't change stop price
+      }
+      
+      requestBody.trailPrice = null; // Not currently used
+
+      console.log(`✏️ Modifying order with body:`, JSON.stringify(requestBody, null, 2));
+      console.log(`🔍 Using endpoint: /api/Order/modify`);
+
+      // Use the exact endpoint from the documentation
+      const response = await this.apiRequest('/api/Order/modify', {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': 'text/plain'
+        },
+      }) as any;
+
+      console.log(`📥 Order modification response:`, response);
+
+      // Check for error in response (API returns { success: true/false, errorCode: 0/non-zero, errorMessage: string/null })
+      if (response?.errorCode !== undefined && response.errorCode !== 0) {
+        const errorMsg = response.errorMessage || `API returned error code ${response.errorCode}`;
+        console.error(`❌ Order modification failed: ${errorMsg}`);
+        return {
+          success: false,
+          error: errorMsg
+        };
+      }
+
+      // Check for success (API returns { success: true, errorCode: 0 })
+      if (response && response.success === true) {
+        console.log(`✅ Order modified successfully: ${orderId}`);
+        return { success: true };
+      }
+
+      // If success is not explicitly true but errorCode is 0, consider it successful
+      if (response && (response.errorCode === undefined || response.errorCode === 0)) {
+        console.log(`✅ Order modified successfully (implied): ${orderId}`);
+        return { success: true };
+      }
+
+      // If we got here, the response format is unexpected
+      console.warn(`⚠️ Unexpected response format:`, JSON.stringify(response, null, 2));
+      return {
+        success: false,
+        error: `Unexpected response format: ${JSON.stringify(response)}`
+      };
+    } catch (error: any) {
+      console.error('❌ Error modifying order:', error);
+      return {
+        success: false,
+        error: error.message || 'Unknown error'
+      };
+    }
+  }
 }
 

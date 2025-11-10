@@ -187,9 +187,10 @@ export async function POST(request: NextRequest) {
 
         // Get previously tracked open orders for this account (from copy_trade_logs)
         // These are orders that we've seen before and should still be open
+        // Also fetch order_price and order_type to detect modifications
         const { data: trackedOpenOrders, error: trackedError } = await adminSupabase
           .from('copy_trade_logs' as any)
-          .select('id, source_order_id, order_id, order_status, destination_broker_connection_id, destination_account_id')
+          .select('id, source_order_id, order_id, order_status, destination_broker_connection_id, destination_account_id, order_price, order_type')
           .eq('source_account_id', conn.trading_account_id)
           .in('order_status', ['pending', 'submitted'])
           .not('source_order_id', 'is', null)
@@ -199,9 +200,17 @@ export async function POST(request: NextRequest) {
           console.warn(`  ⚠️ Error fetching tracked orders:`, trackedError);
         }
 
-        // Create a set of currently open order IDs from the API
+        // Create maps for easier lookup
         const currentOpenOrderIds = new Set(
           openOrders.map((o: any) => (o.id || o.orderId || o.order_id)?.toString()).filter(Boolean)
+        );
+        
+        // Map of order ID to order details for quick lookup
+        const currentOpenOrdersMap = new Map(
+          openOrders.map((o: any) => {
+            const orderId = (o.id || o.orderId || o.order_id)?.toString();
+            return [orderId, o];
+          }).filter(([id]) => id)
         );
 
         // Find orders that were tracked as open but are no longer in the open orders list
@@ -220,6 +229,39 @@ export async function POST(request: NextRequest) {
           return !stillOpen;
         });
 
+        // Find orders that are still open but have been modified (price, stop price, or quantity changed)
+        const modifiedOrders = (trackedOpenOrders || []).filter((log: any) => {
+          const sourceOrderId = log.source_order_id?.toString();
+          if (!sourceOrderId) return false;
+          
+          // Check if this order is still in the open orders list
+          const currentOrder = currentOpenOrdersMap.get(sourceOrderId);
+          if (!currentOrder) return false; // Order is missing, not modified
+          
+          // Extract current order details
+          const currentLimitPrice = currentOrder.limitPrice || currentOrder.limit_price || currentOrder.price;
+          const currentStopPrice = currentOrder.stopPrice || currentOrder.stop_price || currentOrder.triggerPrice || currentOrder.trigger_price;
+          const currentQuantity = currentOrder.size || currentOrder.quantity || currentOrder.qty || 1;
+          
+          // Compare with tracked values
+          const trackedLimitPrice = log.order_price;
+          const trackedQuantity = log.source_quantity; // We track source quantity, but destination might be different due to multiplier
+          
+          // Check if price or stop price has changed (allow small floating point differences)
+          const priceChanged = trackedLimitPrice !== null && 
+                              currentLimitPrice !== null && 
+                              Math.abs(Number(trackedLimitPrice) - Number(currentLimitPrice)) > 0.01;
+          
+          // Note: We don't track stop price in logs currently, so we can't detect stop price changes
+          // For now, we'll focus on limit price changes
+          
+          if (priceChanged) {
+            console.log(`  ✏️ Order ${sourceOrderId} price changed: ${trackedLimitPrice} → ${currentLimitPrice}`);
+          }
+          
+          return priceChanged;
+        });
+
         console.log(`🔍 Found ${missingOrders.length} tracked order(s) that are no longer open (may be filled or cancelled)`);
 
         // Filter new orders (orders we haven't tracked yet)
@@ -235,11 +277,11 @@ export async function POST(request: NextRequest) {
           return !alreadyTracked;
         });
 
-        console.log(`📈 Found ${newOrders.length} new order(s) (not yet tracked) and ${missingOrders.length} missing order(s) (no longer open)`);
+        console.log(`📈 Found ${newOrders.length} new order(s) (not yet tracked), ${missingOrders.length} missing order(s) (no longer open), and ${modifiedOrders.length} modified order(s)`);
 
-        totalChecked += newOrders.length + missingOrders.length;
+        totalChecked += newOrders.length + missingOrders.length + modifiedOrders.length;
 
-        console.log(`🔍 Processing ${newOrders.length} new order(s) and ${missingOrders.length} missing order(s) for account ${conn.broker_account_name}`);
+        console.log(`🔍 Processing ${newOrders.length} new order(s), ${missingOrders.length} missing order(s), and ${modifiedOrders.length} modified order(s) for account ${conn.broker_account_name}`);
 
         // Check each new order to see if it's already been processed
         for (const order of newOrders) {
@@ -438,6 +480,126 @@ export async function POST(request: NextRequest) {
             console.log(`  ✅ Updated copy trade log ${log.id} to cancelled status${cancellationSuccess ? ' (destination order cancelled)' : ' (destination order cancellation failed or not attempted)'}`);
           } else {
             console.log(`  ⏭️ Skipping cancellation - destination order status is ${log.order_status} (not pending/submitted)`);
+          }
+        }
+
+        // Handle modified orders - modify corresponding destination orders
+        for (const log of modifiedOrders) {
+          const sourceOrderId = log.source_order_id?.toString();
+          if (!sourceOrderId) continue;
+
+          // Get the current order details from the API
+          const currentOrder = currentOpenOrdersMap.get(sourceOrderId);
+          if (!currentOrder) continue;
+
+          // Extract current order details
+          const currentLimitPrice = currentOrder.limitPrice || currentOrder.limit_price || currentOrder.price;
+          const currentStopPrice = currentOrder.stopPrice || currentOrder.stop_price || currentOrder.triggerPrice || currentOrder.trigger_price;
+          const currentQuantity = currentOrder.size || currentOrder.quantity || currentOrder.qty || 1;
+
+          // Get tracked values
+          const trackedLimitPrice = log.order_price;
+          const trackedQuantity = log.source_quantity;
+
+          console.log(`  ✏️ Order ${sourceOrderId} has been modified`);
+          console.log(`     Price: ${trackedLimitPrice} → ${currentLimitPrice}`);
+          if (currentStopPrice) {
+            console.log(`     Stop Price: ${currentStopPrice}`);
+          }
+          console.log(`     Quantity: ${trackedQuantity} → ${currentQuantity}`);
+
+          // Check if destination order is still pending/submitted (can be modified)
+          if (log.order_status === 'pending' || log.order_status === 'submitted') {
+            if (log.order_id && log.destination_broker_connection_id) {
+              try {
+                // Get broker connection to modify order
+                const { data: destConnection } = await adminSupabase
+                  .from('broker_connections' as any)
+                  .select('*')
+                  .eq('id', log.destination_broker_connection_id)
+                  .single();
+
+                if (destConnection && destConnection.broker_type === 'projectx') {
+                  // Modify order on destination broker
+                  const { ProjectXClient } = await import('@/utils/projectx/client');
+                  const serviceType = (destConnection.api_service_type as 'topstepx' | 'alphaticks') || 'topstepx';
+                  
+                  let client: any;
+                  if (destConnection.api_key && destConnection.api_username) {
+                    client = new ProjectXClient(
+                      destConnection.api_key,
+                      destConnection.api_username,
+                      undefined,
+                      undefined,
+                      undefined,
+                      undefined,
+                      serviceType
+                    );
+                    if (destConnection.api_base_url) {
+                      client.setBaseUrl(destConnection.api_base_url);
+                    }
+                  }
+
+                  if (client) {
+                    // Get the account ID from the broker connection
+                    const accountId = destConnection.broker_account_name || 
+                                     destConnection.broker_user_id || 
+                                     destConnection.trading_account_id;
+                    
+                    console.log(`  ✏️ Attempting to modify destination order ${log.order_id} on ${destConnection.broker_account_name}`);
+                    console.log(`     Account ID: ${accountId}, Order ID: ${log.order_id}`);
+                    console.log(`     New limit price: ${currentLimitPrice}, New stop price: ${currentStopPrice || 'N/A'}`);
+
+                    // Calculate destination quantity with multiplier (if quantity changed)
+                    // We need to get the multiplier from the copy trade config
+                    const { data: config } = await adminSupabase
+                      .from('copy_trade_configs' as any)
+                      .select('multiplier')
+                      .eq('source_account_id', conn.trading_account_id)
+                      .eq('destination_account_id', log.destination_account_id)
+                      .eq('enabled', true)
+                      .maybeSingle();
+
+                    const multiplier = config?.multiplier || 1;
+                    const destinationQuantity = Math.round(currentQuantity * multiplier);
+
+                    const modifyResult = await client.modifyOrder({
+                      accountId: accountId,
+                      orderId: log.order_id,
+                      limitPrice: currentLimitPrice || undefined,
+                      stopPrice: currentStopPrice || undefined,
+                      quantity: destinationQuantity !== trackedQuantity * multiplier ? destinationQuantity : undefined
+                    });
+
+                    if (modifyResult.success) {
+                      console.log(`  ✅ Successfully modified destination order ${log.order_id} on ${destConnection.broker_account_name}`);
+                      
+                      // Update log with new price
+                      await adminSupabase
+                        .from('copy_trade_logs' as any)
+                        .update({ 
+                          order_price: currentLimitPrice,
+                          updated_at: new Date().toISOString()
+                        })
+                        .eq('id', log.id);
+                    } else {
+                      console.warn(`  ⚠️ Failed to modify destination order ${log.order_id}: ${modifyResult.error}`);
+                    }
+                  } else {
+                    console.warn(`  ⚠️ Could not initialize ProjectX client for modification`);
+                  }
+                } else {
+                  console.warn(`  ⚠️ Destination broker type ${destConnection?.broker_type} does not support order modification`);
+                }
+              } catch (modifyError: any) {
+                console.error(`  ❌ Error modifying destination order:`, modifyError);
+                console.error(`  Stack:`, modifyError.stack);
+              }
+            } else {
+              console.log(`  ⏭️ Skipping modification - no order_id (${log.order_id}) or broker connection (${log.destination_broker_connection_id})`);
+            }
+          } else {
+            console.log(`  ⏭️ Skipping modification - destination order status is ${log.order_status} (not pending/submitted)`);
           }
         }
       } catch (error: any) {
