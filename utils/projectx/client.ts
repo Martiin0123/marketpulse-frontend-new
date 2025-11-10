@@ -50,6 +50,13 @@ export class ProjectXClient {
   private authMethod: 'oauth' | 'api_key' = 'api_key';
   private serviceType: 'topstepx' | 'alphaticks' | null = null;
 
+  /**
+   * Get the current session token (for SignalR connections)
+   */
+  getSessionToken(): string | null {
+    return this.sessionToken;
+  }
+
   constructor(
     apiKey?: string,
     apiUsername?: string,

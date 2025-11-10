@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import {
   PlusIcon,
@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import type { TradingAccount } from '@/types/journal';
 import CopyTradeLogs from './CopyTradeLogs';
+import { ProjectXSignalRClient, ProjectXOrderUpdate } from '@/utils/projectx/signalr-client';
 
 interface CopyTradeConfig {
   id: string;
@@ -51,68 +52,159 @@ export default function CopyTradeSection({
     loadConfigs();
   }, [refreshKey]);
 
-  // Real-time monitoring: Poll continuously for new trades and execute copy trades
+  // Real-time monitoring: Use SignalR WebSocket for instant order updates
+  const signalRClientsRef = useRef<Map<string, ProjectXSignalRClient>>(new Map());
+
   useEffect(() => {
-    // Only poll if there are active configs
+    // Only connect if there are active configs
     const activeConfigs = configs.filter((c) => c.enabled);
     if (activeConfigs.length === 0) {
-      console.log('⏸️ Copy trade polling paused: No active configs');
+      console.log('⏸️ Copy trade SignalR paused: No active configs');
+      // Disconnect all clients
+      signalRClientsRef.current.forEach((client) => {
+        client.disconnect();
+      });
+      signalRClientsRef.current.clear();
       return;
     }
 
     console.log(
-      `🔄 Starting copy trade polling with ${activeConfigs.length} active config(s)`
+      `🔄 Setting up SignalR connections for ${activeConfigs.length} active config(s)`
     );
 
-    let isPolling = true;
-
-    const poll = async () => {
-      if (!isPolling) return;
-
+    // Fetch SignalR connection details
+    const setupSignalRConnections = async () => {
       try {
-        const response = await fetch('/api/copy-trade/check-and-execute', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
+        const response = await fetch('/api/copy-trade/signalr-connection');
+        if (!response.ok) {
+          console.warn('⚠️ Failed to get SignalR connection details');
+          return;
+        }
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.executed > 0) {
-            console.log(
-              `✅ Executed ${data.executed} copy trade(s) in real-time`
+        const data = await response.json();
+        const connections = data.connections || [];
+
+        if (connections.length === 0) {
+          console.log('⚠️ No SignalR connections available');
+          return;
+        }
+
+        console.log(`📡 Setting up ${connections.length} SignalR connection(s)...`);
+
+        // Set up SignalR client for each connection
+        for (const conn of connections) {
+          const connectionKey = `${conn.connectionId}-${conn.accountId}`;
+          
+          // Skip if already connected
+          if (signalRClientsRef.current.has(connectionKey)) {
+            console.log(`  ⏭️ Already connected: ${connectionKey}`);
+            continue;
+          }
+
+          try {
+            const signalRClient = new ProjectXSignalRClient(
+              conn.jwtToken,
+              conn.accountId,
+              conn.hubUrl
             );
+
+            // Handle order updates (new orders, modifications, cancellations)
+            signalRClient.onOrderUpdate(async (order: ProjectXOrderUpdate) => {
+              console.log(`📥 Real-time order update received:`, order);
+              
+              // Status: 0=None, 1=Open, 2=Filled, 3=Cancelled, 4=Expired, 5=Rejected, 6=Pending
+              
+              // Process new/open orders (status 1=Open, 6=Pending)
+              if (order.status === 1 || order.status === 6) {
+                try {
+                  const response = await fetch('/api/copy-trade/process-order-update', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                      connectionId: conn.connectionId,
+                      tradingAccountId: conn.tradingAccountId,
+                      order: {
+                        id: order.id.toString(),
+                        symbol: order.contractId,
+                        side: order.side === 0 ? 'BUY' : 'SELL',
+                        quantity: order.size,
+                        orderType: order.type === 1 ? 'Limit' : order.type === 2 ? 'Market' : order.type === 4 ? 'Stop' : 'Limit',
+                        price: order.limitPrice,
+                        stopPrice: order.stopPrice,
+                        status: order.status
+                      },
+                      action: 'new_or_modified' // Could be new order or modified order
+                    })
+                  });
+
+                  if (response.ok) {
+                    const result = await response.json();
+                    if (result.executed > 0) {
+                      console.log(`✅ Executed ${result.executed} copy trade(s) from real-time update`);
+                    }
+                    if (result.modified > 0) {
+                      console.log(`✏️ Modified ${result.modified} copy trade order(s) from real-time update`);
+                    }
+                  }
+                } catch (error) {
+                  console.error('❌ Error processing order update:', error);
+                }
+              }
+              
+              // Handle cancelled orders (status 3=Cancelled)
+              if (order.status === 3) {
+                try {
+                  const response = await fetch('/api/copy-trade/process-order-update', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                      connectionId: conn.connectionId,
+                      tradingAccountId: conn.tradingAccountId,
+                      order: {
+                        id: order.id.toString()
+                      },
+                      action: 'cancelled'
+                    })
+                  });
+
+                  if (response.ok) {
+                    const result = await response.json();
+                    if (result.cancelled > 0) {
+                      console.log(`🚫 Cancelled ${result.cancelled} copy trade order(s) from real-time update`);
+                    }
+                  }
+                } catch (error) {
+                  console.error('❌ Error processing order cancellation:', error);
+                }
+              }
+            });
+
+            // Connect to SignalR
+            await signalRClient.connect();
+            signalRClientsRef.current.set(connectionKey, signalRClient);
+            console.log(`  ✅ Connected to SignalR for account ${conn.accountId}`);
+          } catch (error: any) {
+            console.error(`❌ Error setting up SignalR for ${connectionKey}:`, error);
           }
-          if (data.checked > 0 || data.executed > 0 || data.message) {
-            console.log(
-              `📊 Copy trade check: ${data.checked || 0} checked, ${data.executed || 0} executed`,
-              data.message ? `(${data.message})` : ''
-            );
-          }
-          if (data.errors && data.errors.length > 0) {
-            console.warn('⚠️ Copy trade errors:', data.errors);
-          }
-        } else {
-          const errorData = await response.json().catch(() => ({}));
-          console.warn('⚠️ Copy trade check failed:', errorData);
         }
       } catch (error) {
-        // Silently fail - don't spam console
-        console.debug('Copy trade check error:', error);
-      }
-
-      // Poll again immediately after response (continuous polling)
-      if (isPolling) {
-        setTimeout(poll, 1000); // Check every 1 second for immediate response
+        console.error('❌ Error setting up SignalR connections:', error);
       }
     };
 
-    // Start polling immediately
-    poll();
+    setupSignalRConnections();
 
+    // Cleanup: disconnect all SignalR clients on unmount or when configs change
     return () => {
-      isPolling = false;
+      console.log('🧹 Cleaning up SignalR connections...');
+      signalRClientsRef.current.forEach((client) => {
+        client.disconnect();
+      });
+      signalRClientsRef.current.clear();
     };
   }, [configs]);
 
