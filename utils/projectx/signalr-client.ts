@@ -180,10 +180,7 @@ export class ProjectXSignalRClient {
         .withUrl(connectionUrl, {
           skipNegotiation: true,
           transport: signalR.HttpTransportType.WebSockets,
-          accessTokenFactory: () => {
-            // Also provide via factory as shown in docs
-            return this.jwtToken;
-          },
+          // Token is already in URL, don't duplicate via accessTokenFactory
           timeout: 10000
         })
         .withAutomaticReconnect({
