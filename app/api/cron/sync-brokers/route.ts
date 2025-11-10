@@ -5,14 +5,17 @@ import { syncProjectXTrades } from '@/utils/projectx/sync-service';
 
 /**
  * Cron job to automatically sync trades from all brokers
- * Should be called by Vercel Cron or similar service every 5-15 minutes
+ * Runs once daily at 2 AM UTC (Vercel Hobby plan limitation)
+ * 
+ * Note: Real-time trade syncing still works via SignalR for copy trading.
+ * This cron job is for historical/backup syncing.
  * 
  * To set up in Vercel:
  * Add to vercel.json:
  * {
  *   "crons": [{
  *     "path": "/api/cron/sync-brokers",
- *     "schedule": "every 10 minutes"
+ *     "schedule": "0 2 * * *"
  *   }]
  * }
  */
