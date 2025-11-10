@@ -253,7 +253,6 @@ export class ProjectXClient {
 
       // Store session token
       this.sessionToken = data.token;
-      const serviceName = this.serviceType === 'alphaticks' ? 'AlphaTicks' : 'TopStepX';
       console.log(`✅ Successfully authenticated with ${serviceName} API`);
     } catch (error: any) {
       console.error('❌ Authentication error:', error);
