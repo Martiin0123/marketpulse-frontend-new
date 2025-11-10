@@ -42,34 +42,48 @@ async function getData() {
 function categorizeProducts(products: any[]) {
   const signalsProducts: any[] = [];
   const journalProducts: any[] = [];
+  const uncategorizedProducts: any[] = [];
 
   products.forEach((product) => {
     const metadata = product.metadata as any;
     const productType = metadata?.product_type || metadata?.category;
     const productName = (product.name || '').toLowerCase();
 
-    // Check metadata first, then fallback to name matching
-    // Only add to signals if it's not a journal product
-    if (
-      (productType === 'signals' ||
-        productName.includes('signal') ||
-        (productName.includes('premium') && !productName.includes('journal')) ||
-        (productName.includes('vip') && !productName.includes('journal'))) &&
-      productType !== 'journal' &&
-      !productName.includes('journal')
-    ) {
-      signalsProducts.push(product);
-    }
-
-    if (
+    // Check if it's a journal product first (more specific)
+    const isJournal =
       productType === 'journal' ||
       productName.includes('journal') ||
       productName.includes('tradesyncer') ||
-      productName.includes('copy trade')
-    ) {
+      productName.includes('tradesyncer') ||
+      productName.includes('copy trade') ||
+      productName.includes('copy trading');
+
+    // Check if it's a signals product
+    const isSignals =
+      productType === 'signals' ||
+      productName.includes('signal') ||
+      (productName.includes('premium') && !isJournal) ||
+      (productName.includes('vip') && !isJournal);
+
+    if (isJournal) {
       journalProducts.push(product);
+    } else if (isSignals) {
+      signalsProducts.push(product);
+    } else {
+      // If we can't categorize, add to both sections for now
+      // This ensures products are still visible
+      uncategorizedProducts.push(product);
     }
   });
+
+  // If we have uncategorized products and no categorized ones, show them in signals section
+  // (assuming existing products are signals)
+  if (uncategorizedProducts.length > 0 && signalsProducts.length === 0 && journalProducts.length === 0) {
+    signalsProducts.push(...uncategorizedProducts);
+  } else if (uncategorizedProducts.length > 0) {
+    // If we have some categorized, add uncategorized to signals as default
+    signalsProducts.push(...uncategorizedProducts);
+  }
 
   return { signalsProducts, journalProducts };
 }
@@ -79,6 +93,17 @@ export default async function PricingPage() {
   const { signalsProducts, journalProducts } = categorizeProducts(
     data.products ?? []
   );
+
+  // Debug logging (remove in production if needed)
+  console.log('[PRICING] Product categorization:', {
+    totalProducts: data.products?.length || 0,
+    signalsCount: signalsProducts.length,
+    journalCount: journalProducts.length,
+    productNames: data.products?.map((p: any) => ({
+      name: p.name,
+      metadata: p.metadata
+    }))
+  });
 
   return (
     <>
