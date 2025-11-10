@@ -210,16 +210,27 @@ export class ProjectXSignalRClient {
       
       console.log('🚀 Starting SignalR connection...');
       await this.connection.start();
+      
+      // Verify connection is actually connected
+      if (this.connection.state !== signalR.HubConnectionState.Connected) {
+        throw new Error(`Connection not in Connected state after start. State: ${this.connection.state}`);
+      }
+      
       this.isConnected = true;
       this.reconnectAttempts = 0;
       console.log('✅ SignalR connected successfully', {
         connectionId: this.connection.connectionId,
         state: this.connection.state,
-        url: connectionUrl
+        url: connectionUrl.substring(0, 100) + '...'
       });
 
       // Wait a bit before subscribing to ensure connection is stable
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Double-check connection is still connected before subscribing
+      if (this.connection.state !== signalR.HubConnectionState.Connected) {
+        throw new Error(`Connection disconnected before subscription. State: ${this.connection.state}`);
+      }
 
       // Subscribe to updates
       await this.subscribe();
@@ -293,6 +304,16 @@ export class ProjectXSignalRClient {
       });
     });
 
+    // Handle connection close
+    this.connection.onclose((error) => {
+      console.warn('⚠️ [SignalR] Connection closed', error);
+      this.isConnected = false;
+      // Try to reconnect if it wasn't intentional
+      if (error) {
+        console.log('🔄 [SignalR] Connection closed with error, will attempt reconnect...');
+      }
+    });
+
     // Handle reconnection
     this.connection.onreconnected((connectionId) => {
       console.log(`🔄 [SignalR] Reconnected (connection ID: ${connectionId})`);
@@ -303,14 +324,27 @@ export class ProjectXSignalRClient {
         console.error('❌ Error re-subscribing after reconnect:', err);
       });
     });
+
+    // Handle reconnecting
+    this.connection.onreconnecting((error) => {
+      console.log('🔄 [SignalR] Reconnecting...', error);
+      this.isConnected = false;
+    });
   }
 
   /**
    * Subscribe to account, orders, positions, and trades
    */
   private async subscribe(): Promise<void> {
-    if (!this.connection || !this.isConnected) {
-      console.warn('⚠️ Cannot subscribe: not connected');
+    if (!this.connection) {
+      console.warn('⚠️ Cannot subscribe: no connection');
+      return;
+    }
+
+    // Check connection state
+    if (this.connection.state !== signalR.HubConnectionState.Connected) {
+      console.warn(`⚠️ Cannot subscribe: connection not connected. State: ${this.connection.state}`);
+      this.isConnected = false;
       return;
     }
 
@@ -346,9 +380,11 @@ export class ProjectXSignalRClient {
       console.error('  Error details:', {
         message: error.message,
         stack: error.stack,
+        connectionState: this.connection?.state,
         accountId: this.accountId,
         accountIdType: typeof this.accountId
       });
+      this.isConnected = false;
       throw error;
     }
   }
