@@ -135,18 +135,15 @@ export async function POST(request: NextRequest) {
 
         // Fetch recent orders for immediate detection
         // We check orders instead of executions to catch trades as soon as they're placed
-        // Also check for cancelled orders
-        console.log(`  🔍 Fetching orders for ${conn.broker_account_name}...`);
+        console.log(`  🔍 Fetching open orders for ${conn.broker_account_name}...`);
         
-        // Fetch open orders (for new orders)
-        const openOrders = await client.getOrders(
+        // Fetch currently open orders
+        const currentOpenOrders = await client.getOrders(
           conn.broker_account_name,
-          'All' // Get all orders to catch new ones and cancelled ones
+          'All' // Get all orders
         );
 
-        // Also try to fetch cancelled orders if the API supports it
-        // For now, we'll check status in the openOrders response
-        const orders = openOrders;
+        const orders = currentOpenOrders;
 
         console.log(`📊 Fetched ${orders.length} total order(s) from API`);
 
@@ -162,24 +159,20 @@ export async function POST(request: NextRequest) {
           })));
         }
 
-        // Filter to only new/pending/submitted orders (not filled or cancelled)
-        // These are orders that were just placed and need to be copied
+        // Filter to only open/pending/submitted orders (not filled or cancelled)
+        // These are orders that are currently open and need to be tracked
         // ProjectX API: status 1 = Open, other numbers = different states
-        const newOrders = orders.filter(order => {
+        const openOrders = orders.filter(order => {
           const status = order.status || order.orderStatus || order.order_status;
           
           // Handle numeric status (ProjectX format: 1 = Open)
           if (typeof status === 'number') {
-            const isNew = status === 1; // 1 = Open order
-            if (!isNew) {
-              console.log(`  ⏭️ Filtered out order with numeric status: ${status}`);
-            }
-            return isNew;
+            return status === 1; // 1 = Open order
           }
           
           // Handle string status
           const statusStr = (status || '').toString().toUpperCase();
-          const isNew = statusStr === 'PENDING' || 
+          return statusStr === 'PENDING' || 
                         statusStr === 'SUBMITTED' || 
                         statusStr === 'NEW' ||
                         statusStr === 'OPEN' ||
@@ -187,35 +180,66 @@ export async function POST(request: NextRequest) {
                         statusStr === 'WORKING' ||
                         statusStr === 'PARTIALLY_FILLED' ||
                         statusStr === '1' ||
-                        !statusStr; // If no status, assume it's new
-          
-          if (!isNew) {
-            console.log(`  ⏭️ Filtered out order with status: ${statusStr || status}`);
-          }
-          
-          return isNew;
+                        !statusStr; // If no status, assume it's open
         });
 
-        // Also check for cancelled orders (status changed from open to cancelled)
-        // ProjectX API: status 3 = Cancelled (or check for cancelled status)
-        const cancelledOrders = orders.filter(order => {
-          const status = order.status || order.orderStatus || order.order_status;
+        console.log(`📈 Found ${openOrders.length} currently open order(s) out of ${orders.length} total`);
+
+        // Get previously tracked open orders for this account (from copy_trade_logs)
+        // These are orders that we've seen before and should still be open
+        const { data: trackedOpenOrders, error: trackedError } = await adminSupabase
+          .from('copy_trade_logs' as any)
+          .select('id, source_order_id, order_id, order_status, destination_broker_connection_id, destination_account_id')
+          .eq('source_account_id', conn.trading_account_id)
+          .in('order_status', ['pending', 'submitted'])
+          .not('source_order_id', 'is', null)
+          .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()); // Last 24 hours
+
+        if (trackedError) {
+          console.warn(`  ⚠️ Error fetching tracked orders:`, trackedError);
+        }
+
+        // Create a set of currently open order IDs from the API
+        const currentOpenOrderIds = new Set(
+          openOrders.map((o: any) => (o.id || o.orderId || o.order_id)?.toString()).filter(Boolean)
+        );
+
+        // Find orders that were tracked as open but are no longer in the open orders list
+        // These orders were either filled or cancelled
+        const missingOrders = (trackedOpenOrders || []).filter((log: any) => {
+          const sourceOrderId = log.source_order_id?.toString();
+          if (!sourceOrderId) return false;
           
-          // Handle numeric status (ProjectX format: 3 = Cancelled)
-          if (typeof status === 'number') {
-            return status === 3; // 3 = Cancelled
+          // Check if this order is still in the open orders list
+          const stillOpen = currentOpenOrderIds.has(sourceOrderId);
+          
+          if (!stillOpen) {
+            console.log(`  🔍 Order ${sourceOrderId} is no longer in open orders list (was tracked, now missing)`);
           }
           
-          // Handle string status
-          const statusStr = (status || '').toString().toUpperCase();
-          return statusStr === 'CANCELLED' || statusStr === 'CANCELED' || statusStr === '3';
+          return !stillOpen;
         });
 
-        console.log(`📈 Found ${newOrders.length} new order(s) (pending/submitted) and ${cancelledOrders.length} cancelled order(s) out of ${orders.length} total`);
+        console.log(`🔍 Found ${missingOrders.length} tracked order(s) that are no longer open (may be filled or cancelled)`);
 
-        totalChecked += newOrders.length + cancelledOrders.length;
+        // Filter new orders (orders we haven't tracked yet)
+        const newOrders = openOrders.filter(order => {
+          const orderId = (order.id || order.orderId || order.order_id)?.toString();
+          if (!orderId) return false;
+          
+          // Check if we've already tracked this order
+          const alreadyTracked = trackedOpenOrders?.some((log: any) => 
+            log.source_order_id?.toString() === orderId
+          );
+          
+          return !alreadyTracked;
+        });
 
-        console.log(`🔍 Checking ${newOrders.length} new order(s) and ${cancelledOrders.length} cancelled order(s) for account ${conn.broker_account_name}`);
+        console.log(`📈 Found ${newOrders.length} new order(s) (not yet tracked) and ${missingOrders.length} missing order(s) (no longer open)`);
+
+        totalChecked += newOrders.length + missingOrders.length;
+
+        console.log(`🔍 Processing ${newOrders.length} new order(s) and ${missingOrders.length} missing order(s) for account ${conn.broker_account_name}`);
 
         // Check each new order to see if it's already been processed
         for (const order of newOrders) {
@@ -313,77 +337,35 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Handle cancelled orders - cancel corresponding destination orders
-        for (const order of cancelledOrders) {
-          const orderId = order.id || order.orderId || order.order_id || 'unknown';
-          const orderSymbol = order.contractId || order.contract_id || order.symbol || order.contractName || order.contract_name || 'unknown';
-          
-          // Extract side and quantity for matching
-          // Map side: 0 = BUY (Bid), 1 = SELL (Ask) - CORRECT ProjectX format
-          let orderSide = 'unknown';
-          if (order.side === 0 || order.side === '0' || order.side === 'BUY' || order.side === 'buy' || order.side === 'long' || order.side === 'Bid' || order.side === 'bid') {
-            orderSide = 'BUY';
-          } else if (order.side === 1 || order.side === '1' || order.side === 'SELL' || order.side === 'sell' || order.side === 'short' || order.side === 'Ask' || order.side === 'ask') {
-            orderSide = 'SELL';
-          } else if (order.direction) {
-            orderSide = order.direction.toUpperCase();
-          } else if (order.side) {
-            orderSide = order.side.toString().toUpperCase();
-          }
-          
-          const orderQty = order.size || order.quantity || order.qty || 1;
-          
-          console.log(`  🚫 Checking for cancelled order: ${orderSymbol} ${orderSide} ${orderQty} (ID: ${orderId})`);
+        // Handle missing orders - these are orders that were tracked as open but are no longer in the open orders list
+        // They could be filled or cancelled - we'll cancel them on follower accounts if they're still pending/submitted
+        for (const log of missingOrders) {
+          const sourceOrderId = log.source_order_id?.toString();
+          if (!sourceOrderId) continue;
 
-          // First, try to match by source_order_id (most accurate)
-          const { data: exactMatchLogs, error: exactMatchError } = await adminSupabase
-            .from('copy_trade_logs' as any)
-            .select('id, order_id, order_status, destination_broker_connection_id, source_order_id, source_side, source_quantity')
-            .eq('source_account_id', conn.trading_account_id)
-            .eq('source_order_id', orderId.toString())
-            .in('order_status', ['pending', 'submitted'])
-            .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()); // Last 24 hours
+          console.log(`  🚫 Order ${sourceOrderId} is no longer in open orders - checking if we should cancel follower orders`);
 
-          let matchingLogs: any[] = [];
+          // Check if the destination order is still pending/submitted (hasn't been filled)
+          // If it's still pending, we should cancel it
+          if (log.order_status === 'pending' || log.order_status === 'submitted') {
+            console.log(`  🔄 Order ${sourceOrderId} was tracked but is no longer open. Cancelling follower order ${log.order_id}...`);
 
-          if (!exactMatchError && exactMatchLogs && exactMatchLogs.length > 0) {
-            // Found exact match by source_order_id
-            console.log(`  ✅ Found ${exactMatchLogs.length} exact match(es) by source_order_id: ${orderId}`);
-            matchingLogs = exactMatchLogs;
-          } else {
-            // Fallback: match by symbol, side, and quantity
-            console.log(`  🔍 No exact match by source_order_id, trying fallback matching...`);
-            const { data: activeLogs, error: logsError } = await adminSupabase
+            // Get the full log details including destination connection
+            const { data: fullLog, error: logError } = await adminSupabase
               .from('copy_trade_logs' as any)
-              .select('id, order_id, order_status, destination_broker_connection_id, source_order_id, source_side, source_quantity')
-              .eq('source_account_id', conn.trading_account_id)
-              .eq('source_symbol', orderSymbol)
-              .in('order_status', ['pending', 'submitted'])
-              .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()); // Last 24 hours
+              .select('id, order_id, order_status, destination_broker_connection_id, source_order_id')
+              .eq('id', log.id)
+              .single();
 
-            if (logsError) {
-              console.warn(`  ⚠️ Error checking logs for cancelled order:`, logsError);
+            if (logError || !fullLog) {
+              console.warn(`  ⚠️ Error fetching full log details:`, logError);
               continue;
             }
 
-            // Filter logs to match the cancelled order's side and quantity more closely
-            matchingLogs = activeLogs?.filter((log: any) => {
-              // Try to match by side and quantity (within reasonable range)
-              const sideMatch = log.source_side === orderSide || 
-                               (orderSide === 'SELL' && (log.source_side === '0' || log.source_side === 'SELL')) ||
-                               (orderSide === 'BUY' && (log.source_side === '1' || log.source_side === 'BUY'));
-              const qtyMatch = Math.abs(Number(log.source_quantity) - Number(orderQty)) < 0.01; // Allow small floating point differences
-              
-              return sideMatch && qtyMatch;
-            }) || [];
+            const matchingLogs = [fullLog];
 
-            if (matchingLogs.length > 0) {
-              console.log(`  ✅ Found ${matchingLogs.length} match(es) by symbol/side/quantity fallback`);
-            }
-          }
-
-          if (matchingLogs && matchingLogs.length > 0) {
-            console.log(`  🔄 Found ${matchingLogs.length} active copy trade log(s) to cancel for order ${orderId}`);
+            if (matchingLogs && matchingLogs.length > 0) {
+              console.log(`  🔄 Found ${matchingLogs.length} copy trade log(s) to cancel for missing order ${sourceOrderId}`);
 
             // Update logs to cancelled status and cancel destination orders
             for (const log of matchingLogs) {
