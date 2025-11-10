@@ -49,6 +49,15 @@ export default function CopyTradeSection({
     multiplier: '1.0'
   });
   const [error, setError] = useState<string | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<{
+    connected: boolean;
+    state?: string;
+    activeConnections: number;
+  }>({
+    connected: false,
+    state: 'Disconnected',
+    activeConnections: 0
+  });
 
   const supabase = createClient();
 
@@ -77,6 +86,11 @@ export default function CopyTradeSection({
         client.disconnect();
       });
       signalRClientsRef.current.clear();
+      setConnectionStatus({
+        connected: false,
+        state: 'Disconnected',
+        activeConnections: 0
+      });
       return;
     }
 
@@ -523,10 +537,42 @@ export default function CopyTradeSection({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white">Copy Trading</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold text-white">Copy Trading</h2>
+            {/* Connection Status Indicator */}
+            <div className="flex items-center gap-2">
+              <div
+                className={`h-3 w-3 rounded-full ${
+                  connectionStatus.connected
+                    ? 'bg-green-500 animate-pulse'
+                    : connectionStatus.state === 'Connecting' || connectionStatus.state === 'Reconnecting'
+                    ? 'bg-yellow-500 animate-pulse'
+                    : 'bg-red-500'
+                }`}
+                title={`Status: ${connectionStatus.state} (${connectionStatus.activeConnections} active)`}
+              />
+              <span
+                className={`text-sm font-medium ${
+                  connectionStatus.connected
+                    ? 'text-green-400'
+                    : connectionStatus.state === 'Connecting' || connectionStatus.state === 'Reconnecting'
+                    ? 'text-yellow-400'
+                    : 'text-red-400'
+                }`}
+              >
+                {connectionStatus.state}
+              </span>
+            </div>
+          </div>
           <p className="text-slate-400 mt-1">
             Automatically copy trades from one account to another
           </p>
+          <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+            <p className="text-sm text-amber-400">
+              ⚠️ <strong>Important:</strong> Copy trading only works when this page is open. 
+              The connection must remain active for real-time trade copying to function.
+            </p>
+          </div>
         </div>
         <button
           onClick={() => {

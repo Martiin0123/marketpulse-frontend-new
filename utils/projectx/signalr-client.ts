@@ -149,6 +149,27 @@ export class ProjectXSignalRClient {
   }
 
   /**
+   * Get current connection status
+   */
+  getConnectionStatus(): { connected: boolean; state?: string } {
+    if (!this.connection) {
+      return { connected: false, state: 'Disconnected' };
+    }
+    
+    const state = this.connection.state;
+    const connected = state === signalR?.HubConnectionState?.Connected && this.isConnected;
+    
+    return {
+      connected,
+      state: state === signalR?.HubConnectionState?.Connected ? 'Connected' :
+             state === signalR?.HubConnectionState?.Connecting ? 'Connecting' :
+             state === signalR?.HubConnectionState?.Reconnecting ? 'Reconnecting' :
+             state === signalR?.HubConnectionState?.Disconnected ? 'Disconnected' :
+             'Unknown'
+    };
+  }
+
+  /**
    * Connect to the SignalR hub
    */
   async connect(): Promise<void> {
