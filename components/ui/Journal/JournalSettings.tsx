@@ -249,6 +249,22 @@ export default function JournalSettings({
         }}
       />
 
+      {/* Connect Broker Modal */}
+      {selectedBrokerType && (
+        <ConnectBrokerModal
+          isOpen={isConnectBrokerModalOpen}
+          onClose={() => {
+            setIsConnectBrokerModalOpen(false);
+            setSelectedBrokerType(null);
+          }}
+          brokerType={selectedBrokerType}
+          onAccountCreated={async (account) => {
+            await onAccountCreated(account);
+            setIsConnectBrokerModalOpen(false);
+            setSelectedBrokerType(null);
+          }}
+        />
+      )}
     </div>
   );
 }
