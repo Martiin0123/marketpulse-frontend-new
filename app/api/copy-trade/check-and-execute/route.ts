@@ -190,11 +190,26 @@ export async function POST(request: NextRequest) {
           return isNew;
         });
 
-        console.log(`📈 Found ${newOrders.length} new order(s) (pending/submitted) out of ${orders.length} total`);
+        // Also check for cancelled orders (status changed from open to cancelled)
+        // ProjectX API: status 3 = Cancelled (or check for cancelled status)
+        const cancelledOrders = orders.filter(order => {
+          const status = order.status || order.orderStatus || order.order_status;
+          
+          // Handle numeric status (ProjectX format: 3 = Cancelled)
+          if (typeof status === 'number') {
+            return status === 3; // 3 = Cancelled
+          }
+          
+          // Handle string status
+          const statusStr = (status || '').toString().toUpperCase();
+          return statusStr === 'CANCELLED' || statusStr === 'CANCELED' || statusStr === '3';
+        });
 
-        totalChecked += newOrders.length;
+        console.log(`📈 Found ${newOrders.length} new order(s) (pending/submitted) and ${cancelledOrders.length} cancelled order(s) out of ${orders.length} total`);
 
-        console.log(`🔍 Checking ${newOrders.length} new order(s) for account ${conn.broker_account_name}`);
+        totalChecked += newOrders.length + cancelledOrders.length;
+
+        console.log(`🔍 Checking ${newOrders.length} new order(s) and ${cancelledOrders.length} cancelled order(s) for account ${conn.broker_account_name}`);
 
         // Check each new order to see if it's already been processed
         for (const order of newOrders) {
@@ -287,6 +302,88 @@ export async function POST(request: NextRequest) {
             }
           } else {
             console.log(`  ⏭️ Order already processed (status: ${existingLog.order_status})`);
+          }
+        }
+
+        // Handle cancelled orders - cancel corresponding destination orders
+        for (const order of cancelledOrders) {
+          const orderId = order.id || order.orderId || order.order_id || 'unknown';
+          const orderSymbol = order.contractId || order.contract_id || order.symbol || order.contractName || order.contract_name || 'unknown';
+          
+          console.log(`  🚫 Checking for cancelled order: ${orderSymbol} (ID: ${orderId})`);
+
+          // Find copy trade logs for this order that are still pending/submitted
+          const { data: activeLogs, error: logsError } = await adminSupabase
+            .from('copy_trade_logs' as any)
+            .select('id, order_id, order_status, destination_broker_connection_id')
+            .eq('source_account_id', conn.trading_account_id)
+            .eq('source_symbol', orderSymbol)
+            .in('order_status', ['pending', 'submitted'])
+            .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()); // Last 24 hours
+
+          if (logsError) {
+            console.warn(`  ⚠️ Error checking logs for cancelled order:`, logsError);
+            continue;
+          }
+
+          if (activeLogs && activeLogs.length > 0) {
+            console.log(`  🔄 Found ${activeLogs.length} active copy trade log(s) to cancel for order ${orderId}`);
+
+            // Update logs to cancelled status
+            for (const log of activeLogs) {
+              // Try to cancel the destination order if we have an order_id
+              if (log.order_id && log.destination_broker_connection_id) {
+                try {
+                  // Get broker connection to cancel order
+                  const { data: destConnection } = await adminSupabase
+                    .from('broker_connections' as any)
+                    .select('*')
+                    .eq('id', log.destination_broker_connection_id)
+                    .single();
+
+                  if (destConnection && destConnection.broker_type === 'projectx') {
+                    // Cancel order on destination broker
+                    const { ProjectXClient } = await import('@/utils/projectx/client');
+                    const serviceType = (destConnection.api_service_type as 'topstepx' | 'alphaticks') || 'topstepx';
+                    
+                    let client: any;
+                    if (destConnection.api_key && destConnection.api_username) {
+                      client = new ProjectXClient(
+                        destConnection.api_key,
+                        destConnection.api_username,
+                        undefined,
+                        undefined,
+                        undefined,
+                        undefined,
+                        serviceType
+                      );
+                      if (destConnection.api_base_url) {
+                        client.setBaseUrl(destConnection.api_base_url);
+                      }
+                    }
+
+                    if (client) {
+                      // Cancel order (we'll need to implement cancelOrder method)
+                      console.log(`  🚫 Attempting to cancel destination order ${log.order_id} on ${destConnection.broker_account_name}`);
+                      // TODO: Implement cancelOrder method in ProjectXClient
+                    }
+                  }
+                } catch (cancelError: any) {
+                  console.warn(`  ⚠️ Error cancelling destination order:`, cancelError.message);
+                }
+              }
+
+              // Update log status to cancelled
+              await adminSupabase
+                .from('copy_trade_logs' as any)
+                .update({ 
+                  order_status: 'cancelled',
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', log.id);
+
+              console.log(`  ✅ Updated copy trade log ${log.id} to cancelled status`);
+            }
           }
         }
       } catch (error: any) {
