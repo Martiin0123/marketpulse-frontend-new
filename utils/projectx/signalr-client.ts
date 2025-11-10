@@ -3,8 +3,17 @@
  * Connects to the ProjectX Gateway API real-time hub to receive instant order updates
  */
 
-// @ts-ignore - SignalR types may not be available
-import * as signalR from '@microsoft/signalr';
+// Dynamic import for SignalR to handle SSR
+let signalR: any = null;
+
+// Load SignalR only on client side
+if (typeof window !== 'undefined') {
+  try {
+    signalR = require('@microsoft/signalr');
+  } catch (error) {
+    console.error('❌ Failed to load SignalR:', error);
+  }
+}
 
 export interface ProjectXOrderUpdate {
   id: number;
@@ -119,6 +128,12 @@ export class ProjectXSignalRClient {
    * Connect to the SignalR hub
    */
   async connect(): Promise<void> {
+    // Check if SignalR is loaded
+    if (!signalR) {
+      console.error('❌ SignalR is not loaded. Make sure @microsoft/signalr is installed.');
+      throw new Error('SignalR library not available');
+    }
+
     if (this.connection && this.isConnected) {
       console.log('✅ SignalR already connected');
       return;
@@ -139,7 +154,10 @@ export class ProjectXSignalRClient {
         .withUrl(connectionUrl, {
           skipNegotiation: true,
           transport: signalR.HttpTransportType.WebSockets,
-          accessTokenFactory: () => this.jwtToken, // Also provide via factory as fallback
+          accessTokenFactory: () => {
+            console.log('🔑 Using accessTokenFactory to provide JWT token');
+            return this.jwtToken;
+          },
           timeout: 10000
         })
         .withAutomaticReconnect({
@@ -352,14 +370,16 @@ export class ProjectXSignalRClient {
    * Check if connected
    */
   get connected(): boolean {
-    return this.isConnected && this.connection?.state === signalR.HubConnectionState.Connected;
+    if (!signalR || !this.connection) return false;
+    return this.isConnected && this.connection.state === signalR.HubConnectionState.Connected;
   }
 
   /**
    * Get connection state
    */
-  get state(): signalR.HubConnectionState | null {
-    return this.connection?.state ?? null;
+  get state(): any {
+    if (!signalR || !this.connection) return null;
+    return this.connection.state ?? null;
   }
 }
 

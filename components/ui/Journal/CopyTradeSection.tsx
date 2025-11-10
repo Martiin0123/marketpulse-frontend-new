@@ -61,6 +61,11 @@ export default function CopyTradeSection({
   );
 
   useEffect(() => {
+    console.log('🔄 CopyTradeSection useEffect triggered', {
+      configsCount: configs.length,
+      activeConfigs: configs.filter((c) => c.enabled).length
+    });
+
     // Only connect if there are active configs
     const activeConfigs = configs.filter((c) => c.enabled);
     if (activeConfigs.length === 0) {
