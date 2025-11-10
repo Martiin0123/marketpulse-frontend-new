@@ -49,16 +49,16 @@ function categorizeProducts(products: any[]) {
     const productName = (product.name || '').toLowerCase();
 
     // Check metadata first, then fallback to name matching
+    // Only add to signals if it's not a journal product
     if (
-      productType === 'signals' ||
-      productName.includes('signal') ||
-      productName.includes('premium') ||
-      productName.includes('vip')
+      (productType === 'signals' ||
+        productName.includes('signal') ||
+        (productName.includes('premium') && !productName.includes('journal')) ||
+        (productName.includes('vip') && !productName.includes('journal'))) &&
+      productType !== 'journal' &&
+      !productName.includes('journal')
     ) {
-      // Only add if not already a journal product
-      if (!productType === 'journal' && !productName.includes('journal')) {
-        signalsProducts.push(product);
-      }
+      signalsProducts.push(product);
     }
 
     if (
