@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
         .order('created_at', { ascending: false });
 
       // Get the most recent active log
-      const log = logs && logs.length > 0 ? logs[0] : null;
+      let log = logs && logs.length > 0 ? logs[0] : null;
 
       // If not found by source_order_id, try to find any recent log for this account
       // (in case source_order_id wasn't set)
