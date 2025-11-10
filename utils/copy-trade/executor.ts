@@ -206,23 +206,43 @@ export async function processCopyTradeExecution(
     console.log(`📋 Found ${configs.length} active copy trade config(s)`);
 
     // Get destination broker connections
-    const destinationAccountIds = configs.map((c: CopyTradeConfig) => c.destination_account_id);
+    const destinationAccountIds = configs
+      .map((c: CopyTradeConfig) => c.destination_account_id)
+      .filter((id: string) => id && id !== 'undefined' && id !== 'null'); // Filter out invalid IDs
+
+    if (destinationAccountIds.length === 0) {
+      console.error('❌ No valid destination account IDs found in configs');
+      result.errors.push('No valid destination account IDs found');
+      return result;
+    }
+
+    console.log(`🔍 Fetching destination accounts:`, destinationAccountIds);
+
     const { data: destinationAccounts, error: accountsError } = await supabase
       .from('trading_accounts' as any)
       .select('id')
       .in('id', destinationAccountIds);
 
-    if (accountsError || !destinationAccounts) {
+    if (accountsError) {
       console.error('❌ Error fetching destination accounts:', accountsError);
-      result.errors.push(`Failed to fetch destination accounts: ${accountsError?.message || 'Unknown error'}`);
+      result.errors.push(`Failed to fetch destination accounts: ${accountsError.message}`);
       return result;
     }
+
+    if (!destinationAccounts || destinationAccounts.length === 0) {
+      console.error('❌ No destination accounts found');
+      result.errors.push('No destination accounts found');
+      return result;
+    }
+
+    const validAccountIds = destinationAccounts.map((acc: any) => acc.id).filter((id: any) => id);
+    console.log(`✅ Found ${validAccountIds.length} destination account(s):`, validAccountIds);
 
     // Get broker connections for destination accounts
     const { data: brokerConnections, error: connectionsError } = await supabase
       .from('broker_connections' as any)
       .select('*')
-      .in('trading_account_id', destinationAccountIds.map((acc: any) => acc.id));
+      .in('trading_account_id', validAccountIds);
 
     if (connectionsError) {
       console.error('❌ Error fetching broker connections:', connectionsError);
