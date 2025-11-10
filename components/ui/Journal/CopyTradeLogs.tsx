@@ -7,7 +7,8 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   ExclamationTriangleIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
 import {
   CheckCircleIcon as CheckCircleIconSolid,
@@ -61,6 +62,7 @@ export default function CopyTradeLogs({
     'all' | 'pending' | 'submitted' | 'filled' | 'cancelled' | 'error'
   >('all');
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [isClearing, setIsClearing] = useState(false);
 
   const supabase = createClient();
 
@@ -114,6 +116,40 @@ export default function CopyTradeLogs({
       console.error('Error in loadLogs:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleClearLogs = async () => {
+    if (!confirm('Are you sure you want to clear all copy trade logs? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setIsClearing(true);
+
+      let query = supabase
+        .from('copy_trade_logs' as any)
+        .delete();
+
+      if (configId) {
+        query = query.eq('copy_trade_config_id', configId);
+      }
+
+      const { error } = await query;
+
+      if (error) {
+        console.error('Error clearing logs:', error);
+        alert('Failed to clear logs. Please try again.');
+        return;
+      }
+
+      // Reload logs after clearing
+      await loadLogs();
+    } catch (error) {
+      console.error('Error in handleClearLogs:', error);
+      alert('Failed to clear logs. Please try again.');
+    } finally {
+      setIsClearing(false);
     }
   };
 
