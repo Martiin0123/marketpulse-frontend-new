@@ -95,6 +95,9 @@ export async function GET(request: NextRequest) {
     } else if (broker === 'projectx') {
       tokens = await ProjectXClient.exchangeCodeForToken(code, redirectUri);
       const client = new ProjectXClient(
+        undefined, // apiKey
+        undefined, // apiUsername
+        undefined, // apiSecret
         tokens.access_token,
         tokens.refresh_token,
         new Date(Date.now() + tokens.expires_in * 1000)

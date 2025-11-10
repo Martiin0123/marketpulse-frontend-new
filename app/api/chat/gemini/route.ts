@@ -3,9 +3,10 @@ import { NextRequest, NextResponse } from 'next/server';
 const GOOGLE_AI_API_KEY = process.env.GOOGLE_AI_API_KEY;
 
 export async function POST(request: NextRequest) {
+  let userMessage = '';
   try {
     const { message, conversationHistory, userIntent } = await request.json();
-    const userMessage = message; // Extract for fallback use
+    userMessage = message; // Extract for fallback use
 
     if (!GOOGLE_AI_API_KEY) {
       console.log('❌ No Google AI API key found, using fallback');
@@ -136,8 +137,8 @@ Assistant:`;
   } catch (error) {
     console.error('Chat API error:', error);
     
-    // Fallback response
-    return getFallbackResponse(userMessage);
+    // Fallback response - use empty string if userMessage not set
+    return getFallbackResponse(userMessage || 'Hello');
   }
 }
 

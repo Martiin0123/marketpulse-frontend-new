@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     console.log(`✅ Found ${configs.length} active copy trade config(s)`);
 
     // Get unique source account IDs
-    const sourceAccountIds = [...new Set(configs.map((c: any) => c.source_account_id))];
+    const sourceAccountIds = Array.from(new Set(configs.map((c: any) => c.source_account_id)));
 
     // Get broker connections for source accounts
     console.log(`🔍 Fetching broker connections for ${sourceAccountIds.length} source account(s)...`);
