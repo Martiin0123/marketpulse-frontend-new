@@ -385,9 +385,10 @@ export async function POST(request: NextRequest) {
           if (matchingLogs && matchingLogs.length > 0) {
             console.log(`  🔄 Found ${matchingLogs.length} active copy trade log(s) to cancel for order ${orderId}`);
 
-            // Update logs to cancelled status
+            // Update logs to cancelled status and cancel destination orders
             for (const log of matchingLogs) {
               // Try to cancel the destination order if we have an order_id
+              let cancellationSuccess = false;
               if (log.order_id && log.destination_broker_connection_id) {
                 try {
                   // Get broker connection to cancel order
@@ -419,26 +420,48 @@ export async function POST(request: NextRequest) {
                     }
 
                     if (client) {
-                      // Cancel order (we'll need to implement cancelOrder method)
-                      console.log(`  🚫 Attempting to cancel destination order ${log.order_id} on ${destConnection.broker_account_name}`);
-                      // TODO: Implement cancelOrder method in ProjectXClient
+                      // Get the account ID from the broker connection
+                      const accountId = destConnection.broker_account_name || destConnection.trading_account_id;
+                      
+                      console.log(`  🚫 Attempting to cancel destination order ${log.order_id} on ${destConnection.broker_account_name} (Account: ${accountId})`);
+                      
+                      const cancelResult = await client.cancelOrder({
+                        accountId: accountId,
+                        orderId: log.order_id
+                      });
+
+                      if (cancelResult.success) {
+                        cancellationSuccess = true;
+                        console.log(`  ✅ Successfully cancelled destination order ${log.order_id} on ${destConnection.broker_account_name}`);
+                      } else {
+                        console.warn(`  ⚠️ Failed to cancel destination order ${log.order_id}: ${cancelResult.error}`);
+                      }
+                    } else {
+                      console.warn(`  ⚠️ Could not initialize ProjectX client for cancellation`);
                     }
+                  } else {
+                    console.warn(`  ⚠️ Destination broker type ${destConnection?.broker_type} does not support order cancellation`);
                   }
                 } catch (cancelError: any) {
-                  console.warn(`  ⚠️ Error cancelling destination order:`, cancelError.message);
+                  console.error(`  ❌ Error cancelling destination order:`, cancelError);
+                  console.error(`  Stack:`, cancelError.stack);
                 }
+              } else {
+                console.log(`  ⏭️ Skipping cancellation - no order_id (${log.order_id}) or broker connection (${log.destination_broker_connection_id})`);
               }
 
-              // Update log status to cancelled
+              // Update log status to cancelled (regardless of whether we successfully cancelled the destination order)
+              // The source order was cancelled, so the log should reflect that
               await adminSupabase
                 .from('copy_trade_logs' as any)
                 .update({ 
                   order_status: 'cancelled',
-                  updated_at: new Date().toISOString()
+                  updated_at: new Date().toISOString(),
+                  error_message: cancellationSuccess ? null : (log.order_id ? 'Failed to cancel destination order' : 'No destination order ID to cancel')
                 })
                 .eq('id', log.id);
 
-              console.log(`  ✅ Updated copy trade log ${log.id} to cancelled status`);
+              console.log(`  ✅ Updated copy trade log ${log.id} to cancelled status${cancellationSuccess ? ' (destination order cancelled)' : ' (destination order cancellation failed or not attempted)'}`);
             }
           }
         }
