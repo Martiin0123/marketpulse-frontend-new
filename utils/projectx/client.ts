@@ -546,17 +546,17 @@ export class ProjectXClient {
           headers: {
             'Content-Type': 'application/json',
           },
-        });
+        }) as any;
 
         if (response && Array.isArray(response)) {
           console.log(`✅ Successfully fetched ${response.length} order(s) from ${endpoint}`);
           return response;
-        } else if (response && response.orders && Array.isArray(response.orders)) {
-          console.log(`✅ Successfully fetched ${response.orders.length} order(s) from ${endpoint}`);
-          return response.orders;
-        } else if (response && response.data && Array.isArray(response.data)) {
-          console.log(`✅ Successfully fetched ${response.data.length} order(s) from ${endpoint}`);
-          return response.data;
+        } else if (response && (response as any).orders && Array.isArray((response as any).orders)) {
+          console.log(`✅ Successfully fetched ${(response as any).orders.length} order(s) from ${endpoint}`);
+          return (response as any).orders;
+        } else if (response && (response as any).data && Array.isArray((response as any).data)) {
+          console.log(`✅ Successfully fetched ${(response as any).data.length} order(s) from ${endpoint}`);
+          return (response as any).data;
         }
       } catch (error: any) {
         // Continue to next endpoint if this one fails
