@@ -3,6 +3,9 @@ import { createClient } from '@/utils/supabase/server';
 import { getSupabaseAdmin } from '@/utils/supabase/admin';
 import { ProjectXClient } from '@/utils/projectx/client';
 
+// Force dynamic rendering since we use cookies for authentication
+export const dynamic = 'force-dynamic';
+
 /**
  * Get SignalR connection details for real-time order updates
  * Returns JWT token and account ID for each active copy trade source account

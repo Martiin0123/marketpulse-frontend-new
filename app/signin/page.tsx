@@ -6,6 +6,9 @@ import AuthRedirectHandler from '@/components/ui/AuthRedirectHandler/AuthRedirec
 import Link from 'next/link';
 import { ArrowLeft, Home } from 'lucide-react';
 
+// Force dynamic rendering since we use cookies for authentication
+export const dynamic = 'force-dynamic';
+
 interface SignInProps {
   searchParams: { [key: string]: string | string[] | undefined };
 }

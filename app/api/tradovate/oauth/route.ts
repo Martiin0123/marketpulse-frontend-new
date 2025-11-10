@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { TradovateClient } from '@/utils/tradovate/client';
 
+// Force dynamic rendering since we use request.url
+export const dynamic = 'force-dynamic';
+
 /**
  * Initiate Tradovate OAuth flow
  * GET /api/tradovate/oauth?trading_account_id=xxx&redirect_uri=xxx

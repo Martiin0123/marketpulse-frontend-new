@@ -3,6 +3,9 @@ import { createClient } from '@/utils/supabase/server';
 import { TradovateClient } from '@/utils/tradovate/client';
 import { ProjectXClient } from '@/utils/projectx/client';
 
+// Force dynamic rendering since we use request.url
+export const dynamic = 'force-dynamic';
+
 const brokerNames: Record<string, string> = {
   tradovate: 'Tradovate',
   projectx: 'Project X'

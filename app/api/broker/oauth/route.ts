@@ -3,6 +3,9 @@ import { createClient } from '@/utils/supabase/server';
 import { TradovateClient } from '@/utils/tradovate/client';
 import { ProjectXClient } from '@/utils/projectx/client';
 
+// Force dynamic rendering since we use request.url
+export const dynamic = 'force-dynamic';
+
 /**
  * Generic broker OAuth flow
  * GET /api/broker/oauth?broker=tradovate|projectx&trading_account_id=xxx&redirect_uri=xxx
