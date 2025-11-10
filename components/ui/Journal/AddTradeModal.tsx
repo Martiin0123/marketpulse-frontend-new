@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { createClient } from '@/utils/supabase/client';
 import type { TradeEntry } from '@/types/journal';
+import type { TradeEntry as TradeEntryType } from '@/types/journal';
 
 interface AddTradeModalProps {
   isOpen: boolean;
@@ -94,6 +95,25 @@ export default function AddTradeModal({
 
       if (!data) {
         throw new Error('No data returned from database');
+      }
+
+      // Trigger copy trade if enabled
+      try {
+        const { copyTradeToDestinationAccounts } = await import('@/utils/copy-trade/service');
+        const copyResult = await copyTradeToDestinationAccounts(
+          data as unknown as TradeEntryType,
+          accountId,
+          user.id
+        );
+        if (copyResult.copied > 0) {
+          console.log(`✅ Copied trade to ${copyResult.copied} destination account(s)`);
+        }
+        if (copyResult.errors.length > 0) {
+          console.warn('⚠️ Some copy trades failed:', copyResult.errors);
+        }
+      } catch (copyError) {
+        // Don't fail the trade creation if copy fails
+        console.error('Error copying trade:', copyError);
       }
 
       onTradeAdded(data);

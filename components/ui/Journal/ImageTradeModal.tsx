@@ -263,14 +263,18 @@ export default function ImageTradeModal({
 
       // Trigger copy trade if enabled
       try {
-        const { copyTradeToDestinationAccounts } = await import('@/utils/copy-trade/service');
+        const { copyTradeToDestinationAccounts } = await import(
+          '@/utils/copy-trade/service'
+        );
         const copyResult = await copyTradeToDestinationAccounts(
           data as unknown as TradeEntry,
           formData.accountId,
           user.id
         );
         if (copyResult.copied > 0) {
-          console.log(`✅ Copied trade to ${copyResult.copied} destination account(s)`);
+          console.log(
+            `✅ Copied trade to ${copyResult.copied} destination account(s)`
+          );
         }
         if (copyResult.errors.length > 0) {
           console.warn('⚠️ Some copy trades failed:', copyResult.errors);

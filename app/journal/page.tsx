@@ -563,8 +563,12 @@ export default function JournalPage() {
 
     // Trigger copy trade if enabled
     try {
-      const { copyTradeToDestinationAccounts } = await import('@/utils/copy-trade/service');
-      const { data: { user } } = await supabase.auth.getUser();
+      const { copyTradeToDestinationAccounts } = await import(
+        '@/utils/copy-trade/service'
+      );
+      const {
+        data: { user }
+      } = await supabase.auth.getUser();
       if (user) {
         const copyResult = await copyTradeToDestinationAccounts(
           trade,
@@ -572,7 +576,9 @@ export default function JournalPage() {
           trade.user_id || user.id
         );
         if (copyResult.copied > 0) {
-          console.log(`✅ Copied trade to ${copyResult.copied} destination account(s)`);
+          console.log(
+            `✅ Copied trade to ${copyResult.copied} destination account(s)`
+          );
           // Refresh the page to show copied trades
           setRefreshKey((prev) => prev + 1);
         }

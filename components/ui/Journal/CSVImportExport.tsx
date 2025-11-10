@@ -287,17 +287,50 @@ export default function CSVImportExport({
 
       // Insert trades in batches
       const batchSize = 50;
+      const insertedTrades: any[] = [];
+      
       for (let i = 0; i < tradesToImport.length; i += batchSize) {
         const batch = tradesToImport.slice(i, i + batchSize);
-        const { error: insertError } = await supabase
+        const { data: insertedBatch, error: insertError } = await supabase
           .from('trade_entries' as any)
-          .insert(batch);
+          .insert(batch)
+          .select();
 
         if (insertError) {
           console.error('Error inserting batch:', insertError);
           errorCount += batch.length;
         } else {
           successCount += batch.length;
+          if (insertedBatch) {
+            insertedTrades.push(...insertedBatch);
+          }
+        }
+      }
+
+      // Trigger copy trade for all inserted trades
+      if (insertedTrades.length > 0) {
+        try {
+          const { copyTradeToDestinationAccounts } = await import('@/utils/copy-trade/service');
+          let totalCopied = 0;
+          
+          for (const trade of insertedTrades) {
+            const copyResult = await copyTradeToDestinationAccounts(
+              trade as any,
+              trade.account_id,
+              trade.user_id
+            );
+            totalCopied += copyResult.copied;
+            if (copyResult.errors.length > 0) {
+              console.warn('⚠️ Some copy trades failed:', copyResult.errors);
+            }
+          }
+          
+          if (totalCopied > 0) {
+            console.log(`✅ Copied ${totalCopied} trades to destination accounts from CSV import`);
+          }
+        } catch (copyError) {
+          // Don't fail the import if copy fails
+          console.error('Error copying trades from CSV import:', copyError);
         }
       }
 
