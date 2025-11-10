@@ -316,7 +316,21 @@ export async function POST(request: NextRequest) {
           const orderId = order.id || order.orderId || order.order_id || 'unknown';
           const orderSymbol = order.contractId || order.contract_id || order.symbol || order.contractName || order.contract_name || 'unknown';
           
-          console.log(`  🚫 Checking for cancelled order: ${orderSymbol} (ID: ${orderId})`);
+          // Extract side and quantity for matching
+          let orderSide = 'unknown';
+          if (order.side === 1 || order.side === '1' || order.side === 'BUY' || order.side === 'buy' || order.side === 'long') {
+            orderSide = 'BUY';
+          } else if (order.side === 0 || order.side === '0' || order.side === 'SELL' || order.side === 'sell' || order.side === 'short') {
+            orderSide = 'SELL';
+          } else if (order.direction) {
+            orderSide = order.direction.toUpperCase();
+          } else if (order.side) {
+            orderSide = order.side.toString().toUpperCase();
+          }
+          
+          const orderQty = order.size || order.quantity || order.qty || 1;
+          
+          console.log(`  🚫 Checking for cancelled order: ${orderSymbol} ${orderSide} ${orderQty} (ID: ${orderId})`);
 
           // Find copy trade logs for this order that are still pending/submitted
           // Match by symbol, side, and quantity (since we don't have a direct source order ID)
@@ -328,14 +342,19 @@ export async function POST(request: NextRequest) {
             .in('order_status', ['pending', 'submitted'])
             .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()); // Last 24 hours
 
+          if (logsError) {
+            console.warn(`  ⚠️ Error checking logs for cancelled order:`, logsError);
+            continue;
+          }
+
           // Filter logs to match the cancelled order's side and quantity more closely
           // This helps when multiple orders exist for the same symbol
           const matchingLogs = activeLogs?.filter((log: any) => {
             // Try to match by side and quantity (within reasonable range)
             const sideMatch = log.source_side === orderSide || 
-                             (orderSide === 'SELL' && log.source_side === '0') ||
-                             (orderSide === 'BUY' && log.source_side === '1');
-            const qtyMatch = Math.abs(log.source_quantity - orderQty) < 0.01; // Allow small floating point differences
+                             (orderSide === 'SELL' && (log.source_side === '0' || log.source_side === 'SELL')) ||
+                             (orderSide === 'BUY' && (log.source_side === '1' || log.source_side === 'BUY'));
+            const qtyMatch = Math.abs(Number(log.source_quantity) - Number(orderQty)) < 0.01; // Allow small floating point differences
             
             return sideMatch && qtyMatch;
           }) || [];
