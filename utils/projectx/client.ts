@@ -512,8 +512,10 @@ export class ProjectXClient {
     await this.ensureValidAuth();
     
     // Try different endpoint patterns based on Gateway API structure
+    // ProjectX Gateway API: /api/Order/searchOpen for open orders
     const endpoints = [
-      '/api/Order/search',  // Most likely for orders
+      '/api/Order/searchOpen',  // Correct endpoint for open orders (from docs)
+      '/api/Order/search',  // Alternative (requires startTimestamp)
       '/api/Order/list',
       '/api/Order/open',
       '/api/Order/pending',
@@ -523,13 +525,19 @@ export class ProjectXClient {
     ];
 
     // Build request body (Gateway API uses POST with body)
+    // For searchOpen, we only need accountId
     const requestBody: any = {
       accountId: parseInt(accountId) || accountId,
     };
     
-    if (status && status !== 'All') {
-      requestBody.status = status;
-    }
+    // For /api/Order/search, we need startTimestamp and request wrapper
+    const searchRequestBody: any = {
+      request: {
+        accountId: parseInt(accountId) || accountId,
+        startTimestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // Last 24 hours
+        endTimestamp: new Date().toISOString()
+      }
+    };
 
     console.log(`🔍 Fetching orders from ProjectX API:`, {
       accountId,
@@ -540,9 +548,16 @@ export class ProjectXClient {
 
     for (const endpoint of endpoints) {
       try {
+        // Use different request body format for searchOpen vs search
+        const body = endpoint === '/api/Order/searchOpen' 
+          ? JSON.stringify(requestBody)
+          : endpoint === '/api/Order/search'
+          ? JSON.stringify(searchRequestBody)
+          : JSON.stringify(requestBody);
+        
         const response = await this.apiRequest(endpoint, {
           method: 'POST',
-          body: JSON.stringify(requestBody),
+          body: body,
           headers: {
             'Content-Type': 'application/json',
           },
