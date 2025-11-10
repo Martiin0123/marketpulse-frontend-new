@@ -4,7 +4,8 @@ export interface TradingAccount {
   name: string;
   currency: string;
   initial_balance: number;
-  fixed_risk: number;
+  fixed_risk?: number; // Deprecated, use risk_per_r instead
+  risk_per_r?: number; // Dollar amount that equals 1R
   created_at: string;
   updated_at: string;
 }
@@ -48,6 +49,7 @@ export interface ExitLevel {
 export interface TradeEntry {
   id: string;
   account_id: string;
+  user_id?: string;
   symbol: string;
   side: 'long' | 'short';
   entry_price: number;
@@ -65,6 +67,9 @@ export interface TradeEntry {
   image_url?: string;
   image_data?: string;
   exit_levels?: ExitLevel[]; // Array of exit levels for trades with multiple partial exits
+  size?: number; // Trade size/quantity
+  broker_trade_id?: string; // For synced trades or copied trades
+  sync_source?: string; // Source of the trade (e.g., 'projectx', 'tradovate', 'copy_trade')
   created_at: string;
   updated_at: string;
 }
