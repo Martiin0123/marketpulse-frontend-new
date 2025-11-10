@@ -37,13 +37,13 @@ export async function POST(request: NextRequest) {
     if (action === 'cancelled' && order?.id) {
       console.log(`🚫 Processing real-time order cancellation: ${order.id}`);
 
-      // Find the copy trade log for this order
+      // Find the copy trade log for this order (check all active statuses, not just pending/submitted)
       const { data: log } = await adminSupabase
         .from('copy_trade_logs' as any)
         .select('id, order_id, order_status, destination_broker_connection_id, destination_account_id')
         .eq('source_account_id', tradingAccountId)
         .eq('source_order_id', order.id.toString())
-        .in('order_status', ['pending', 'submitted'])
+        .in('order_status', ['pending', 'submitted', 'open', 'filled']) // Include all active statuses
         .maybeSingle();
 
       if (log && log.order_id && log.destination_broker_connection_id) {
@@ -122,17 +122,36 @@ export async function POST(request: NextRequest) {
     // Check if this order has already been processed
     const { data: existingLog } = await adminSupabase
       .from('copy_trade_logs' as any)
-      .select('id, order_status, order_price, order_id, destination_broker_connection_id')
+      .select('id, order_status, order_price, order_stop_price, order_id, destination_broker_connection_id')
       .eq('source_account_id', tradingAccountId)
       .eq('source_order_id', order.id.toString())
       .maybeSingle();
 
-    // If order exists and is still pending/submitted, check if it was modified
-    if (existingLog && (existingLog.order_status === 'pending' || existingLog.order_status === 'submitted')) {
-      // Check if price changed (modification)
-      if (order.price && existingLog.order_price && 
-          Math.abs(Number(existingLog.order_price) - Number(order.price)) > 0.01) {
-        console.log(`✏️ Processing real-time order modification: ${order.id} (price: ${existingLog.order_price} → ${order.price})`);
+    // If order exists and is still active (not filled/cancelled/rejected), check if it was modified
+    if (existingLog && 
+        existingLog.order_status !== 'filled' && 
+        existingLog.order_status !== 'cancelled' && 
+        existingLog.order_status !== 'rejected' &&
+        existingLog.order_status !== 'error') {
+      
+      // Check if limit price changed (for limit orders)
+      const limitPriceChanged = order.price !== undefined && existingLog.order_price !== null && 
+          Math.abs(Number(existingLog.order_price) - Number(order.price)) > 0.01;
+      
+      // Check if stop price changed (for stop orders)
+      const stopPriceChanged = order.stopPrice !== undefined && existingLog.order_stop_price !== null && 
+          Math.abs(Number(existingLog.order_stop_price) - Number(order.stopPrice)) > 0.01;
+      
+      // Also check if stop price was added/changed when it didn't exist before
+      const stopPriceAdded = order.stopPrice !== undefined && 
+          (existingLog.order_stop_price === null || existingLog.order_stop_price === undefined) && 
+          order.stopPrice > 0;
+      
+      if (limitPriceChanged || stopPriceChanged || stopPriceAdded) {
+        const priceChange = limitPriceChanged ? `${existingLog.order_price} → ${order.price}` : '';
+        const stopChange = stopPriceChanged ? `stop: ${existingLog.order_stop_price} → ${order.stopPrice}` : 
+                          stopPriceAdded ? `stop: added ${order.stopPrice}` : '';
+        console.log(`✏️ Processing real-time order modification: ${order.id} (${priceChange}${priceChange && stopChange ? ', ' : ''}${stopChange})`);
 
         // Get destination broker connection
         const { data: destConnection } = await adminSupabase
@@ -169,17 +188,28 @@ export async function POST(request: NextRequest) {
               const modifyResult = await client.modifyOrder({
                 accountId: accountId,
                 orderId: existingLog.order_id,
-                limitPrice: order.price,
-                stopPrice: order.stopPrice
+                limitPrice: order.price || undefined, // Only include if present
+                stopPrice: order.stopPrice || undefined // Only include if present
               });
 
               if (modifyResult.success) {
+                const updateData: any = {
+                  updated_at: new Date().toISOString()
+                };
+                
+                // Update limit price if it changed
+                if (limitPriceChanged && order.price) {
+                  updateData.order_price = order.price;
+                }
+                
+                // Update stop price if it changed
+                if ((stopPriceChanged || stopPriceAdded) && order.stopPrice) {
+                  updateData.order_stop_price = order.stopPrice;
+                }
+                
                 await adminSupabase
                   .from('copy_trade_logs' as any)
-                  .update({ 
-                    order_price: order.price,
-                    updated_at: new Date().toISOString()
-                  })
+                  .update(updateData)
                   .eq('id', existingLog.id);
 
                 return NextResponse.json({
