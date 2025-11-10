@@ -1019,42 +1019,53 @@ export class ProjectXClient {
             headers['Authorization'] = `Bearer ${this.accessToken}`;
           }
 
-          console.log('📤 Placing order via ProjectX API:', { url, orderData: requestBody });
+          console.log(`🔍 Trying order placement endpoint: ${endpoint}`);
+          console.log('📤 Placing order via ProjectX API:', { url, requestBody });
 
-          const response = await fetch(url, {
+          const response = await this.apiRequest(endpoint, {
             method: 'POST',
-            headers,
             body: JSON.stringify(requestBody),
-          });
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }) as any;
 
-          if (!response.ok) {
-            if (response.status === 404) {
-              console.warn(`Endpoint ${endpoint} returned 404, trying next...`);
-              continue;
+          console.log(`📥 Order placement response from ${endpoint}:`, response);
+
+          // Check for error in response
+          if (response?.errorCode !== undefined && response.errorCode !== 0) {
+            throw new Error(response.errorMessage || `API returned error code ${response.errorCode}`);
+          }
+
+          // Check for success (API returns { orderId, success: true, errorCode: 0 })
+          if (response && response.success === true) {
+            const orderId = response.orderId || response.id || response.order_id;
+            if (orderId) {
+              console.log(`✅ Order placed successfully with ID: ${orderId}`);
+              return { success: true, orderId: orderId.toString() };
             }
-            const errorText = await response.text();
-            throw new Error(`Failed to place order: ${response.status} ${errorText}`);
           }
 
-          const data = await response.json();
-          
-          // Check for error codes
-          if (data.errorCode !== undefined && data.errorCode !== 0) {
-            throw new Error(data.errorMessage || 'Failed to place order');
+          // Also check if orderId exists directly (even without success flag)
+          if (response && (response.orderId || response.id || response.order_id)) {
+            const orderId = response.orderId || response.id || response.order_id;
+            console.log(`✅ Order placed successfully with ID: ${orderId}`);
+            return { success: true, orderId: orderId.toString() };
           }
 
-          // Extract order ID from response
-          const orderId = data.orderId || data.id || data.order_id || data.orderNumber;
-
-          return {
-            success: true,
-            orderId: orderId?.toString()
-          };
+          // If we got here, the response format is unexpected
+          console.warn(`⚠️ Unexpected response format from ${endpoint}:`, JSON.stringify(response, null, 2));
         } catch (error: any) {
-          if (!error.message?.includes('404') && !error.message?.includes('Failed to place order')) {
-            throw error;
+          console.log(`⚠️ Endpoint ${endpoint} failed:`, error.message);
+          if (error.stack) {
+            console.log(`Stack:`, error.stack);
           }
-          // Continue to next endpoint
+          // Continue to next endpoint if it's a 404 or similar
+          if (error.message?.includes('404') || error.message?.includes('Not Found')) {
+            continue;
+          }
+          // For other errors, try next endpoint
+          continue;
         }
       }
 
