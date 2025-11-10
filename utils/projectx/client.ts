@@ -132,7 +132,8 @@ export class ProjectXClient {
    */
   static async exchangeCodeForToken(
     code: string,
-    redirectUri: string
+    redirectUri: string,
+    baseUrl?: string
   ): Promise<ProjectXTokens> {
     const clientId = process.env.NEXT_PUBLIC_PROJECTX_CLIENT_ID;
     const clientSecret = process.env.PROJECTX_CLIENT_SECRET;
@@ -141,7 +142,8 @@ export class ProjectXClient {
       throw new Error('Project X OAuth credentials not configured');
     }
 
-    const oauthBase = this.baseUrl || 'https://api.topstepx.com';
+    // Use provided baseUrl or default to TopStepX
+    const oauthBase = baseUrl || process.env.PROJECTX_API_URL || 'https://api.topstepx.com';
     const response = await fetch(`${oauthBase}/v1/oauth/token`, {
       method: 'POST',
       headers: {
