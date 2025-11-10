@@ -87,11 +87,11 @@ export class ProjectXClient {
                      process.env.PROJECTX_TOPSTEPX_API_URL || 
                      'https://api.topstepx.com';
     } else if (this.serviceType === 'alphaticks') {
-      // AlphaTicks - uses same API infrastructure as TopStepX
-      // Users can override with custom URL if needed
+      // AlphaTicks - uses same API structure as TopStepX but different base URL
+      // Default to alphaticks.com domain, users can override with custom URL
       this.baseUrl = process.env.PROJECTX_ALPHATICKS_API_URL || 
                      process.env.PROJECTX_API_URL || 
-                     'https://api.topstepx.com';
+                     'https://api.alphaticks.com';
     } else {
       // Fallback
       this.baseUrl = process.env.PROJECTX_API_URL || 'https://api.topstepx.com';
@@ -224,7 +224,8 @@ export class ProjectXClient {
 
     try {
       const loginUrl = `${this.baseUrl}/api/Auth/loginKey`;
-      console.log('🔐 Authenticating with TopStepX API...', { loginUrl, userName: this.apiUsername });
+      const serviceName = this.serviceType === 'alphaticks' ? 'AlphaTicks' : 'TopStepX';
+      console.log(`🔐 Authenticating with ${serviceName} API...`, { loginUrl, userName: this.apiUsername });
       
       const response = await fetch(loginUrl, {
         method: 'POST',
@@ -252,7 +253,8 @@ export class ProjectXClient {
 
       // Store session token
       this.sessionToken = data.token;
-      console.log('✅ Successfully authenticated with TopStepX API');
+      const serviceName = this.serviceType === 'alphaticks' ? 'AlphaTicks' : 'TopStepX';
+      console.log(`✅ Successfully authenticated with ${serviceName} API`);
     } catch (error: any) {
       console.error('❌ Authentication error:', error);
       throw new Error(`Failed to authenticate: ${error.message}`);
