@@ -222,8 +222,7 @@ export async function processCopyTradeExecution(
     const { data: brokerConnections, error: connectionsError } = await supabase
       .from('broker_connections' as any)
       .select('*')
-      .in('trading_account_id', destinationAccountIds.map((acc: any) => acc.id))
-      .eq('enabled', true);
+      .in('trading_account_id', destinationAccountIds.map((acc: any) => acc.id));
 
     if (connectionsError) {
       console.error('❌ Error fetching broker connections:', connectionsError);

@@ -49,7 +49,7 @@ export async function copyTradeToDestinationAccounts(
       .from('copy_trade_configs' as any)
       .select('*')
       .eq('source_account_id', sourceAccountId)
-      .eq('enabled', true);
+      .eq('enabled', true); // This is correct - copy_trade_configs has an 'enabled' column
 
     if (configError) {
       console.error('❌ Error fetching copy trade configs:', configError);
