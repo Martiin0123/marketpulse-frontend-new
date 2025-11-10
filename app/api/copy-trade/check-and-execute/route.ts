@@ -61,8 +61,7 @@ export async function POST(request: NextRequest) {
       .from('broker_connections' as any)
       .select('*')
       .in('trading_account_id', sourceAccountIds)
-      .eq('broker_type', 'projectx')
-      .eq('enabled', true);
+      .eq('broker_type', 'projectx');
 
     if (connError) {
       console.error('❌ Error fetching broker connections:', connError);
