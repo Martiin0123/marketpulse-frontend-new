@@ -62,7 +62,6 @@ export default function CopyTradeSection({
   const supabase = createClient();
 
   useEffect(() => {
-    console.log('🔄 CopyTradeSection: loadConfigs useEffect triggered');
     loadConfigs();
   }, [refreshKey]);
 
@@ -72,15 +71,9 @@ export default function CopyTradeSection({
   );
 
   useEffect(() => {
-    console.log('🔄 CopyTradeSection useEffect triggered', {
-      configsCount: configs.length,
-      activeConfigs: configs.filter((c) => c.enabled).length
-    });
-
     // Only connect if there are active configs
     const activeConfigs = configs.filter((c) => c.enabled);
     if (activeConfigs.length === 0) {
-      console.log('⏸️ Copy trade SignalR paused: No active configs');
       // Disconnect all clients
       signalRClientsRef.current.forEach((client) => {
         client.disconnect();
@@ -94,10 +87,6 @@ export default function CopyTradeSection({
       return;
     }
 
-    console.log(
-      `🔄 Setting up SignalR connections for ${activeConfigs.length} active config(s)`
-    );
-
     // Fetch SignalR connection details
     const setupSignalRConnections = async () => {
       try {
@@ -110,24 +99,9 @@ export default function CopyTradeSection({
         const data = await response.json();
         const connections = data.connections || [];
 
-        console.log('📡 SignalR connection response:', {
-          connectionsCount: connections.length,
-          connections: connections.map((c: any) => ({
-            connectionId: c.connectionId,
-            accountId: c.accountId,
-            hubUrl: c.hubUrl,
-            hasToken: !!c.jwtToken
-          }))
-        });
-
         if (connections.length === 0) {
-          console.log('⚠️ No SignalR connections available');
           return;
         }
-
-        console.log(
-          `📡 Setting up ${connections.length} SignalR connection(s)...`
-        );
 
         // Set up SignalR client for each connection
         for (const conn of connections) {
@@ -135,46 +109,18 @@ export default function CopyTradeSection({
 
           // Skip if already connected
           if (signalRClientsRef.current.has(connectionKey)) {
-            console.log(`  ⏭️ Already connected: ${connectionKey}`);
             continue;
           }
 
           try {
-            console.log(
-              `  🔧 Creating SignalR client for account ${conn.accountId}...`,
-              {
-                connectionId: conn.connectionId,
-                accountId: conn.accountId,
-                hubUrl: conn.hubUrl,
-                hasToken: !!conn.jwtToken,
-                tokenLength: conn.jwtToken?.length
-              }
-            );
-
             const signalRClient = new ProjectXSignalRClient(
               conn.jwtToken,
               conn.accountId,
               conn.hubUrl
             );
 
-            console.log(
-              `  ✅ SignalR client created for account ${conn.accountId}`
-            );
-
             // Handle order updates (new orders, modifications, cancellations)
             signalRClient.onOrderUpdate(async (order: ProjectXOrderUpdate) => {
-              console.log(`📥 [CopyTrade] Real-time order update received:`, {
-                orderId: order.id,
-                accountId: order.accountId,
-                contractId: order.contractId,
-                status: order.status,
-                type: order.type,
-                side: order.side,
-                size: order.size,
-                limitPrice: order.limitPrice,
-                stopPrice: order.stopPrice,
-                fullOrder: order
-              });
 
               // Status: 0=None, 1=Open, 2=Filled, 3=Cancelled, 4=Expired, 5=Rejected, 6=Pending
               // Order Types: 1=Limit, 2=Market, 4=Stop, 5=TrailingStop
@@ -226,18 +172,8 @@ export default function CopyTradeSection({
                     }
                   );
 
-                  if (response.ok) {
-                    const result = await response.json();
-                    if (result.executed > 0) {
-                      console.log(
-                        `✅ Executed ${result.executed} copy trade(s) from real-time update`
-                      );
-                    }
-                    if (result.modified > 0) {
-                      console.log(
-                        `✏️ Modified ${result.modified} copy trade order(s) from real-time update`
-                      );
-                    }
+                  if (!response.ok) {
+                    console.error('❌ Failed to process order update');
                   }
                 } catch (error) {
                   console.error('❌ Error processing order update:', error);
@@ -265,13 +201,8 @@ export default function CopyTradeSection({
                     }
                   );
 
-                  if (response.ok) {
-                    const result = await response.json();
-                    if (result.cancelled > 0) {
-                      console.log(
-                        `🚫 Cancelled ${result.cancelled} copy trade order(s) from real-time update`
-                      );
-                    }
+                  if (!response.ok) {
+                    console.error('❌ Failed to process order cancellation');
                   }
                 } catch (error) {
                   console.error(
@@ -284,15 +215,6 @@ export default function CopyTradeSection({
 
             // Handle trade updates (executed trades)
             signalRClient.onTradeUpdate(async (trade: ProjectXTradeUpdate) => {
-              console.log(`📥 [CopyTrade] Real-time trade update received:`, {
-                tradeId: trade.id,
-                accountId: trade.accountId,
-                contractId: trade.contractId,
-                side: trade.side,
-                size: trade.size,
-                price: trade.price,
-                fullTrade: trade
-              });
 
               // Process executed trades immediately
               try {
@@ -323,13 +245,8 @@ export default function CopyTradeSection({
                   }
                 );
 
-                if (response.ok) {
-                  const result = await response.json();
-                  if (result.executed > 0) {
-                    console.log(
-                      `✅ Executed ${result.executed} copy trade(s) from trade update`
-                    );
-                  }
+                if (!response.ok) {
+                  console.error('❌ Failed to process trade update');
                 }
               } catch (error) {
                 console.error('❌ Error processing trade update:', error);
@@ -339,9 +256,6 @@ export default function CopyTradeSection({
             // Connect to SignalR
             await signalRClient.connect();
             signalRClientsRef.current.set(connectionKey, signalRClient);
-            console.log(
-              `  ✅ Connected to SignalR for account ${conn.accountId}`
-            );
 
             // Update connection status after connecting
             updateConnectionStatus();
@@ -396,7 +310,6 @@ export default function CopyTradeSection({
     // Cleanup: disconnect all SignalR clients on unmount or when configs change
     return () => {
       clearInterval(statusInterval);
-      console.log('🧹 Cleaning up SignalR connections...');
       signalRClientsRef.current.forEach((client) => {
         client.disconnect();
       });
@@ -405,7 +318,6 @@ export default function CopyTradeSection({
   }, [configs]);
 
   const loadConfigs = async () => {
-    console.log('🔄 CopyTradeSection: loadConfigs called');
     try {
       setIsLoading(true);
       const {

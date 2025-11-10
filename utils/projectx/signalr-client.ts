@@ -175,12 +175,10 @@ export class ProjectXSignalRClient {
   async connect(): Promise<void> {
     // Load SignalR if not already loaded
     if (!signalR) {
-      console.log('📦 SignalR not loaded yet, loading now...');
       await loadSignalR();
     }
 
     if (this.connection && this.isConnected) {
-      console.log('✅ SignalR already connected');
       return;
     }
 
@@ -189,13 +187,6 @@ export class ProjectXSignalRClient {
       // According to the docs example, we should include access_token in the URL
       // Format: https://rtc.alphaticks.projectx.com/hubs/user?access_token=YOUR_JWT_TOKEN
       connectionUrl = `${this.userHubUrl}?access_token=${encodeURIComponent(this.jwtToken)}`;
-      
-      console.log('🔌 Building SignalR connection:', {
-        url: connectionUrl.substring(0, 100) + '...', // Log partial URL to avoid exposing full token
-        hubUrl: this.userHubUrl,
-        accountId: this.accountId,
-        hasToken: !!this.jwtToken
-      });
       
       this.connection = new signalR.HubConnectionBuilder()
         .withUrl(connectionUrl, {
@@ -208,7 +199,6 @@ export class ProjectXSignalRClient {
           nextRetryDelayInMilliseconds: (retryContext) => {
             // Exponential backoff: 1s, 2s, 4s, 8s, 16s, max 30s
             const delay = Math.min(1000 * Math.pow(2, retryContext.previousRetryCount), 30000);
-            console.log(`🔄 SignalR reconnecting in ${delay}ms (attempt ${retryContext.previousRetryCount + 1})`);
             return delay;
           }
         })
@@ -218,15 +208,6 @@ export class ProjectXSignalRClient {
       this.setupEventHandlers();
 
       // Start connection
-      console.log('🔌 Connecting to ProjectX SignalR hub...', {
-        url: this.userHubUrl,
-        accountId: this.accountId,
-        accountIdType: typeof this.accountId,
-        hasToken: !!this.jwtToken,
-        tokenLength: this.jwtToken?.length
-      });
-      
-      console.log('🚀 Starting SignalR connection...');
       await this.connection.start();
       
       // Verify connection is actually connected
@@ -236,11 +217,6 @@ export class ProjectXSignalRClient {
       
       this.isConnected = true;
       this.reconnectAttempts = 0;
-      console.log('✅ SignalR connected successfully', {
-        connectionId: this.connection.connectionId,
-        state: this.connection.state,
-        url: connectionUrl.substring(0, 100) + '...'
-      });
 
       // Wait a bit before subscribing to ensure connection is stable
       await new Promise(resolve => setTimeout(resolve, 200));
@@ -252,8 +228,6 @@ export class ProjectXSignalRClient {
 
       // Subscribe to updates
       await this.subscribe();
-      
-      console.log('✅ SignalR subscription completed');
     } catch (error: any) {
       console.error('❌ Error connecting to SignalR:', error);
       console.error('  Error details:', {
@@ -280,18 +254,6 @@ export class ProjectXSignalRClient {
       // Extract the actual order data from the nested structure
       const orderData = event.data || event;
       
-      console.log('📥 [SignalR] Received GatewayUserOrder event:', JSON.stringify(event, null, 2));
-      console.log('📥 [SignalR] Order details:', {
-        id: orderData.id,
-        accountId: orderData.accountId,
-        contractId: orderData.contractId,
-        status: orderData.status,
-        type: orderData.type,
-        side: orderData.side,
-        size: orderData.size,
-        limitPrice: orderData.limitPrice,
-        stopPrice: orderData.stopPrice
-      });
       
       this.onOrderUpdateCallbacks.forEach(callback => {
         try {
@@ -306,7 +268,6 @@ export class ProjectXSignalRClient {
     // Note: SignalR sends events with structure: { action: number, data: ProjectXPositionUpdate }
     this.connection.on('GatewayUserPosition', (event: any) => {
       const positionData = event.data || event;
-      console.log('📥 [SignalR] Received GatewayUserPosition event:', positionData);
       this.onPositionUpdateCallbacks.forEach(callback => {
         try {
           callback(positionData as ProjectXPositionUpdate);
@@ -320,7 +281,6 @@ export class ProjectXSignalRClient {
     // Note: SignalR sends events with structure: { action: number, data: ProjectXTradeUpdate }
     this.connection.on('GatewayUserTrade', (event: any) => {
       const tradeData = event.data || event;
-      console.log('📥 [SignalR] Received GatewayUserTrade event:', tradeData);
       this.onTradeUpdateCallbacks.forEach(callback => {
         try {
           callback(tradeData as ProjectXTradeUpdate);
@@ -424,14 +384,10 @@ export class ProjectXSignalRClient {
     }
 
     try {
-      console.log(`📡 Unsubscribing from updates for account ${this.accountId}...`);
-      
       await this.connection.invoke('UnsubscribeAccounts');
       await this.connection.invoke('UnsubscribeOrders', this.accountId);
       await this.connection.invoke('UnsubscribePositions', this.accountId);
       await this.connection.invoke('UnsubscribeTrades', this.accountId);
-      
-      console.log('  ✅ Unsubscribed from all updates');
     } catch (error: any) {
       console.error('❌ Error unsubscribing:', error);
     }

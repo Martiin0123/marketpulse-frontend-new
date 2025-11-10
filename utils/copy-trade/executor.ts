@@ -52,19 +52,8 @@ export async function executeCopyTrade(
   multiplier: number
 ): Promise<{ success: boolean; error?: string; orderId?: string; retryable?: boolean }> {
   try {
-    console.log('🚀 Executing copy trade:', {
-      symbol: sourceTrade.symbol,
-      side: sourceTrade.side,
-      sourceQuantity: sourceTrade.quantity,
-      multiplier,
-      calculatedQuantity: sourceTrade.quantity * multiplier,
-      destinationAccount: destinationConnection.broker_account_name
-    });
-
     // Calculate destination quantity with multiplier
     const destinationQuantity = Math.round(sourceTrade.quantity * multiplier);
-    
-    console.log(`📊 Quantity calculation: ${sourceTrade.quantity} × ${multiplier} = ${destinationQuantity}`);
     
     if (destinationQuantity <= 0) {
       return { success: false, error: 'Calculated quantity is 0 or negative' };
@@ -159,7 +148,6 @@ async function executeProjectXOrder(
     });
 
     if (orderResult.success) {
-      console.log('✅ Order placed successfully:', orderResult.orderId);
       return { success: true, orderId: orderResult.orderId };
     } else {
       // Check if error is retryable (network errors, temporary API issues)
@@ -201,13 +189,6 @@ export async function processCopyTradeExecution(
   const result = { copied: 0, errors: [] as string[] };
 
   try {
-    console.log('🔄 Processing copy trade execution:', {
-      sourceAccountId,
-      symbol: tradeExecution.symbol,
-      side: tradeExecution.side,
-      quantity: tradeExecution.quantity
-    });
-
     // Get all active copy trade configs where this account is the source
     const { data: configs, error: configError } = await supabase
       .from('copy_trade_configs' as any)
@@ -222,11 +203,8 @@ export async function processCopyTradeExecution(
     }
 
     if (!configs || configs.length === 0) {
-      console.log('ℹ️ No active copy trade configs found for this account');
       return result;
     }
-
-    console.log(`📋 Found ${configs.length} active copy trade config(s)`);
 
     // Get destination broker connections
     const destinationAccountIds = configs
@@ -238,8 +216,6 @@ export async function processCopyTradeExecution(
       result.errors.push('No valid destination account IDs found');
       return result;
     }
-
-    console.log(`🔍 Fetching destination accounts:`, destinationAccountIds);
 
     const { data: destinationAccounts, error: accountsError } = await supabase
       .from('trading_accounts' as any)
@@ -259,7 +235,6 @@ export async function processCopyTradeExecution(
     }
 
     const validAccountIds = destinationAccounts.map((acc: any) => acc.id).filter((id: any) => id);
-    console.log(`✅ Found ${validAccountIds.length} destination account(s):`, validAccountIds);
 
     // Get broker connections for destination accounts
     const { data: brokerConnections, error: connectionsError } = await supabase
@@ -281,28 +256,15 @@ export async function processCopyTradeExecution(
     // Process each copy trade config
     for (const config of configs as CopyTradeConfig[]) {
       try {
-        console.log(`🔍 Processing config ${config.id}:`, {
-          destinationAccount: config.destination_account_id,
-          multiplier: config.multiplier,
-          enabled: config.enabled
-        });
-        
         // Check filters
         if (!shouldExecuteCopyTrade(tradeExecution, config)) {
-          console.log(`⏭️ Skipping copy trade execution due to filters:`, {
-            configId: config.id,
-            symbol: tradeExecution.symbol
-          });
           continue;
         }
 
         const brokerConnection = connectionMap.get(config.destination_account_id);
         if (!brokerConnection) {
-          console.log(`⏭️ No broker connection found for destination account ${config.destination_account_id}`);
           continue;
         }
-
-        console.log(`✅ Config ${config.id} passed filters, executing with multiplier ${config.multiplier}x`);
 
         // Log the copy trade attempt
         const logId = await logCopyTradeExecution(
@@ -357,7 +319,6 @@ export async function processCopyTradeExecution(
               .update({ retry_count: (existingLog?.retry_count || 0) + 1 })
               .eq('id', logId);
             
-            console.warn(`⚠️ Retryable error (retry count: ${(existingLog?.retry_count || 0) + 1}): ${executionResult.error}`);
           } else {
             // Non-retryable error
             await updateCopyTradeLog(
@@ -375,7 +336,6 @@ export async function processCopyTradeExecution(
 
         if (executionResult.success) {
           result.copied++;
-          console.log(`✅ Successfully executed copy trade on ${brokerConnection.broker_account_name}`);
         } else {
           const errorMsg = executionResult.retryable 
             ? `[Retryable] ${executionResult.error}`
@@ -393,11 +353,6 @@ export async function processCopyTradeExecution(
     console.error('❌ Error in processCopyTradeExecution:', error);
     result.errors.push(`Unexpected error: ${error.message}`);
   }
-
-  console.log(`📊 Copy trade execution result:`, {
-    copied: result.copied,
-    errors: result.errors.length
-  });
 
   return result;
 }

@@ -35,8 +35,6 @@ export async function POST(request: NextRequest) {
 
     // Handle order cancellation
     if (action === 'cancelled' && order?.id) {
-      console.log(`🚫 Processing real-time order cancellation: ${order.id} for account ${tradingAccountId}`);
-
       // Find the copy trade log for this order
       // There may be multiple logs with the same source_order_id (if order was processed multiple times)
       // Get the most recent one that's still active
@@ -54,7 +52,6 @@ export async function POST(request: NextRequest) {
       // If not found by source_order_id, try to find any recent log for this account
       // (in case source_order_id wasn't set)
       if (!log) {
-        console.log(`⚠️ No log found by source_order_id, trying alternative lookup...`);
         const { data: altLogs } = await adminSupabase
           .from('copy_trade_logs' as any)
           .select('id, order_id, order_status, destination_broker_connection_id, destination_account_id, source_order_id, created_at')
@@ -66,12 +63,10 @@ export async function POST(request: NextRequest) {
         
         if (altLogs && altLogs.length > 0) {
           const altLog = altLogs[0];
-          console.log(`⚠️ Found alternative log (may not match):`, altLog);
           // Only use if it's very recent (within last 5 minutes) to avoid false matches
           const logAge = new Date().getTime() - new Date(altLog.created_at).getTime();
           if (logAge < 5 * 60 * 1000) {
             log = altLog;
-            console.log(`✅ Using alternative log (created ${Math.round(logAge / 1000)}s ago)`);
           }
         }
       }
@@ -80,21 +75,9 @@ export async function POST(request: NextRequest) {
       if (logs && logs.length > 1) {
         console.warn(`⚠️ Found ${logs.length} logs with same source_order_id ${order.id}, using most recent one`);
       }
-
-      console.log(`🔍 Cancellation lookup result:`, {
-        found: !!log,
-        logId: log?.id,
-        orderId: log?.order_id,
-        status: log?.order_status,
-        sourceOrderId: log?.source_order_id,
-        searchedSourceOrderId: order.id.toString(),
-        totalLogsFound: logs?.length || 0,
-        error: logError
-      });
       
-      // If we found multiple logs, we need to cancel all of them
-      if (logs && logs.length > 1) {
-        console.log(`⚠️ Found ${logs.length} active logs for order ${order.id}, will cancel all of them`);
+      if (logError) {
+        console.error('❌ Error looking up cancellation log:', logError);
       }
 
       if (log && log.order_id && log.destination_broker_connection_id) {
@@ -146,21 +129,10 @@ export async function POST(request: NextRequest) {
                 }
               }
               
-              console.log(`🚫 Attempting to cancel order:`, {
-                accountId,
-                orderId: log.order_id,
-                accountIdType: typeof accountId,
-                orderIdType: typeof log.order_id,
-                brokerAccountName: destConnection.broker_account_name,
-                brokerUserId: destConnection.broker_user_id
-              });
-              
               const cancelResult = await client.cancelOrder({
                 accountId: accountId,
                 orderId: log.order_id
               });
-
-              console.log(`📥 Cancel result:`, cancelResult);
 
               if (cancelResult.success) {
                 // Cancel all logs with this source_order_id (in case there are duplicates)
@@ -174,7 +146,6 @@ export async function POST(request: NextRequest) {
                   .eq('source_order_id', order.id.toString())
                   .neq('order_status', 'cancelled'); // Only update non-cancelled ones
 
-                console.log(`✅ Cancelled ${cancelledCount.data?.length || 0} log(s) for order ${order.id}`);
 
                 return NextResponse.json({
                   cancelled: cancelledCount.data?.length || 1,
@@ -226,10 +197,8 @@ export async function POST(request: NextRequest) {
     
     const existingLog = existingLogs && existingLogs.length > 0 ? existingLogs[0] : null;
     
-    // If multiple logs exist for this order, log a warning and check if we should skip
+    // If multiple logs exist for this order, check if we should skip (duplicate detection)
     if (existingLogs && existingLogs.length > 1) {
-      console.warn(`⚠️ Found ${existingLogs.length} existing logs for order ${order.id}, using most recent`);
-      
       // Check if any of the recent logs were created in the last 5 seconds (likely duplicate)
       const recentLogs = existingLogs.filter((log: any) => {
         const logAge = new Date().getTime() - new Date(log.created_at).getTime();
@@ -237,7 +206,6 @@ export async function POST(request: NextRequest) {
       });
       
       if (recentLogs.length > 0) {
-        console.log(`⏭️ Skipping duplicate order processing - ${recentLogs.length} recent log(s) found within last 5 seconds`);
         return NextResponse.json({
           executed: 0,
           modified: 0,
@@ -252,15 +220,6 @@ export async function POST(request: NextRequest) {
         existingLog.order_status !== 'cancelled' && 
         existingLog.order_status !== 'rejected' &&
         existingLog.order_status !== 'error') {
-      
-      console.log(`🔍 Checking for modifications:`, {
-        existingPrice: existingLog.order_price,
-        newPrice: order.price,
-        existingStopPrice: existingLog.order_stop_price,
-        newStopPrice: order.stopPrice,
-        existingQuantity: existingLog.destination_quantity,
-        newQuantity: order.quantity
-      });
       
       // Get multiplier first to properly calculate destination quantity for comparison
       const { data: config } = await adminSupabase
@@ -304,21 +263,7 @@ export async function POST(request: NextRequest) {
           (existingLog.order_stop_price === null || existingLog.order_stop_price === undefined) && 
           order.stopPrice > 0;
       
-      console.log(`🔍 Modification detection:`, {
-        isStopOrder,
-        quantityChanged,
-        limitPriceChanged,
-        stopPriceChanged,
-        stopOrderPriceChanged,
-        stopPriceAdded,
-        willModify: quantityChanged || limitPriceChanged || stopPriceChanged || stopOrderPriceChanged || stopPriceAdded
-      });
-      
       if (quantityChanged || limitPriceChanged || stopPriceChanged || stopOrderPriceChanged || stopPriceAdded) {
-        const priceChange = limitPriceChanged ? `${existingLog.order_price} → ${order.price}` : '';
-        const stopChange = stopPriceChanged ? `stop: ${existingLog.order_stop_price} → ${order.stopPrice}` : 
-                          stopPriceAdded ? `stop: added ${order.stopPrice}` : '';
-        console.log(`✏️ Processing real-time order modification: ${order.id} (${priceChange}${priceChange && stopChange ? ', ' : ''}${stopChange})`);
 
         // Get destination broker connection
         const { data: destConnection } = await adminSupabase
@@ -384,8 +329,6 @@ export async function POST(request: NextRequest) {
                 }
               }
               
-              console.log(`✏️ Modifying order with params:`, modifyParams);
-              
               const modifyResult = await client.modifyOrder(modifyParams);
 
                   if (modifyResult.success) {
@@ -440,8 +383,6 @@ export async function POST(request: NextRequest) {
     }
 
     // New order - execute copy trade
-    console.log(`🔄 Processing real-time new order: ${order.symbol} ${order.side} ${order.quantity} (ID: ${order.id})`);
-
     const copyResult = await processCopyTradeExecution(
       tradingAccountId,
       {
