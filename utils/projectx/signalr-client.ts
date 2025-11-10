@@ -73,7 +73,16 @@ export class ProjectXSignalRClient {
   ) {
     this.jwtToken = jwtToken;
     this.accountId = accountId;
-    this.userHubUrl = `${hubUrl}?access_token=${jwtToken}`;
+    // Build URL with access token - SignalR expects it in the query string OR via accessTokenFactory
+    // We'll use accessTokenFactory, so we don't need it in the URL
+    this.userHubUrl = hubUrl;
+    console.log('🔧 SignalR client initialized:', {
+      accountId: accountId,
+      accountIdType: typeof accountId,
+      hubUrl: hubUrl,
+      hasToken: !!jwtToken,
+      tokenLength: jwtToken?.length
+    });
   }
 
   /**
@@ -116,11 +125,21 @@ export class ProjectXSignalRClient {
     }
 
     try {
+      // Build connection URL - try both with and without access_token in query
+      // Some SignalR implementations prefer it in the URL, others use accessTokenFactory
+      const connectionUrl = `${this.userHubUrl}?access_token=${encodeURIComponent(this.jwtToken)}`;
+      
+      console.log('🔌 Building SignalR connection:', {
+        url: connectionUrl,
+        hubUrl: this.userHubUrl,
+        accountId: this.accountId
+      });
+      
       this.connection = new signalR.HubConnectionBuilder()
-        .withUrl(this.userHubUrl, {
+        .withUrl(connectionUrl, {
           skipNegotiation: true,
           transport: signalR.HttpTransportType.WebSockets,
-          accessTokenFactory: () => this.jwtToken,
+          accessTokenFactory: () => this.jwtToken, // Also provide via factory as fallback
           timeout: 10000
         })
         .withAutomaticReconnect({
