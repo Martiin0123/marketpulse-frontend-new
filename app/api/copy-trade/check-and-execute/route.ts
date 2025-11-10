@@ -158,19 +158,33 @@ export async function POST(request: NextRequest) {
 
         // Filter to only new/pending/submitted orders (not filled or cancelled)
         // These are orders that were just placed and need to be copied
+        // ProjectX API: status 1 = Open, other numbers = different states
         const newOrders = orders.filter(order => {
-          const status = (order.status || order.orderStatus || order.order_status || '').toUpperCase();
-          const isNew = status === 'PENDING' || 
-                        status === 'SUBMITTED' || 
-                        status === 'NEW' ||
-                        status === 'OPEN' ||
-                        status === 'ACTIVE' ||
-                        status === 'WORKING' ||
-                        status === 'PARTIALLY_FILLED' ||
-                        !status; // If no status, assume it's new
+          const status = order.status || order.orderStatus || order.order_status;
+          
+          // Handle numeric status (ProjectX format: 1 = Open)
+          if (typeof status === 'number') {
+            const isNew = status === 1; // 1 = Open order
+            if (!isNew) {
+              console.log(`  ⏭️ Filtered out order with numeric status: ${status}`);
+            }
+            return isNew;
+          }
+          
+          // Handle string status
+          const statusStr = (status || '').toString().toUpperCase();
+          const isNew = statusStr === 'PENDING' || 
+                        statusStr === 'SUBMITTED' || 
+                        statusStr === 'NEW' ||
+                        statusStr === 'OPEN' ||
+                        statusStr === 'ACTIVE' ||
+                        statusStr === 'WORKING' ||
+                        statusStr === 'PARTIALLY_FILLED' ||
+                        statusStr === '1' ||
+                        !statusStr; // If no status, assume it's new
           
           if (!isNew) {
-            console.log(`  ⏭️ Filtered out order with status: ${status}`);
+            console.log(`  ⏭️ Filtered out order with status: ${statusStr || status}`);
           }
           
           return isNew;
