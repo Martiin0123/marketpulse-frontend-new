@@ -37,8 +37,9 @@ interface TradeExecution {
   symbol: string;
   side: 'BUY' | 'SELL' | 'long' | 'short';
   quantity: number;
-  price?: number; // Optional for market orders
-  orderType?: 'Market' | 'Limit';
+  price?: number; // Optional for market orders, required for limit orders
+  orderType?: 'Market' | 'Limit' | 'Stop' | 'StopLimit';
+  stopPrice?: number; // Required for stop and stop-limit orders
 }
 
 /**
@@ -68,6 +69,9 @@ export async function executeCopyTrade(
     // Normalize side (BUY/SELL vs long/short)
     const normalizedSide = sourceTrade.side === 'BUY' || sourceTrade.side === 'long' ? 'BUY' : 'SELL';
 
+    // Determine order type - preserve the source order type
+    const orderType = sourceTrade.orderType || 'Market';
+
     // Execute based on broker type
     if (destinationConnection.broker_type === 'projectx') {
       return await executeProjectXOrder(
@@ -77,7 +81,8 @@ export async function executeCopyTrade(
           side: normalizedSide,
           quantity: destinationQuantity,
           price: sourceTrade.price,
-          orderType: sourceTrade.orderType || 'Market'
+          orderType: orderType,
+          stopPrice: sourceTrade.stopPrice
         }
       );
     }
@@ -99,7 +104,8 @@ async function executeProjectXOrder(
     side: 'BUY' | 'SELL';
     quantity: number;
     price?: number;
-    orderType?: 'Market' | 'Limit';
+    orderType?: 'Market' | 'Limit' | 'Stop' | 'StopLimit';
+    stopPrice?: number;
   }
 ): Promise<{ success: boolean; error?: string; orderId?: string }> {
   try {
@@ -144,7 +150,8 @@ async function executeProjectXOrder(
       side: order.side,
       quantity: order.quantity,
       orderType: order.orderType || 'Market',
-      price: order.price
+      price: order.price,
+      stopPrice: order.stopPrice
     });
 
     if (orderResult.success) {
@@ -365,7 +372,8 @@ async function logCopyTradeExecution(
         multiplier: multiplier,
         order_status: status,
         order_type: tradeExecution.orderType || 'Market',
-        order_price: tradeExecution.price || null
+        order_price: tradeExecution.price || null,
+        // Note: stop_price would need to be added to the copy_trade_logs table if we want to store it
       })
       .select('id')
       .single();

@@ -146,6 +146,11 @@ export async function POST(request: NextRequest) {
           if (!existingLog && !existingTrade) {
             console.log(`🔄 NEW opening execution detected: ${exec.symbol} ${exec.side} ${exec.quantity || (exec as any).size || 1}`);
 
+            // Extract order type and prices from execution
+            const orderType = (exec as any).orderType || 'Market';
+            const price = exec.price;
+            const stopPrice = (exec as any).stopPrice;
+
             // Execute copy trade for this source account
             const copyResult = await processCopyTradeExecution(
               conn.trading_account_id,
@@ -153,7 +158,9 @@ export async function POST(request: NextRequest) {
                 symbol: exec.symbol,
                 side: exec.side,
                 quantity: exec.quantity || (exec as any).size || 1,
-                orderType: 'Market'
+                orderType: orderType,
+                price: price,
+                stopPrice: stopPrice
               },
               user.id
             );

@@ -63,14 +63,16 @@ export default function CopyTradeSection({
         const response = await fetch('/api/copy-trade/check-and-execute', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-          },
+            'Content-Type': 'application/json'
+          }
         });
 
         if (response.ok) {
           const data = await response.json();
           if (data.executed > 0) {
-            console.log(`✅ Executed ${data.executed} copy trade(s) in real-time`);
+            console.log(
+              `✅ Executed ${data.executed} copy trade(s) in real-time`
+            );
             // Optionally refresh logs or show notification
           }
         }

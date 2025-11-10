@@ -854,12 +854,20 @@ export async function syncProjectXTrades(
       
       // If it's a NEW opening execution (PnL=0 and doesn't exist yet), trigger copy trade
       if (!existingExec && (!exec.pnl || exec.pnl === 0)) {
+        // Extract order type and prices from execution
+        const orderType = (exec as any).orderType || 'Market'; // Default to Market if not specified
+        const price = exec.price; // Limit price for Limit/StopLimit orders
+        const stopPrice = (exec as any).stopPrice; // Stop price for Stop/StopLimit orders
+
         newOpeningExecutions.push({
           symbol: exec.symbol,
           side: exec.side,
           quantity: exec.quantity || (exec as any).size || 1,
           timestamp: exec.timestamp,
-          executionId: exec.id
+          executionId: exec.id,
+          orderType: orderType,
+          price: price,
+          stopPrice: stopPrice
         });
         console.log(`🔄 NEW opening execution detected: ${exec.symbol} ${exec.side} ${exec.quantity || (exec as any).size || 1} (ID: ${exec.id})`);
       }
@@ -879,7 +887,9 @@ export async function syncProjectXTrades(
                 symbol: execution.symbol,
                 side: execution.side,
                 quantity: execution.quantity,
-                orderType: 'Market' // Default to market order for copy trades
+                orderType: execution.orderType || 'Market',
+                price: execution.price,
+                stopPrice: execution.stopPrice
               },
               userId
             );

@@ -23,6 +23,8 @@ interface ProjectXTrade {
   pnl: number;
   commission: number;
   status: string;
+  orderType?: string; // 'Market', 'Limit', 'Stop', 'StopLimit', etc.
+  stopPrice?: number; // Stop price if applicable
 }
 
 interface ProjectXAccount {
@@ -766,6 +768,15 @@ export class ProjectXClient {
             }
           }
 
+          // Extract order type from trade data
+          // ProjectX API might have: orderType, OrderType, order_type, type, etc.
+          const orderType = trade.orderType || trade.OrderType || trade.order_type || 
+                           trade.type || (trade.price && trade.price !== trade.executedPrice ? 'Limit' : 'Market');
+          
+          // Extract stop price if available
+          const stopPrice = trade.stopPrice || trade.stop_price || trade.StopPrice || 
+                           trade.triggerPrice || trade.trigger_price || undefined;
+
           return {
             id: trade.id?.toString() || trade.executionId?.toString() || trade.orderId?.toString() || '',
             accountId: trade.accountId?.toString() || accountId,
@@ -779,12 +790,14 @@ export class ProjectXClient {
             pnl: pnl, // This should be profitAndLoss from ProjectX
             commission: trade.commission || trade.fees || trade.totalFee || 0,
             status: trade.status || 'FILLED',
+            orderType: orderType, // Preserve order type for copy trading
+            stopPrice: stopPrice, // Preserve stop price for stop orders
             // Store entry/exit timestamps if available (for completed trades)
             enteredAt: enteredAt || undefined,
             exitedAt: exitedAt || undefined,
             // Preserve Type field for grouping logic
             tradeType: tradeType || undefined
-          } as ProjectXTrade & { enteredAt?: string; exitedAt?: string; tradeType?: string };
+          } as ProjectXTrade & { enteredAt?: string; exitedAt?: string; tradeType?: string; orderType?: string; stopPrice?: number };
         });
         
       } catch (error: any) {
@@ -814,8 +827,9 @@ export class ProjectXClient {
     symbol: string;
     side: 'BUY' | 'SELL';
     quantity: number;
-    orderType?: 'Market' | 'Limit';
-    price?: number;
+    orderType?: 'Market' | 'Limit' | 'Stop' | 'StopLimit';
+    price?: number; // Limit price (for Limit and StopLimit orders)
+    stopPrice?: number; // Stop price (for Stop and StopLimit orders)
   }): Promise<{ success: boolean; orderId?: string; error?: string }> {
     try {
       await this.ensureValidAuth();
@@ -838,8 +852,24 @@ export class ProjectXClient {
         orderType: orderData.orderType || 'Market'
       };
 
-      if (orderData.price && orderData.orderType === 'Limit') {
+      // Add price for Limit orders
+      if (orderData.orderType === 'Limit' && orderData.price) {
         requestBody.price = orderData.price;
+      }
+
+      // Add stop price for Stop orders
+      if (orderData.orderType === 'Stop' && orderData.stopPrice) {
+        requestBody.stopPrice = orderData.stopPrice;
+      }
+
+      // Add both price and stopPrice for StopLimit orders
+      if (orderData.orderType === 'StopLimit') {
+        if (orderData.price) {
+          requestBody.price = orderData.price;
+        }
+        if (orderData.stopPrice) {
+          requestBody.stopPrice = orderData.stopPrice;
+        }
       }
 
       for (const endpoint of endpoints) {
