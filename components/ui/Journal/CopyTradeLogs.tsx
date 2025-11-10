@@ -61,7 +61,7 @@ export default function CopyTradeLogs({
   const [filter, setFilter] = useState<
     'all' | 'pending' | 'submitted' | 'filled' | 'cancelled' | 'error'
   >('all');
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
   const supabase = createClient();
@@ -131,25 +131,44 @@ export default function CopyTradeLogs({
     try {
       setIsClearing(true);
 
-      let query = supabase.from('copy_trade_logs' as any).delete();
+      // Get current user to filter by user_id
+      const {
+        data: { user }
+      } = await supabase.auth.getUser();
 
+      if (!user) {
+        alert('You must be logged in to clear logs.');
+        setIsClearing(false);
+        return;
+      }
+
+      // Build delete query with user filter
+      let query = supabase
+        .from('copy_trade_logs' as any)
+        .delete()
+        .eq('user_id', user.id);
+
+      // If filtering by config, add that filter too
       if (configId) {
         query = query.eq('copy_trade_config_id', configId);
       }
 
-      const { error } = await query;
+      const { error, count } = await query;
 
       if (error) {
         console.error('Error clearing logs:', error);
-        alert('Failed to clear logs. Please try again.');
+        alert(`Failed to clear logs: ${error.message}`);
+        setIsClearing(false);
         return;
       }
 
-      // Reload logs after clearing
-      await loadLogs();
-    } catch (error) {
+      // Clear local state
+      setLogs([]);
+      
+      console.log('✅ Successfully cleared copy trade logs');
+    } catch (error: any) {
       console.error('Error in handleClearLogs:', error);
-      alert('Failed to clear logs. Please try again.');
+      alert(`Failed to clear logs: ${error.message || 'Unknown error'}`);
     } finally {
       setIsClearing(false);
     }
@@ -281,6 +300,16 @@ export default function CopyTradeLogs({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Auto-refresh toggle */}
+            <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer hover:text-slate-300 transition-colors">
+              <input
+                type="checkbox"
+                checked={autoRefresh}
+                onChange={(e) => setAutoRefresh(e.target.checked)}
+                className="rounded w-3.5 h-3.5"
+              />
+              <span>Auto-refresh</span>
+            </label>
             {/* Compact Filters */}
             <div className="flex gap-1">
               {(['all', 'filled', 'pending', 'error'] as const).map((f) => (
@@ -303,6 +332,14 @@ export default function CopyTradeLogs({
               title="Refresh"
             >
               <ArrowPathIcon className="h-4 w-4" />
+            </button>
+            <button
+              onClick={handleClearLogs}
+              disabled={isClearing || logs.length === 0}
+              className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors"
+              title="Clear all logs"
+            >
+              <TrashIcon className="h-4 w-4" />
             </button>
           </div>
         </div>
