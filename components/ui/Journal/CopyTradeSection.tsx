@@ -117,7 +117,18 @@ export default function CopyTradeSection({
 
             // Handle order updates (new orders, modifications, cancellations)
             signalRClient.onOrderUpdate(async (order: ProjectXOrderUpdate) => {
-              console.log(`📥 Real-time order update received:`, order);
+              console.log(`📥 [CopyTrade] Real-time order update received:`, {
+                orderId: order.id,
+                accountId: order.accountId,
+                contractId: order.contractId,
+                status: order.status,
+                type: order.type,
+                side: order.side,
+                size: order.size,
+                limitPrice: order.limitPrice,
+                stopPrice: order.stopPrice,
+                fullOrder: order
+              });
 
               // Status: 0=None, 1=Open, 2=Filled, 3=Cancelled, 4=Expired, 5=Rejected, 6=Pending
 

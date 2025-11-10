@@ -137,11 +137,21 @@ export class ProjectXSignalRClient {
       this.setupEventHandlers();
 
       // Start connection
-      console.log('🔌 Connecting to ProjectX SignalR hub...');
+      console.log('🔌 Connecting to ProjectX SignalR hub...', {
+        url: this.userHubUrl,
+        accountId: this.accountId,
+        accountIdType: typeof this.accountId,
+        hasToken: !!this.jwtToken,
+        tokenLength: this.jwtToken?.length
+      });
+      
       await this.connection.start();
       this.isConnected = true;
       this.reconnectAttempts = 0;
-      console.log('✅ SignalR connected successfully');
+      console.log('✅ SignalR connected successfully', {
+        connectionId: this.connection.connectionId,
+        state: this.connection.state
+      });
 
       // Subscribe to updates
       await this.subscribe();
@@ -173,7 +183,19 @@ export class ProjectXSignalRClient {
 
     // Handle order updates
     this.connection.on('GatewayUserOrder', (data: ProjectXOrderUpdate) => {
-      console.log('📥 Received order update:', data);
+      console.log('📥 [SignalR] Received GatewayUserOrder event:', JSON.stringify(data, null, 2));
+      console.log('📥 [SignalR] Order details:', {
+        id: data.id,
+        accountId: data.accountId,
+        contractId: data.contractId,
+        status: data.status,
+        type: data.type,
+        side: data.side,
+        size: data.size,
+        limitPrice: data.limitPrice,
+        stopPrice: data.stopPrice
+      });
+      
       this.onOrderUpdateCallbacks.forEach(callback => {
         try {
           callback(data);
@@ -218,25 +240,40 @@ export class ProjectXSignalRClient {
     }
 
     try {
-      console.log(`📡 Subscribing to updates for account ${this.accountId}...`);
+      console.log(`📡 Subscribing to updates for account ${this.accountId} (type: ${typeof this.accountId})...`);
+      
+      // Ensure accountId is a number (SignalR expects integer)
+      const accountIdNum = typeof this.accountId === 'number' ? this.accountId : parseInt(this.accountId.toString());
+      
+      if (isNaN(accountIdNum)) {
+        throw new Error(`Invalid account ID: ${this.accountId} (must be a number)`);
+      }
+
+      console.log(`📡 Using account ID: ${accountIdNum} for subscriptions`);
       
       // Subscribe to accounts (general account updates)
-      await this.connection.invoke('SubscribeAccounts');
-      console.log('  ✅ Subscribed to accounts');
+      const accountsResult = await this.connection.invoke('SubscribeAccounts');
+      console.log('  ✅ Subscribed to accounts', accountsResult);
 
       // Subscribe to orders for this account
-      await this.connection.invoke('SubscribeOrders', this.accountId);
-      console.log(`  ✅ Subscribed to orders for account ${this.accountId}`);
+      const ordersResult = await this.connection.invoke('SubscribeOrders', accountIdNum);
+      console.log(`  ✅ Subscribed to orders for account ${accountIdNum}`, ordersResult);
 
       // Subscribe to positions for this account
-      await this.connection.invoke('SubscribePositions', this.accountId);
-      console.log(`  ✅ Subscribed to positions for account ${this.accountId}`);
+      const positionsResult = await this.connection.invoke('SubscribePositions', accountIdNum);
+      console.log(`  ✅ Subscribed to positions for account ${accountIdNum}`, positionsResult);
 
       // Subscribe to trades for this account
-      await this.connection.invoke('SubscribeTrades', this.accountId);
-      console.log(`  ✅ Subscribed to trades for account ${this.accountId}`);
+      const tradesResult = await this.connection.invoke('SubscribeTrades', accountIdNum);
+      console.log(`  ✅ Subscribed to trades for account ${accountIdNum}`, tradesResult);
     } catch (error: any) {
       console.error('❌ Error subscribing to updates:', error);
+      console.error('  Error details:', {
+        message: error.message,
+        stack: error.stack,
+        accountId: this.accountId,
+        accountIdType: typeof this.accountId
+      });
       throw error;
     }
   }

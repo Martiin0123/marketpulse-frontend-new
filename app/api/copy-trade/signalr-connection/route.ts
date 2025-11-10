@@ -94,9 +94,26 @@ export async function GET(request: NextRequest) {
             hubUrl = 'https://rtc.topstepx.com/hubs/user';
           }
 
+          // Get account ID - must be numeric for SignalR
+          const accountIdStr = conn.broker_account_name || conn.broker_user_id || '';
+          const accountId = parseInt(accountIdStr);
+          
+          if (isNaN(accountId) || accountId === 0) {
+            console.warn(`⚠️ Invalid account ID for connection ${conn.id}: ${accountIdStr}`);
+            return null;
+          }
+
+          console.log(`✅ SignalR connection details for ${conn.id}:`, {
+            accountId: accountId,
+            accountIdStr: accountIdStr,
+            hubUrl: hubUrl,
+            serviceType: serviceType,
+            hasToken: !!sessionToken
+          });
+
           return {
             connectionId: conn.id,
-            accountId: parseInt(conn.broker_account_name || conn.broker_user_id || '0'),
+            accountId: accountId,
             tradingAccountId: conn.trading_account_id,
             jwtToken: sessionToken,
             hubUrl: hubUrl,
