@@ -78,7 +78,11 @@ function categorizeProducts(products: any[]) {
 
   // If we have uncategorized products and no categorized ones, show them in signals section
   // (assuming existing products are signals)
-  if (uncategorizedProducts.length > 0 && signalsProducts.length === 0 && journalProducts.length === 0) {
+  if (
+    uncategorizedProducts.length > 0 &&
+    signalsProducts.length === 0 &&
+    journalProducts.length === 0
+  ) {
     signalsProducts.push(...uncategorizedProducts);
   } else if (uncategorizedProducts.length > 0) {
     // If we have some categorized, add uncategorized to signals as default

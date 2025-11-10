@@ -12,7 +12,7 @@ import { syncProjectXTrades } from '@/utils/projectx/sync-service';
  * {
  *   "crons": [{
  *     "path": "/api/cron/sync-brokers",
- *     "schedule": "*/10 * * * *"
+ *     "schedule": "every 10 minutes"
  *   }]
  * }
  */

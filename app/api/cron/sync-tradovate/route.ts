@@ -11,7 +11,7 @@ import { syncTradovateTrades } from '@/utils/tradovate/sync-service';
  * {
  *   "crons": [{
  *     "path": "/api/cron/sync-tradovate",
- *     "schedule": "*/10 * * * *"
+ *     "schedule": "every 10 minutes"
  *   }]
  * }
  */
