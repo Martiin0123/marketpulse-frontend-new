@@ -382,11 +382,6 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          if (logsError) {
-            console.warn(`  ⚠️ Error checking logs for cancelled order:`, logsError);
-            continue;
-          }
-
           if (matchingLogs && matchingLogs.length > 0) {
             console.log(`  🔄 Found ${matchingLogs.length} active copy trade log(s) to cancel for order ${orderId}`);
 
