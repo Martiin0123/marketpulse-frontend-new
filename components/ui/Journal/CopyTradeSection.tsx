@@ -166,7 +166,11 @@ export default function CopyTradeSection({
 
               // Process new/open orders (status 1=Open, 6=Pending) AND filled orders (status 2=Filled)
               // Filled orders need to be copied immediately
-              if (order.status === 1 || order.status === 6 || order.status === 2) {
+              if (
+                order.status === 1 ||
+                order.status === 6 ||
+                order.status === 2
+              ) {
                 try {
                   const response = await fetch(
                     '/api/copy-trade/process-order-update',
@@ -281,7 +285,10 @@ export default function CopyTradeSection({
                       connectionId: conn.connectionId,
                       tradingAccountId: conn.tradingAccountId,
                       order: {
-                        id: trade.id?.toString() || trade.orderId?.toString() || '',
+                        id:
+                          trade.id?.toString() ||
+                          trade.orderId?.toString() ||
+                          '',
                         symbol: trade.contractId,
                         side: trade.side === 0 ? 'BUY' : 'SELL',
                         quantity: trade.size,

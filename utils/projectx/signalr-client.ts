@@ -254,23 +254,27 @@ export class ProjectXSignalRClient {
     if (!this.connection) return;
 
     // Handle order updates
-    this.connection.on('GatewayUserOrder', (data: ProjectXOrderUpdate) => {
-      console.log('📥 [SignalR] Received GatewayUserOrder event:', JSON.stringify(data, null, 2));
+    // Note: SignalR sends events with structure: { action: number, data: ProjectXOrderUpdate }
+    this.connection.on('GatewayUserOrder', (event: any) => {
+      // Extract the actual order data from the nested structure
+      const orderData = event.data || event;
+      
+      console.log('📥 [SignalR] Received GatewayUserOrder event:', JSON.stringify(event, null, 2));
       console.log('📥 [SignalR] Order details:', {
-        id: data.id,
-        accountId: data.accountId,
-        contractId: data.contractId,
-        status: data.status,
-        type: data.type,
-        side: data.side,
-        size: data.size,
-        limitPrice: data.limitPrice,
-        stopPrice: data.stopPrice
+        id: orderData.id,
+        accountId: orderData.accountId,
+        contractId: orderData.contractId,
+        status: orderData.status,
+        type: orderData.type,
+        side: orderData.side,
+        size: orderData.size,
+        limitPrice: orderData.limitPrice,
+        stopPrice: orderData.stopPrice
       });
       
       this.onOrderUpdateCallbacks.forEach(callback => {
         try {
-          callback(data);
+          callback(orderData as ProjectXOrderUpdate);
         } catch (error) {
           console.error('❌ Error in order update callback:', error);
         }
@@ -278,11 +282,13 @@ export class ProjectXSignalRClient {
     });
 
     // Handle position updates
-    this.connection.on('GatewayUserPosition', (data: ProjectXPositionUpdate) => {
-      console.log('📥 [SignalR] Received GatewayUserPosition event:', data);
+    // Note: SignalR sends events with structure: { action: number, data: ProjectXPositionUpdate }
+    this.connection.on('GatewayUserPosition', (event: any) => {
+      const positionData = event.data || event;
+      console.log('📥 [SignalR] Received GatewayUserPosition event:', positionData);
       this.onPositionUpdateCallbacks.forEach(callback => {
         try {
-          callback(data);
+          callback(positionData as ProjectXPositionUpdate);
         } catch (error) {
           console.error('❌ Error in position update callback:', error);
         }
@@ -290,11 +296,13 @@ export class ProjectXSignalRClient {
     });
 
     // Handle trade updates
-    this.connection.on('GatewayUserTrade', (data: ProjectXTradeUpdate) => {
-      console.log('📥 [SignalR] Received GatewayUserTrade event:', data);
+    // Note: SignalR sends events with structure: { action: number, data: ProjectXTradeUpdate }
+    this.connection.on('GatewayUserTrade', (event: any) => {
+      const tradeData = event.data || event;
+      console.log('📥 [SignalR] Received GatewayUserTrade event:', tradeData);
       this.onTradeUpdateCallbacks.forEach(callback => {
         try {
-          callback(data);
+          callback(tradeData as ProjectXTradeUpdate);
         } catch (error) {
           console.error('❌ Error in trade update callback:', error);
         }
