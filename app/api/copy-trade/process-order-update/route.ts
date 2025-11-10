@@ -37,8 +37,9 @@ export async function POST(request: NextRequest) {
     if (action === 'cancelled' && order?.id) {
       console.log(`🚫 Processing real-time order cancellation: ${order.id} for account ${tradingAccountId}`);
 
-      // Find the copy trade log for this order (check all statuses except already cancelled)
-      const { data: log, error: logError } = await adminSupabase
+      // Find the copy trade log for this order
+      // First try by source_order_id (preferred)
+      let { data: log, error: logError } = await adminSupabase
         .from('copy_trade_logs' as any)
         .select('id, order_id, order_status, destination_broker_connection_id, destination_account_id, source_order_id')
         .eq('source_account_id', tradingAccountId)
@@ -46,12 +47,38 @@ export async function POST(request: NextRequest) {
         .neq('order_status', 'cancelled') // Don't try to cancel already cancelled orders
         .maybeSingle();
 
+      // If not found by source_order_id, try to find any recent log for this account
+      // (in case source_order_id wasn't set)
+      if (!log) {
+        console.log(`⚠️ No log found by source_order_id, trying alternative lookup...`);
+        const { data: altLog } = await adminSupabase
+          .from('copy_trade_logs' as any)
+          .select('id, order_id, order_status, destination_broker_connection_id, destination_account_id, source_order_id')
+          .eq('source_account_id', tradingAccountId)
+          .neq('order_status', 'cancelled')
+          .neq('order_status', 'filled')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (altLog) {
+          console.log(`⚠️ Found alternative log (may not match):`, altLog);
+          // Only use if it's very recent (within last 5 minutes) to avoid false matches
+          const logAge = new Date().getTime() - new Date(altLog.created_at).getTime();
+          if (logAge < 5 * 60 * 1000) {
+            log = altLog;
+            console.log(`✅ Using alternative log (created ${Math.round(logAge / 1000)}s ago)`);
+          }
+        }
+      }
+
       console.log(`🔍 Cancellation lookup result:`, {
         found: !!log,
         logId: log?.id,
         orderId: log?.order_id,
         status: log?.order_status,
         sourceOrderId: log?.source_order_id,
+        searchedSourceOrderId: order.id.toString(),
         error: logError
       });
 
@@ -84,14 +111,41 @@ export async function POST(request: NextRequest) {
             }
 
             if (client) {
-              const accountId = destConnection.broker_account_name || 
+              // For ProjectX, accountId should be the numeric account ID
+              // broker_account_name should contain the ProjectX account ID (numeric)
+              let accountId: string | number = destConnection.broker_account_name || 
                                destConnection.broker_user_id || 
                                destConnection.trading_account_id;
+              
+              // Ensure accountId is a number (ProjectX API requires integer)
+              if (typeof accountId === 'string') {
+                const parsed = parseInt(accountId);
+                if (!isNaN(parsed)) {
+                  accountId = parsed;
+                } else {
+                  console.error(`❌ Invalid accountId format: ${accountId}`);
+                  return NextResponse.json({
+                    cancelled: 0,
+                    message: `Invalid accountId format: ${accountId}`
+                  });
+                }
+              }
+              
+              console.log(`🚫 Attempting to cancel order:`, {
+                accountId,
+                orderId: log.order_id,
+                accountIdType: typeof accountId,
+                orderIdType: typeof log.order_id,
+                brokerAccountName: destConnection.broker_account_name,
+                brokerUserId: destConnection.broker_user_id
+              });
               
               const cancelResult = await client.cancelOrder({
                 accountId: accountId,
                 orderId: log.order_id
               });
+
+              console.log(`📥 Cancel result:`, cancelResult);
 
               if (cancelResult.success) {
                 await adminSupabase
@@ -106,7 +160,15 @@ export async function POST(request: NextRequest) {
                   cancelled: 1,
                   message: 'Order cancelled successfully'
                 });
+              } else {
+                console.error(`❌ Cancel failed: ${cancelResult.error}`);
+                return NextResponse.json({
+                  cancelled: 0,
+                  message: `Cancel failed: ${cancelResult.error || 'Unknown error'}`
+                });
               }
+            } else {
+              console.error(`❌ Client not initialized for cancellation`);
             }
           } catch (error: any) {
             console.error('❌ Error cancelling order:', error);
