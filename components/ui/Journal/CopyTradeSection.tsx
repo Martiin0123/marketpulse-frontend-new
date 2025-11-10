@@ -84,10 +84,14 @@ export default function CopyTradeSection({
               `✅ Executed ${data.executed} copy trade(s) in real-time`
             );
           }
-          if (data.checked > 0 || data.executed > 0) {
+          if (data.checked > 0 || data.executed > 0 || data.message) {
             console.log(
-              `📊 Copy trade check: ${data.checked} checked, ${data.executed} executed`
+              `📊 Copy trade check: ${data.checked || 0} checked, ${data.executed || 0} executed`,
+              data.message ? `(${data.message})` : ''
             );
+          }
+          if (data.errors && data.errors.length > 0) {
+            console.warn('⚠️ Copy trade errors:', data.errors);
           }
         } else {
           const errorData = await response.json().catch(() => ({}));
