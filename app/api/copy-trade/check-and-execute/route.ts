@@ -112,21 +112,39 @@ export async function POST(request: NextRequest) {
 
         console.log(`📊 Fetched ${orders.length} total order(s) from API`);
 
+        // Log all orders for debugging
+        if (orders.length > 0) {
+          console.log(`📋 All orders received:`, orders.map((o: any) => ({
+            id: o.id || o.orderId || o.order_id,
+            symbol: o.symbol || o.contractName || o.contract_name,
+            side: o.side || o.direction,
+            quantity: o.quantity || o.size || o.qty,
+            status: o.status || o.orderStatus || o.order_status,
+            type: o.orderType || o.order_type || o.type
+          })));
+        }
+
         // Filter to only new/pending/submitted orders (not filled or cancelled)
         // These are orders that were just placed and need to be copied
         const newOrders = orders.filter(order => {
-          const status = (order.status || order.orderStatus || '').toUpperCase();
+          const status = (order.status || order.orderStatus || order.order_status || '').toUpperCase();
           const isNew = status === 'PENDING' || 
                         status === 'SUBMITTED' || 
                         status === 'NEW' ||
                         status === 'OPEN' ||
                         status === 'ACTIVE' ||
+                        status === 'WORKING' ||
+                        status === 'PARTIALLY_FILLED' ||
                         !status; // If no status, assume it's new
+          
+          if (!isNew) {
+            console.log(`  ⏭️ Filtered out order with status: ${status}`);
+          }
           
           return isNew;
         });
 
-        console.log(`📈 Found ${newOrders.length} new order(s) (pending/submitted)`);
+        console.log(`📈 Found ${newOrders.length} new order(s) (pending/submitted) out of ${orders.length} total`);
 
         totalChecked += newOrders.length;
 

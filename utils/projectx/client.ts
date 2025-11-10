@@ -548,19 +548,44 @@ export class ProjectXClient {
           },
         }) as any;
 
+        console.log(`🔍 Response from ${endpoint}:`, {
+          isArray: Array.isArray(response),
+          hasOrders: !!(response as any)?.orders,
+          hasData: !!(response as any)?.data,
+          keys: response ? Object.keys(response) : [],
+          type: typeof response,
+          responsePreview: JSON.stringify(response).substring(0, 500)
+        });
+
         if (response && Array.isArray(response)) {
           console.log(`✅ Successfully fetched ${response.length} order(s) from ${endpoint}`);
+          // Log first order structure for debugging
+          if (response.length > 0) {
+            console.log(`📋 First order structure:`, JSON.stringify(response[0], null, 2));
+          }
           return response;
         } else if (response && (response as any).orders && Array.isArray((response as any).orders)) {
           console.log(`✅ Successfully fetched ${(response as any).orders.length} order(s) from ${endpoint}`);
+          if ((response as any).orders.length > 0) {
+            console.log(`📋 First order structure:`, JSON.stringify((response as any).orders[0], null, 2));
+          }
           return (response as any).orders;
         } else if (response && (response as any).data && Array.isArray((response as any).data)) {
           console.log(`✅ Successfully fetched ${(response as any).data.length} order(s) from ${endpoint}`);
+          if ((response as any).data.length > 0) {
+            console.log(`📋 First order structure:`, JSON.stringify((response as any).data[0], null, 2));
+          }
           return (response as any).data;
+        } else if (response) {
+          // Log the full response if it's not in expected format
+          console.log(`⚠️ Unexpected response format from ${endpoint}:`, JSON.stringify(response, null, 2));
         }
       } catch (error: any) {
         // Continue to next endpoint if this one fails
         console.log(`⚠️ Endpoint ${endpoint} failed:`, error.message);
+        if (error.stack) {
+          console.log(`Stack:`, error.stack);
+        }
         continue;
       }
     }
