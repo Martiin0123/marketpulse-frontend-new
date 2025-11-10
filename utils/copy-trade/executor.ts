@@ -40,6 +40,7 @@ interface TradeExecution {
   price?: number; // Optional for market orders, required for limit orders
   orderType?: 'Market' | 'Limit' | 'Stop' | 'StopLimit';
   stopPrice?: number; // Required for stop and stop-limit orders
+  sourceOrderId?: string; // Source broker order ID for tracking cancellations
 }
 
 /**
@@ -374,26 +375,32 @@ async function logCopyTradeExecution(
   status: string
 ): Promise<string | null> {
   try {
+    const insertData: any = {
+      user_id: userId,
+      copy_trade_config_id: configId,
+      source_account_id: sourceAccountId,
+      source_symbol: tradeExecution.symbol,
+      source_side: tradeExecution.side,
+      source_quantity: tradeExecution.quantity,
+      destination_account_id: destinationAccountId,
+      destination_broker_connection_id: brokerConnectionId,
+      destination_symbol: tradeExecution.symbol,
+      destination_side: tradeExecution.side,
+      destination_quantity: Math.round(tradeExecution.quantity * multiplier),
+      multiplier: multiplier,
+      order_status: status,
+      order_type: tradeExecution.orderType || 'Market',
+      order_price: tradeExecution.price || null,
+    };
+
+    // Store source order ID if available (for tracking cancellations)
+    if (tradeExecution.sourceOrderId) {
+      insertData.source_order_id = tradeExecution.sourceOrderId;
+    }
+
     const { data, error } = await supabase
       .from('copy_trade_logs' as any)
-      .insert({
-        user_id: userId,
-        copy_trade_config_id: configId,
-        source_account_id: sourceAccountId,
-        source_symbol: tradeExecution.symbol,
-        source_side: tradeExecution.side,
-        source_quantity: tradeExecution.quantity,
-        destination_account_id: destinationAccountId,
-        destination_broker_connection_id: brokerConnectionId,
-        destination_symbol: tradeExecution.symbol,
-        destination_side: tradeExecution.side,
-        destination_quantity: Math.round(tradeExecution.quantity * multiplier),
-        multiplier: multiplier,
-        order_status: status,
-        order_type: tradeExecution.orderType || 'Market',
-        order_price: tradeExecution.price || null,
-        // Note: stop_price would need to be added to the copy_trade_logs table if we want to store it
-      })
+      .insert(insertData)
       .select('id')
       .single();
 

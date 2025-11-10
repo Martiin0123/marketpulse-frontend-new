@@ -285,6 +285,7 @@ export async function POST(request: NextRequest) {
             });
 
             // Execute copy trade for this source account
+            // Pass the source order ID so we can track it if it gets cancelled
             const copyResult = await processCopyTradeExecution(
               conn.trading_account_id,
               {
@@ -293,7 +294,8 @@ export async function POST(request: NextRequest) {
                 quantity: orderQty,
                 orderType: orderType,
                 price: orderPrice,
-                stopPrice: orderStopPrice
+                stopPrice: orderStopPrice,
+                sourceOrderId: orderId.toString() // Store source order ID for cancellation tracking
               },
               user.id
             );
@@ -333,32 +335,52 @@ export async function POST(request: NextRequest) {
           
           console.log(`  🚫 Checking for cancelled order: ${orderSymbol} ${orderSide} ${orderQty} (ID: ${orderId})`);
 
-          // Find copy trade logs for this order that are still pending/submitted
-          // Match by symbol, side, and quantity (since we don't have a direct source order ID)
-          const { data: activeLogs, error: logsError } = await adminSupabase
+          // First, try to match by source_order_id (most accurate)
+          const { data: exactMatchLogs, error: exactMatchError } = await adminSupabase
             .from('copy_trade_logs' as any)
-            .select('id, order_id, order_status, destination_broker_connection_id, source_side, source_quantity')
+            .select('id, order_id, order_status, destination_broker_connection_id, source_order_id, source_side, source_quantity')
             .eq('source_account_id', conn.trading_account_id)
-            .eq('source_symbol', orderSymbol)
+            .eq('source_order_id', orderId.toString())
             .in('order_status', ['pending', 'submitted'])
             .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()); // Last 24 hours
 
-          if (logsError) {
-            console.warn(`  ⚠️ Error checking logs for cancelled order:`, logsError);
-            continue;
-          }
+          let matchingLogs: any[] = [];
 
-          // Filter logs to match the cancelled order's side and quantity more closely
-          // This helps when multiple orders exist for the same symbol
-          const matchingLogs = activeLogs?.filter((log: any) => {
-            // Try to match by side and quantity (within reasonable range)
-            const sideMatch = log.source_side === orderSide || 
-                             (orderSide === 'SELL' && (log.source_side === '0' || log.source_side === 'SELL')) ||
-                             (orderSide === 'BUY' && (log.source_side === '1' || log.source_side === 'BUY'));
-            const qtyMatch = Math.abs(Number(log.source_quantity) - Number(orderQty)) < 0.01; // Allow small floating point differences
-            
-            return sideMatch && qtyMatch;
-          }) || [];
+          if (!exactMatchError && exactMatchLogs && exactMatchLogs.length > 0) {
+            // Found exact match by source_order_id
+            console.log(`  ✅ Found ${exactMatchLogs.length} exact match(es) by source_order_id: ${orderId}`);
+            matchingLogs = exactMatchLogs;
+          } else {
+            // Fallback: match by symbol, side, and quantity
+            console.log(`  🔍 No exact match by source_order_id, trying fallback matching...`);
+            const { data: activeLogs, error: logsError } = await adminSupabase
+              .from('copy_trade_logs' as any)
+              .select('id, order_id, order_status, destination_broker_connection_id, source_order_id, source_side, source_quantity')
+              .eq('source_account_id', conn.trading_account_id)
+              .eq('source_symbol', orderSymbol)
+              .in('order_status', ['pending', 'submitted'])
+              .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()); // Last 24 hours
+
+            if (logsError) {
+              console.warn(`  ⚠️ Error checking logs for cancelled order:`, logsError);
+              continue;
+            }
+
+            // Filter logs to match the cancelled order's side and quantity more closely
+            matchingLogs = activeLogs?.filter((log: any) => {
+              // Try to match by side and quantity (within reasonable range)
+              const sideMatch = log.source_side === orderSide || 
+                               (orderSide === 'SELL' && (log.source_side === '0' || log.source_side === 'SELL')) ||
+                               (orderSide === 'BUY' && (log.source_side === '1' || log.source_side === 'BUY'));
+              const qtyMatch = Math.abs(Number(log.source_quantity) - Number(orderQty)) < 0.01; // Allow small floating point differences
+              
+              return sideMatch && qtyMatch;
+            }) || [];
+
+            if (matchingLogs.length > 0) {
+              console.log(`  ✅ Found ${matchingLogs.length} match(es) by symbol/side/quantity fallback`);
+            }
+          }
 
           if (logsError) {
             console.warn(`  ⚠️ Error checking logs for cancelled order:`, logsError);
