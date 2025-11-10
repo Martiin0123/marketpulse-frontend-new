@@ -177,8 +177,12 @@ export default function CopyTradeSection({
               });
 
               // Status: 0=None, 1=Open, 2=Filled, 3=Cancelled, 4=Expired, 5=Rejected, 6=Pending
+              // Order Types: 1=Limit, 2=Market, 4=Stop, 5=TrailingStop
+              // Note: Stop Loss (SL) orders are typically type 4 (Stop)
+              // Take Profit (TP) orders are typically type 1 (Limit) in opposite direction
 
               // Process new/open orders (status 1=Open, 6=Pending) AND filled orders (status 2=Filled)
+              // This includes entry orders, stop loss (SL), and take profit (TP) orders
               // Filled orders need to be copied immediately
               if (
                 order.status === 1 ||

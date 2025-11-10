@@ -4,13 +4,16 @@
 
 1. **Real-time Order Updates** - SignalR WebSocket connection for instant updates
 2. **Order Deduplication** - 5-second window prevents duplicate processing
-3. **Order Modification** - Handles price and stop price changes
+3. **Order Modification** - Handles price, stop price, and quantity changes
 4. **Order Cancellation** - Cancels destination orders when source is cancelled
 5. **Order Types** - Supports Market, Limit, Stop, and StopLimit orders
-6. **Multiplier Support** - Scales orders by multiplier (0.5x, 1x, 2x, etc.)
-7. **Connection Status** - Real-time connection indicator
-8. **Order Logging** - Comprehensive logging of all copy trade actions
-9. **Error Tracking** - Tracks errors in copy_trade_logs table
+6. **Stop Loss (SL) Orders** - ✅ Stop orders (type 4) are automatically copied
+7. **Take Profit (TP) Orders** - ✅ Limit orders in any direction are copied (TP typically Limit orders)
+8. **Multiplier Support** - Scales orders by multiplier (0.5x, 1x, 2x, etc.)
+9. **Connection Status** - Real-time connection indicator
+10. **Order Logging** - Comprehensive logging of all copy trade actions
+11. **Error Tracking** - Tracks errors in copy_trade_logs table
+12. **Quantity Changes** - ✅ Real-time quantity modification support
 
 ## ⚠️ Partially Implemented
 
