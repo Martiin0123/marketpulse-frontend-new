@@ -9,6 +9,7 @@ import {
   PauseIcon
 } from '@heroicons/react/24/outline';
 import type { TradingAccount } from '@/types/journal';
+import CopyTradeLogs from './CopyTradeLogs';
 
 interface CopyTradeConfig {
   id: string;
@@ -363,6 +364,9 @@ export default function CopyTradeSection({
           })}
         </div>
       )}
+
+      {/* Copy Trade Activity Logs */}
+      <CopyTradeLogs />
 
       {/* Create/Edit Modal */}
       {isModalOpen && (

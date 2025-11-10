@@ -247,12 +247,39 @@ export async function processCopyTradeExecution(
           continue;
         }
 
+        // Log the copy trade attempt
+        const logId = await logCopyTradeExecution(
+          supabase,
+          userId,
+          config.id,
+          sourceAccountId,
+          tradeExecution,
+          config.destination_account_id,
+          brokerConnection.id,
+          config.multiplier,
+          'pending'
+        );
+
         // Execute the copy trade
         const executionResult = await executeCopyTrade(
           tradeExecution,
           brokerConnection,
           config.multiplier
         );
+
+        // Update log with execution result
+        if (logId) {
+          await updateCopyTradeLog(
+            supabase,
+            logId,
+            executionResult.success ? 'submitted' : 'error',
+            executionResult.orderId,
+            undefined,
+            undefined,
+            undefined,
+            executionResult.error
+          );
+        }
 
         if (executionResult.success) {
           result.copied++;
@@ -304,5 +331,88 @@ function shouldExecuteCopyTrade(
   // These will be checked when the trade is closed and synced
 
   return true;
+}
+
+/**
+ * Log a copy trade execution attempt
+ */
+async function logCopyTradeExecution(
+  supabase: any,
+  userId: string,
+  configId: string,
+  sourceAccountId: string,
+  tradeExecution: TradeExecution,
+  destinationAccountId: string,
+  brokerConnectionId: string,
+  multiplier: number,
+  status: string
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from('copy_trade_logs' as any)
+      .insert({
+        user_id: userId,
+        copy_trade_config_id: configId,
+        source_account_id: sourceAccountId,
+        source_symbol: tradeExecution.symbol,
+        source_side: tradeExecution.side,
+        source_quantity: tradeExecution.quantity,
+        destination_account_id: destinationAccountId,
+        destination_broker_connection_id: brokerConnectionId,
+        destination_symbol: tradeExecution.symbol,
+        destination_side: tradeExecution.side,
+        destination_quantity: Math.round(tradeExecution.quantity * multiplier),
+        multiplier: multiplier,
+        order_status: status,
+        order_type: tradeExecution.orderType || 'Market',
+        order_price: tradeExecution.price || null
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('Error logging copy trade execution:', error);
+      return null;
+    }
+
+    return data?.id || null;
+  } catch (error) {
+    console.error('Error in logCopyTradeExecution:', error);
+    return null;
+  }
+}
+
+/**
+ * Update a copy trade log
+ */
+async function updateCopyTradeLog(
+  supabase: any,
+  logId: string,
+  status: string,
+  orderId?: string,
+  filledQuantity?: number,
+  filledPrice?: number,
+  filledAt?: Date,
+  errorMessage?: string
+): Promise<void> {
+  try {
+    const updateData: any = {
+      order_status: status,
+      updated_at: new Date().toISOString()
+    };
+
+    if (orderId) updateData.order_id = orderId;
+    if (filledQuantity !== undefined) updateData.filled_quantity = filledQuantity;
+    if (filledPrice !== undefined) updateData.filled_price = filledPrice;
+    if (filledAt) updateData.filled_at = filledAt.toISOString();
+    if (errorMessage) updateData.error_message = errorMessage;
+
+    await supabase
+      .from('copy_trade_logs' as any)
+      .update(updateData)
+      .eq('id', logId);
+  } catch (error) {
+    console.error('Error updating copy trade log:', error);
+  }
 }
 
