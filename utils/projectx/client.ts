@@ -87,11 +87,12 @@ export class ProjectXClient {
                      process.env.PROJECTX_TOPSTEPX_API_URL || 
                      'https://api.topstepx.com';
     } else if (this.serviceType === 'alphaticks') {
-      // AlphaTicks - uses same API structure as TopStepX but different base URL
-      // Default to alphaticks.com domain, users can override with custom URL
+      // AlphaTicks - uses same API infrastructure and URL as TopStepX
+      // Same workflow, just different credentials/service type
+      // Users can override with custom URL if needed
       this.baseUrl = process.env.PROJECTX_ALPHATICKS_API_URL || 
                      process.env.PROJECTX_API_URL || 
-                     'https://api.alphaticks.com';
+                     'https://api.topstepx.com';
     } else {
       // Fallback
       this.baseUrl = process.env.PROJECTX_API_URL || 'https://api.topstepx.com';
