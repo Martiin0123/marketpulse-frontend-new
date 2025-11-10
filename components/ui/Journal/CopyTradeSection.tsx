@@ -338,24 +338,53 @@ export default function CopyTradeSection({
             console.log(
               `  ✅ Connected to SignalR for account ${conn.accountId}`
             );
+            
+            // Update connection status after connecting
+            updateConnectionStatus();
           } catch (error: any) {
             console.error(
               `❌ Error setting up SignalR for ${connectionKey}:`,
               error
             );
+            updateConnectionStatus();
           }
         }
       } catch (error) {
         console.error('❌ Error setting up SignalR connections:', error);
+        updateConnectionStatus();
       }
+    };
+
+    // Function to update connection status
+    const updateConnectionStatus = () => {
+      const clients = Array.from(signalRClientsRef.current.values());
+      const statuses = clients.map(client => client.getConnectionStatus());
+      const connectedCount = statuses.filter(s => s.connected).length;
+      const allConnected = connectedCount === clients.length && clients.length > 0;
+      const anyConnecting = statuses.some(s => s.state === 'Connecting' || s.state === 'Reconnecting');
+      
+      setConnectionStatus({
+        connected: allConnected,
+        state: allConnected ? 'Connected' : 
+               anyConnecting ? 'Connecting' : 
+               clients.length > 0 ? 'Disconnected' : 'No Active Configs',
+        activeConnections: connectedCount
+      });
     };
 
     setupSignalRConnections().catch((error) => {
       console.error('❌ Error in setupSignalRConnections:', error);
+      updateConnectionStatus();
     });
+
+    // Set up periodic status check
+    const statusInterval = setInterval(() => {
+      updateConnectionStatus();
+    }, 3000); // Check every 3 seconds
 
     // Cleanup: disconnect all SignalR clients on unmount or when configs change
     return () => {
+      clearInterval(statusInterval);
       console.log('🧹 Cleaning up SignalR connections...');
       signalRClientsRef.current.forEach((client) => {
         client.disconnect();
