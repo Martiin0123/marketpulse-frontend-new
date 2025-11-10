@@ -38,30 +38,34 @@ export async function POST(request: NextRequest) {
       console.log(`🚫 Processing real-time order cancellation: ${order.id} for account ${tradingAccountId}`);
 
       // Find the copy trade log for this order
-      // First try by source_order_id (preferred)
-      let { data: log, error: logError } = await adminSupabase
+      // There may be multiple logs with the same source_order_id (if order was processed multiple times)
+      // Get the most recent one that's still active
+      const { data: logs, error: logError } = await adminSupabase
         .from('copy_trade_logs' as any)
-        .select('id, order_id, order_status, destination_broker_connection_id, destination_account_id, source_order_id')
+        .select('id, order_id, order_status, destination_broker_connection_id, destination_account_id, source_order_id, created_at')
         .eq('source_account_id', tradingAccountId)
         .eq('source_order_id', order.id.toString())
         .neq('order_status', 'cancelled') // Don't try to cancel already cancelled orders
-        .maybeSingle();
+        .order('created_at', { ascending: false });
+
+      // Get the most recent active log
+      const log = logs && logs.length > 0 ? logs[0] : null;
 
       // If not found by source_order_id, try to find any recent log for this account
       // (in case source_order_id wasn't set)
       if (!log) {
         console.log(`⚠️ No log found by source_order_id, trying alternative lookup...`);
-        const { data: altLog } = await adminSupabase
+        const { data: altLogs } = await adminSupabase
           .from('copy_trade_logs' as any)
-          .select('id, order_id, order_status, destination_broker_connection_id, destination_account_id, source_order_id')
+          .select('id, order_id, order_status, destination_broker_connection_id, destination_account_id, source_order_id, created_at')
           .eq('source_account_id', tradingAccountId)
           .neq('order_status', 'cancelled')
           .neq('order_status', 'filled')
           .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .limit(1);
         
-        if (altLog) {
+        if (altLogs && altLogs.length > 0) {
+          const altLog = altLogs[0];
           console.log(`⚠️ Found alternative log (may not match):`, altLog);
           // Only use if it's very recent (within last 5 minutes) to avoid false matches
           const logAge = new Date().getTime() - new Date(altLog.created_at).getTime();
@@ -71,6 +75,11 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+      
+      // If multiple logs found, log a warning
+      if (logs && logs.length > 1) {
+        console.warn(`⚠️ Found ${logs.length} logs with same source_order_id ${order.id}, using most recent one`);
+      }
 
       console.log(`🔍 Cancellation lookup result:`, {
         found: !!log,
@@ -79,8 +88,14 @@ export async function POST(request: NextRequest) {
         status: log?.order_status,
         sourceOrderId: log?.source_order_id,
         searchedSourceOrderId: order.id.toString(),
+        totalLogsFound: logs?.length || 0,
         error: logError
       });
+      
+      // If we found multiple logs, we need to cancel all of them
+      if (logs && logs.length > 1) {
+        console.log(`⚠️ Found ${logs.length} active logs for order ${order.id}, will cancel all of them`);
+      }
 
       if (log && log.order_id && log.destination_broker_connection_id) {
         // Get destination broker connection
@@ -148,16 +163,21 @@ export async function POST(request: NextRequest) {
               console.log(`📥 Cancel result:`, cancelResult);
 
               if (cancelResult.success) {
-                await adminSupabase
+                // Cancel all logs with this source_order_id (in case there are duplicates)
+                const cancelledCount = await adminSupabase
                   .from('copy_trade_logs' as any)
                   .update({ 
                     order_status: 'cancelled',
                     updated_at: new Date().toISOString()
                   })
-                  .eq('id', log.id);
+                  .eq('source_account_id', tradingAccountId)
+                  .eq('source_order_id', order.id.toString())
+                  .neq('order_status', 'cancelled'); // Only update non-cancelled ones
+
+                console.log(`✅ Cancelled ${cancelledCount.data?.length || 0} log(s) for order ${order.id}`);
 
                 return NextResponse.json({
-                  cancelled: 1,
+                  cancelled: cancelledCount.data?.length || 1,
                   message: 'Order cancelled successfully'
                 });
               } else {
@@ -172,6 +192,10 @@ export async function POST(request: NextRequest) {
             }
           } catch (error: any) {
             console.error('❌ Error cancelling order:', error);
+            return NextResponse.json({
+              cancelled: 0,
+              message: `Error: ${error.message || 'Unknown error'}`
+            });
           }
         }
       }
@@ -191,12 +215,36 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if this order has already been processed
-    const { data: existingLog } = await adminSupabase
+    // Use .limit(1) instead of .maybeSingle() to avoid errors when multiple logs exist
+    const { data: existingLogs } = await adminSupabase
       .from('copy_trade_logs' as any)
-      .select('id, order_status, order_price, order_stop_price, order_id, destination_broker_connection_id')
+      .select('id, order_status, order_price, order_stop_price, order_id, destination_broker_connection_id, created_at')
       .eq('source_account_id', tradingAccountId)
       .eq('source_order_id', order.id.toString())
-      .maybeSingle();
+      .order('created_at', { ascending: false })
+      .limit(10); // Get up to 10 to check for duplicates
+    
+    const existingLog = existingLogs && existingLogs.length > 0 ? existingLogs[0] : null;
+    
+    // If multiple logs exist for this order, log a warning and check if we should skip
+    if (existingLogs && existingLogs.length > 1) {
+      console.warn(`⚠️ Found ${existingLogs.length} existing logs for order ${order.id}, using most recent`);
+      
+      // Check if any of the recent logs were created in the last 5 seconds (likely duplicate)
+      const recentLogs = existingLogs.filter((log: any) => {
+        const logAge = new Date().getTime() - new Date(log.created_at).getTime();
+        return logAge < 5000; // 5 seconds
+      });
+      
+      if (recentLogs.length > 0) {
+        console.log(`⏭️ Skipping duplicate order processing - ${recentLogs.length} recent log(s) found within last 5 seconds`);
+        return NextResponse.json({
+          executed: 0,
+          modified: 0,
+          message: 'Order already being processed (duplicate detected)'
+        });
+      }
+    }
 
     // If order exists and is still active (not filled/cancelled/rejected), check if it was modified
     if (existingLog && 
