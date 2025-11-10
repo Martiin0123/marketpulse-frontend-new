@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
     // Check if this order has already been processed
     const { data: existingLog } = await adminSupabase
       .from('copy_trade_logs' as any)
-      .select('id, order_status, order_price')
+      .select('id, order_status, order_price, order_id, destination_broker_connection_id')
       .eq('source_account_id', tradingAccountId)
       .eq('source_order_id', order.id.toString())
       .maybeSingle();
