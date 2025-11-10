@@ -210,6 +210,39 @@ export default function CopyTradeLogs({
     }
   };
 
+  const getActionDescription = (log: CopyTradeLog): string => {
+    const sourceAccount = log.source_account?.name || 'Source';
+    const destAccount = log.destination_account?.name || 'Destination';
+    const symbol = log.source_symbol;
+    const side = log.source_side.toUpperCase();
+    const quantity = log.destination_quantity;
+    
+    // Check if order was modified (updated_at is significantly different from created_at)
+    const createdTime = new Date(log.created_at).getTime();
+    const updatedTime = new Date(log.updated_at).getTime();
+    const wasModified = updatedTime - createdTime > 5000; // More than 5 seconds difference
+    
+    switch (log.order_status) {
+      case 'pending':
+        return `Opening ${side} order for ${quantity} ${symbol} on ${destAccount}`;
+      case 'submitted':
+        return `Submitted ${side} order for ${quantity} ${symbol} on ${destAccount}`;
+      case 'filled':
+        if (wasModified) {
+          return `Filled ${side} order for ${quantity} ${symbol} on ${destAccount} (was modified)`;
+        }
+        return `Filled ${side} order for ${quantity} ${symbol} on ${destAccount}`;
+      case 'cancelled':
+        return `Cancelled ${side} order for ${quantity} ${symbol} on ${destAccount}`;
+      case 'rejected':
+        return `Rejected ${side} order for ${quantity} ${symbol} on ${destAccount}`;
+      case 'error':
+        return `Error executing ${side} order for ${quantity} ${symbol} on ${destAccount}`;
+      default:
+        return `${side} order for ${quantity} ${symbol} on ${destAccount}`;
+    }
+  };
+
   const stats = {
     total: logs.length,
     pending: logs.filter((l) => l.order_status === 'pending').length,
@@ -285,9 +318,8 @@ export default function CopyTradeLogs({
           <table className="w-full">
             <thead className="bg-slate-700/30">
               <tr className="text-left text-xs text-slate-400">
-                <th className="px-4 py-2 font-medium">Status</th>
+                <th className="px-4 py-2 font-medium">Action</th>
                 <th className="px-4 py-2 font-medium">Symbol</th>
-                <th className="px-4 py-2 font-medium">Side</th>
                 <th className="px-4 py-2 font-medium">Quantity</th>
                 <th className="px-4 py-2 font-medium">Price</th>
                 <th className="px-4 py-2 font-medium">Time</th>
@@ -300,27 +332,35 @@ export default function CopyTradeLogs({
                   className={`hover:bg-slate-700/30 transition-colors ${
                     log.order_status === 'filled' ? 'bg-green-500/5' :
                     log.order_status === 'error' || log.order_status === 'rejected' ? 'bg-red-500/5' :
+                    log.order_status === 'cancelled' ? 'bg-orange-500/5' :
                     ''
                   }`}
                 >
                   <td className="px-4 py-2">
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(log.order_status)}
-                      <span className="text-xs text-slate-300 capitalize">
-                        {log.order_status}
-                      </span>
+                    <div className="flex items-start gap-2">
+                      <div className="mt-0.5">
+                        {getStatusIcon(log.order_status)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-white font-medium">
+                          {getActionDescription(log)}
+                        </div>
+                        <div className="text-xs text-slate-400 mt-1">
+                          From {log.source_account?.name || 'Source'} → {log.destination_account?.name || 'Destination'}
+                        </div>
+                        {log.error_message && (
+                          <div className="text-xs text-red-400 mt-1" title={log.error_message}>
+                            {log.error_message}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-2">
                     <div className="text-sm text-white font-medium">
                       {log.source_symbol}
                     </div>
-                    <div className="text-xs text-slate-400">
-                      {log.source_account?.name || 'Source'}
-                    </div>
-                  </td>
-                  <td className="px-4 py-2">
-                    <span className={`text-sm font-medium ${
+                    <span className={`text-xs font-medium ${
                       log.source_side.toUpperCase() === 'BUY' || log.source_side.toUpperCase() === 'LONG'
                         ? 'text-green-400'
                         : 'text-red-400'
@@ -329,11 +369,11 @@ export default function CopyTradeLogs({
                     </span>
                   </td>
                   <td className="px-4 py-2">
-                    <div className="text-sm text-white">
-                      {log.source_quantity}
+                    <div className="text-sm text-white font-medium">
+                      {log.destination_quantity}
                     </div>
                     <div className="text-xs text-slate-400">
-                      ×{log.multiplier.toFixed(1)} = {log.destination_quantity}
+                      {log.source_quantity} × {log.multiplier.toFixed(1)}x
                     </div>
                   </td>
                   <td className="px-4 py-2">
@@ -348,14 +388,19 @@ export default function CopyTradeLogs({
                     ) : (
                       <span className="text-xs text-slate-500">—</span>
                     )}
+                    {log.order_type && log.order_type !== 'Market' && (
+                      <div className="text-xs text-slate-400 mt-1">
+                        {log.order_type}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-2">
                     <div className="text-xs text-slate-400">
                       {formatTime(log.created_at)}
                     </div>
-                    {log.error_message && (
-                      <div className="text-xs text-red-400 mt-1 truncate max-w-[150px]" title={log.error_message}>
-                        {log.error_message}
+                    {log.filled_at && log.filled_at !== log.created_at && (
+                      <div className="text-xs text-green-400 mt-1">
+                        Filled {formatTime(log.filled_at)}
                       </div>
                     )}
                   </td>
