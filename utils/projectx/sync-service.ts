@@ -888,6 +888,27 @@ export async function syncProjectXTrades(
       );
 
       tradesToInsert.push(tradeData);
+
+      // Check if this is a new trade execution (not a completed trade) and trigger copy trade execution
+      // Only trigger for opening executions (PnL = 0 or no PnL yet)
+      if (!trade.pnl || trade.pnl === 0) {
+        try {
+          const { processCopyTradeExecution } = await import('@/utils/copy-trade/executor');
+          await processCopyTradeExecution(
+            conn.trading_account_id,
+            {
+              symbol: trade.symbol,
+              side: trade.side,
+              quantity: trade.quantity || (trade as any).size || 1,
+              orderType: 'Market' // Default to market order for copy trades
+            },
+            userId
+          );
+        } catch (copyError) {
+          // Don't fail the sync if copy execution fails
+          console.error('Error executing copy trade:', copyError);
+        }
+      }
     }
 
     // Insert trades in batch

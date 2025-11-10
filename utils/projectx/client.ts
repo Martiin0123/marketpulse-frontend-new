@@ -804,5 +804,105 @@ export class ProjectXClient {
   async getUserInfo(): Promise<any> {
     return this.apiRequest('/user');
   }
+
+  /**
+   * Place an order on ProjectX
+   * ProjectX Gateway API: POST /api/Order/place or similar
+   */
+  async placeOrder(orderData: {
+    accountId: string;
+    symbol: string;
+    side: 'BUY' | 'SELL';
+    quantity: number;
+    orderType?: 'Market' | 'Limit';
+    price?: number;
+  }): Promise<{ success: boolean; orderId?: string; error?: string }> {
+    try {
+      await this.ensureValidAuth();
+
+      // Try different endpoint patterns for order placement
+      const endpoints = [
+        '/api/Order/place',
+        '/api/Order/submit',
+        '/api/Order/create',
+        '/api/order/place',
+        '/api/order/submit',
+        '/api/order/create'
+      ];
+
+      const requestBody: any = {
+        accountId: parseInt(orderData.accountId) || orderData.accountId,
+        symbol: orderData.symbol,
+        side: orderData.side,
+        quantity: orderData.quantity,
+        orderType: orderData.orderType || 'Market'
+      };
+
+      if (orderData.price && orderData.orderType === 'Limit') {
+        requestBody.price = orderData.price;
+      }
+
+      for (const endpoint of endpoints) {
+        try {
+          const url = `${this.baseUrl}${endpoint}`;
+          const headers: HeadersInit = {
+            'accept': 'text/plain',
+            'Content-Type': 'application/json',
+          };
+          
+          if (this.sessionToken) {
+            headers['Authorization'] = `Bearer ${this.sessionToken}`;
+          } else if (this.accessToken) {
+            headers['Authorization'] = `Bearer ${this.accessToken}`;
+          }
+
+          console.log('📤 Placing order via ProjectX API:', { url, orderData: requestBody });
+
+          const response = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(requestBody),
+          });
+
+          if (!response.ok) {
+            if (response.status === 404) {
+              console.warn(`Endpoint ${endpoint} returned 404, trying next...`);
+              continue;
+            }
+            const errorText = await response.text();
+            throw new Error(`Failed to place order: ${response.status} ${errorText}`);
+          }
+
+          const data = await response.json();
+          
+          // Check for error codes
+          if (data.errorCode !== undefined && data.errorCode !== 0) {
+            throw new Error(data.errorMessage || 'Failed to place order');
+          }
+
+          // Extract order ID from response
+          const orderId = data.orderId || data.id || data.order_id || data.orderNumber;
+
+          return {
+            success: true,
+            orderId: orderId?.toString()
+          };
+        } catch (error: any) {
+          if (!error.message?.includes('404') && !error.message?.includes('Failed to place order')) {
+            throw error;
+          }
+          // Continue to next endpoint
+        }
+      }
+
+      throw new Error(`Failed to place order. Tried endpoints: ${endpoints.join(', ')}`);
+    } catch (error: any) {
+      console.error('❌ Error placing order:', error);
+      return {
+        success: false,
+        error: error.message || 'Unknown error'
+      };
+    }
+  }
 }
 
