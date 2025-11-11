@@ -846,22 +846,23 @@ export default function CopyTradeSection({
                 className="bg-slate-800/50 rounded-xl border border-slate-700 p-6"
               >
                 <div className="flex items-start justify-between">
-                  <div className="flex-1">
+                  <div className="flex-1 w-full">
                     <div className="flex items-center space-x-3 mb-3">
+                      {/* Toggle Switch */}
                       <button
                         onClick={() => handleToggleEnabled(config)}
-                        className={`p-2 rounded-lg transition-colors ${
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
                           config.enabled
-                            ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
-                            : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                            ? 'bg-green-500'
+                            : 'bg-slate-600'
                         }`}
                         title={config.enabled ? 'Pause' : 'Resume'}
                       >
-                        {config.enabled ? (
-                          <PauseIcon className="h-5 w-5" />
-                        ) : (
-                          <PlayIcon className="h-5 w-5" />
-                        )}
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            config.enabled ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
                       </button>
                       <h3 className="text-lg font-semibold text-white">
                         {sourceAccount?.name || 'Unknown'} →{' '}
@@ -888,10 +889,10 @@ export default function CopyTradeSection({
                       </div>
 
                       {/* Accounts Table - Show for both active and paused configs */}
-                      <div className="pt-4 border-t border-slate-700/50">
+                      <div className="pt-4 border-t border-slate-700/50 w-full">
                         {configStats[config.id] ? (
-                          <div className="overflow-x-auto rounded-lg border border-slate-700/50">
-                            <table className="w-full">
+                          <div className="overflow-x-auto rounded-lg border border-slate-700/50 w-full">
+                            <table className="w-full min-w-full">
                               <thead className="bg-slate-700/50">
                                 <tr>
                                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
@@ -908,14 +909,14 @@ export default function CopyTradeSection({
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-700/50 bg-slate-800/30">
-                                {/* Source Account Row */}
+                                {/* Lead Account Row */}
                                 <tr className="hover:bg-slate-700/30 transition-colors">
                                   <td className="px-6 py-4">
                                     <div className="text-sm font-medium text-white">
                                       {sourceAccount?.name || 'Unknown'}
                                     </div>
                                     <div className="text-xs text-slate-400 mt-0.5">
-                                      Source
+                                      Lead Account
                                     </div>
                                   </td>
                                   {config.enabled && (
@@ -968,14 +969,14 @@ export default function CopyTradeSection({
                                   </td>
                                 </tr>
 
-                                {/* Destination Account Row */}
+                                {/* Follower Account Row */}
                                 <tr className="hover:bg-slate-700/30 transition-colors">
                                   <td className="px-6 py-4">
                                     <div className="text-sm font-medium text-white">
                                       {destAccount?.name || 'Unknown'}
                                     </div>
                                     <div className="text-xs text-slate-400 mt-0.5">
-                                      Destination
+                                      Follower Account
                                     </div>
                                   </td>
                                   {config.enabled && (
