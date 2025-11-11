@@ -54,9 +54,16 @@ export default function CopyTradeSection({
     Record<
       string,
       {
-        stats: any;
-        todayPnL: { openPnL: number; realizedPnL: number };
-        initialBalance: number;
+        sourceStats: {
+          stats: any;
+          todayPnL: { openPnL: number; realizedPnL: number };
+          initialBalance: number;
+        };
+        destStats: {
+          stats: any;
+          todayPnL: { openPnL: number; realizedPnL: number };
+          initialBalance: number;
+        };
       }
     >
   >({});
@@ -76,7 +83,7 @@ export default function CopyTradeSection({
     loadConfigs();
   }, [refreshKey]);
 
-  // Load stats for each destination account
+  // Load stats for both source and destination accounts
   useEffect(() => {
     if (configs.length === 0) return;
 
@@ -84,33 +91,55 @@ export default function CopyTradeSection({
       const statsMap: Record<
         string,
         {
-          stats: any;
-          todayPnL: { openPnL: number; realizedPnL: number };
-          initialBalance: number;
+          sourceStats: {
+            stats: any;
+            todayPnL: { openPnL: number; realizedPnL: number };
+            initialBalance: number;
+          };
+          destStats: {
+            stats: any;
+            todayPnL: { openPnL: number; realizedPnL: number };
+            initialBalance: number;
+          };
         }
       > = {};
 
       for (const config of configs) {
+        const sourceAccount = accounts.find(
+          (acc) => acc.id === config.source_account_id
+        );
         const destAccount = accounts.find(
           (acc) => acc.id === config.destination_account_id
         );
-        if (!destAccount) continue;
 
         try {
-          // Calculate stats
-          const stats = await calculateAccountStats(
-            config.destination_account_id
+          // Calculate stats for source account
+          const sourceStats = await calculateAccountStats(
+            config.source_account_id
+          );
+          const sourceTodayPnL = await calculateTodayPnL(
+            config.source_account_id
           );
 
-          // Calculate today's PnL
-          const todayPnL = await calculateTodayPnL(
+          // Calculate stats for destination account
+          const destStats = await calculateAccountStats(
+            config.destination_account_id
+          );
+          const destTodayPnL = await calculateTodayPnL(
             config.destination_account_id
           );
 
           statsMap[config.id] = {
-            stats,
-            todayPnL,
-            initialBalance: destAccount.initial_balance || 0
+            sourceStats: {
+              stats: sourceStats,
+              todayPnL: sourceTodayPnL,
+              initialBalance: sourceAccount?.initial_balance || 0
+            },
+            destStats: {
+              stats: destStats,
+              todayPnL: destTodayPnL,
+              initialBalance: destAccount?.initial_balance || 0
+            }
           };
         } catch (error) {
           console.error(`Error loading stats for config ${config.id}:`, error);
@@ -851,14 +880,6 @@ export default function CopyTradeSection({
                     <div className="space-y-3">
                       <div className="flex items-center space-x-4 text-sm text-slate-400">
                         <span>
-                          <span className="text-slate-500">Source:</span>{' '}
-                          {sourceAccount?.name || 'Unknown Account'}
-                        </span>
-                        <span>
-                          <span className="text-slate-500">Destination:</span>{' '}
-                          {destAccount?.name || 'Unknown Account'}
-                        </span>
-                        <span>
                           <span className="text-slate-500">Multiplier:</span>{' '}
                           <span className="text-white font-medium">
                             {config.multiplier}x
@@ -866,108 +887,153 @@ export default function CopyTradeSection({
                         </span>
                       </div>
 
-                      {/* Stats Grid */}
+                      {/* Accounts Table */}
                       {configStats[config.id] && (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-slate-700">
-                          <div>
-                            <div className="text-xs text-slate-500 mb-1">
-                              Today's P&L
-                            </div>
-                            <div
-                              className={`text-sm font-bold ${
-                                configStats[config.id].todayPnL.openPnL +
-                                  configStats[config.id].todayPnL.realizedPnL >=
-                                0
-                                  ? 'text-green-400'
-                                  : 'text-red-400'
-                              }`}
-                            >
-                              {configStats[config.id].todayPnL.openPnL +
-                                configStats[config.id].todayPnL.realizedPnL >=
-                              0
-                                ? '+'
-                                : ''}
-                              {(
-                                configStats[config.id].todayPnL.openPnL +
-                                configStats[config.id].todayPnL.realizedPnL
-                              ).toFixed(2)}{' '}
-                              {destAccount?.currency || 'USD'}
-                            </div>
-                            <div className="text-xs text-slate-500 mt-1">
-                              Open:{' '}
-                              {configStats[config.id].todayPnL.openPnL >= 0
-                                ? '+'
-                                : ''}
-                              {configStats[config.id].todayPnL.openPnL.toFixed(
-                                2
-                              )}{' '}
-                              | Realized:{' '}
-                              {configStats[config.id].todayPnL.realizedPnL >= 0
-                                ? '+'
-                                : ''}
-                              {configStats[
-                                config.id
-                              ].todayPnL.realizedPnL.toFixed(2)}
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="text-xs text-slate-500 mb-1">
-                              Total P&L
-                            </div>
-                            <div
-                              className={`text-sm font-bold ${
-                                configStats[config.id].stats.totalPnL >= 0
-                                  ? 'text-green-400'
-                                  : 'text-red-400'
-                              }`}
-                            >
-                              {configStats[config.id].stats.totalPnL >= 0
-                                ? '+'
-                                : ''}
-                              {configStats[
-                                config.id
-                              ].stats.totalPnL.toLocaleString('en-US', {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2
-                              })}{' '}
-                              {destAccount?.currency || 'USD'}
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="text-xs text-slate-500 mb-1">
-                              Profit
-                            </div>
-                            <div
-                              className={`text-sm font-bold ${
-                                configStats[config.id].stats.totalPnL >= 0
-                                  ? 'text-green-400'
-                                  : 'text-red-400'
-                              }`}
-                            >
-                              {configStats[config.id].initialBalance > 0
-                                ? `${configStats[config.id].stats.totalPnL >= 0 ? '+' : ''}${((configStats[config.id].stats.totalPnL / configStats[config.id].initialBalance) * 100).toFixed(2)}%`
-                                : 'N/A'}
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="text-xs text-slate-500 mb-1">
-                              Win Rate
-                            </div>
-                            <div className="text-sm font-bold text-slate-300">
-                              {Math.round(configStats[config.id].stats.winRate)}
-                              %
-                            </div>
-                            <div className="text-xs text-slate-500 mt-1">
-                              {configStats[config.id].stats.totalTrades} trades
-                              |{' '}
-                              {configStats[config.id].stats.totalRR >= 0
-                                ? '+'
-                                : ''}
-                              {configStats[config.id].stats.totalRR.toFixed(2)}R
-                            </div>
+                        <div className="pt-3 border-t border-slate-700">
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead className="bg-slate-700/30">
+                                <tr>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-slate-300 uppercase">
+                                    Account
+                                  </th>
+                                  <th className="px-4 py-2 text-right text-xs font-medium text-slate-300 uppercase">
+                                    Today's P&L
+                                  </th>
+                                  <th className="px-4 py-2 text-right text-xs font-medium text-slate-300 uppercase">
+                                    Total P&L
+                                  </th>
+                                  <th className="px-4 py-2 text-right text-xs font-medium text-slate-300 uppercase">
+                                    Profit
+                                  </th>
+                                  <th className="px-4 py-2 text-right text-xs font-medium text-slate-300 uppercase">
+                                    Win Rate
+                                  </th>
+                                  <th className="px-4 py-2 text-right text-xs font-medium text-slate-300 uppercase">
+                                    Total RR
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-700">
+                                {/* Source Account Row */}
+                                <tr className="hover:bg-slate-700/20">
+                                  <td className="px-4 py-3">
+                                    <div className="text-sm font-medium text-white">
+                                      {sourceAccount?.name || 'Unknown'}
+                                    </div>
+                                    <div className="text-xs text-slate-400">Source</div>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <div className={`text-sm font-bold ${
+                                      (configStats[config.id].sourceStats.todayPnL.openPnL + configStats[config.id].sourceStats.todayPnL.realizedPnL) >= 0 
+                                        ? 'text-green-400' 
+                                        : 'text-red-400'
+                                    }`}>
+                                      {(configStats[config.id].sourceStats.todayPnL.openPnL + configStats[config.id].sourceStats.todayPnL.realizedPnL) >= 0 ? '+' : ''}
+                                      {(configStats[config.id].sourceStats.todayPnL.openPnL + configStats[config.id].sourceStats.todayPnL.realizedPnL).toFixed(2)} {sourceAccount?.currency || 'USD'}
+                                    </div>
+                                    <div className="text-xs text-slate-500 mt-1">
+                                      O: {configStats[config.id].sourceStats.todayPnL.openPnL >= 0 ? '+' : ''}
+                                      {configStats[config.id].sourceStats.todayPnL.openPnL.toFixed(2)} | R: {configStats[config.id].sourceStats.todayPnL.realizedPnL >= 0 ? '+' : ''}
+                                      {configStats[config.id].sourceStats.todayPnL.realizedPnL.toFixed(2)}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <span className={`text-sm font-bold ${
+                                      configStats[config.id].sourceStats.stats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'
+                                    }`}>
+                                      {configStats[config.id].sourceStats.stats.totalPnL >= 0 ? '+' : ''}
+                                      {configStats[config.id].sourceStats.stats.totalPnL.toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2
+                                      })}{' '}
+                                      {sourceAccount?.currency || 'USD'}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <span className={`text-sm font-medium ${
+                                      configStats[config.id].sourceStats.stats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'
+                                    }`}>
+                                      {configStats[config.id].sourceStats.initialBalance > 0
+                                        ? `${configStats[config.id].sourceStats.stats.totalPnL >= 0 ? '+' : ''}${((configStats[config.id].sourceStats.stats.totalPnL / configStats[config.id].sourceStats.initialBalance) * 100).toFixed(2)}%`
+                                        : 'N/A'}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <span className="text-sm text-slate-300">
+                                      {Math.round(configStats[config.id].sourceStats.stats.winRate)}%
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <span className={`text-sm font-medium ${
+                                      configStats[config.id].sourceStats.stats.totalRR >= 0 ? 'text-green-400' : 'text-red-400'
+                                    }`}>
+                                      {configStats[config.id].sourceStats.stats.totalRR >= 0 ? '+' : ''}
+                                      {configStats[config.id].sourceStats.stats.totalRR.toFixed(2)}R
+                                    </span>
+                                  </td>
+                                </tr>
+                                
+                                {/* Destination Account Row */}
+                                <tr className="hover:bg-slate-700/20">
+                                  <td className="px-4 py-3">
+                                    <div className="text-sm font-medium text-white">
+                                      {destAccount?.name || 'Unknown'}
+                                    </div>
+                                    <div className="text-xs text-slate-400">Destination</div>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <div className={`text-sm font-bold ${
+                                      (configStats[config.id].destStats.todayPnL.openPnL + configStats[config.id].destStats.todayPnL.realizedPnL) >= 0 
+                                        ? 'text-green-400' 
+                                        : 'text-red-400'
+                                    }`}>
+                                      {(configStats[config.id].destStats.todayPnL.openPnL + configStats[config.id].destStats.todayPnL.realizedPnL) >= 0 ? '+' : ''}
+                                      {(configStats[config.id].destStats.todayPnL.openPnL + configStats[config.id].destStats.todayPnL.realizedPnL).toFixed(2)} {destAccount?.currency || 'USD'}
+                                    </div>
+                                    <div className="text-xs text-slate-500 mt-1">
+                                      O: {configStats[config.id].destStats.todayPnL.openPnL >= 0 ? '+' : ''}
+                                      {configStats[config.id].destStats.todayPnL.openPnL.toFixed(2)} | R: {configStats[config.id].destStats.todayPnL.realizedPnL >= 0 ? '+' : ''}
+                                      {configStats[config.id].destStats.todayPnL.realizedPnL.toFixed(2)}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <span className={`text-sm font-bold ${
+                                      configStats[config.id].destStats.stats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'
+                                    }`}>
+                                      {configStats[config.id].destStats.stats.totalPnL >= 0 ? '+' : ''}
+                                      {configStats[config.id].destStats.stats.totalPnL.toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2
+                                      })}{' '}
+                                      {destAccount?.currency || 'USD'}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <span className={`text-sm font-medium ${
+                                      configStats[config.id].destStats.stats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'
+                                    }`}>
+                                      {configStats[config.id].destStats.initialBalance > 0
+                                        ? `${configStats[config.id].destStats.stats.totalPnL >= 0 ? '+' : ''}${((configStats[config.id].destStats.stats.totalPnL / configStats[config.id].destStats.initialBalance) * 100).toFixed(2)}%`
+                                        : 'N/A'}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <span className="text-sm text-slate-300">
+                                      {Math.round(configStats[config.id].destStats.stats.winRate)}%
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <span className={`text-sm font-medium ${
+                                      configStats[config.id].destStats.stats.totalRR >= 0 ? 'text-green-400' : 'text-red-400'
+                                    }`}>
+                                      {configStats[config.id].destStats.stats.totalRR >= 0 ? '+' : ''}
+                                      {configStats[config.id].destStats.stats.totalRR.toFixed(2)}R
+                                    </span>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
                           </div>
                         </div>
                       )}
