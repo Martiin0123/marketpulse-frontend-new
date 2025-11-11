@@ -76,6 +76,9 @@ export default function CopyTradeSection({
     state: 'Disconnected',
     activeConnections: 0
   });
+  const [configConnectionStatus, setConfigConnectionStatus] = useState<
+    Record<string, { connected: boolean; state: string }>
+  >({});
 
   const supabase = createClient();
 
@@ -192,7 +195,7 @@ export default function CopyTradeSection({
 
         // Set up SignalR client for each connection
         for (const conn of connections) {
-          const connectionKey = `${conn.connectionId}-${conn.accountId}`;
+          const connectionKey = `${conn.connectionId}-${conn.accountId}-${conn.tradingAccountId}`;
 
           // Skip if already connected
           if (signalRClientsRef.current.has(connectionKey)) {
@@ -703,70 +706,6 @@ export default function CopyTradeSection({
 
   return (
     <div className="space-y-6">
-      {/* Connection Status Banner */}
-      <div
-        className={`rounded-lg border p-4 transition-all ${
-          connectionStatus.connected
-            ? 'bg-green-500/10 border-green-500/30'
-            : connectionStatus.state === 'Connecting' ||
-                connectionStatus.state === 'Reconnecting'
-              ? 'bg-yellow-500/10 border-yellow-500/30'
-              : 'bg-red-500/10 border-red-500/30'
-        }`}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <div
-                className={`h-3 w-3 rounded-full ${
-                  connectionStatus.connected
-                    ? 'bg-green-500 shadow-lg shadow-green-500/50'
-                    : connectionStatus.state === 'Connecting' ||
-                        connectionStatus.state === 'Reconnecting'
-                      ? 'bg-yellow-500 shadow-lg shadow-yellow-500/50'
-                      : 'bg-red-500 shadow-lg shadow-red-500/50'
-                }`}
-              />
-              {connectionStatus.connected && (
-                <div className="absolute inset-0 h-3 w-3 rounded-full bg-green-500 animate-ping opacity-75" />
-              )}
-            </div>
-            <div>
-              <div
-                className={`text-base font-semibold ${
-                  connectionStatus.connected
-                    ? 'text-green-400'
-                    : connectionStatus.state === 'Connecting' ||
-                        connectionStatus.state === 'Reconnecting'
-                      ? 'text-yellow-400'
-                      : 'text-red-400'
-                }`}
-              >
-                {connectionStatus.connected
-                  ? 'Connected'
-                  : connectionStatus.state === 'Connecting' ||
-                      connectionStatus.state === 'Reconnecting'
-                    ? 'Connecting...'
-                    : 'Disconnected'}
-              </div>
-              <div className="text-xs text-slate-400 mt-0.5">
-                {connectionStatus.connected
-                  ? `Real-time copy trading active${connectionStatus.activeConnections > 1 ? ` (${connectionStatus.activeConnections} connections)` : ''}`
-                  : connectionStatus.state === 'No Active Configs'
-                    ? 'No active copy trade configurations'
-                    : 'Copy trading is not active'}
-              </div>
-            </div>
-          </div>
-          {!connectionStatus.connected && (
-            <div className="text-xs text-slate-400 flex items-center gap-1">
-              <span>⚠️</span>
-              <span>Keep this page open</span>
-            </div>
-          )}
-        </div>
-      </div>
-
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-white">Copy Trading</h2>
@@ -852,9 +791,7 @@ export default function CopyTradeSection({
                       <button
                         onClick={() => handleToggleEnabled(config)}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                          config.enabled
-                            ? 'bg-green-500'
-                            : 'bg-slate-600'
+                          config.enabled ? 'bg-green-500' : 'bg-slate-600'
                         }`}
                         title={config.enabled ? 'Pause' : 'Resume'}
                       >
