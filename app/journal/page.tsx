@@ -674,7 +674,7 @@ export default function JournalPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900">
+    <div className="min-h-screen bg-slate-900 -mt-24 pt-24">
       {/* Sidebar */}
       <JournalSidebar
         currentSection={currentSection}

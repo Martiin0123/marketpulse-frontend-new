@@ -1101,8 +1101,8 @@ export default function CopyTradeSection({
                                           : 'text-red-400'
                                       }`}
                                     >
-                                      {configStats[config.id].destStats
-                                        .todayPnL.openPnL +
+                                      {configStats[config.id].destStats.todayPnL
+                                        .openPnL +
                                         configStats[config.id].destStats
                                           .todayPnL.realizedPnL >=
                                       0
