@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { Plus, Gear } from '@phosphor-icons/react';
 import AccountSelector from '@/components/ui/Journal/AccountSelector';
@@ -822,6 +822,138 @@ function OverviewSection({
   refreshKey: number;
   onAccountSelect: (id: string) => void;
 }) {
+  const [todayPnL, setTodayPnL] = useState<{
+    openPnL: number;
+    realizedPnL: number;
+    currency: string;
+  } | null>(null);
+  const supabase = createClient();
+
+  // Calculate today's open and realized PnL
+  useEffect(() => {
+    const calculateTodayPnL = async () => {
+      try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayStart = today.toISOString();
+        const todayEnd = new Date(today);
+        todayEnd.setHours(23, 59, 59, 999);
+        const todayEndStr = todayEnd.toISOString();
+
+        if (selectedAccount) {
+          // Single account view
+          const account = accounts.find((a) => a.id === selectedAccount);
+          if (!account) return;
+
+          // Get open positions (status = 'open')
+          const { data: openTrades } = await supabase
+            .from('trade_entries' as any)
+            .select('entry_price, exit_price, side, size, pnl_amount, pnl_percentage')
+            .eq('account_id', selectedAccount)
+            .eq('status', 'open');
+
+          // Calculate open PnL (unrealized)
+          // For open positions, use current pnl_amount if available, otherwise calculate from entry price
+          let openPnL = 0;
+          if (openTrades) {
+            openPnL = openTrades.reduce((sum: number, trade: any) => {
+              // If pnl_amount exists, use it (might be calculated from current price)
+              if (trade.pnl_amount !== null && trade.pnl_amount !== undefined) {
+                return sum + trade.pnl_amount;
+              }
+              // Otherwise, if exit_price exists (partial exit), calculate from that
+              if (trade.exit_price && trade.entry_price && trade.size) {
+                const priceDiff = trade.side === 'long' 
+                  ? trade.exit_price - trade.entry_price
+                  : trade.entry_price - trade.exit_price;
+                return sum + (priceDiff * trade.size);
+              }
+              return sum;
+            }, 0);
+          }
+
+          // Get closed trades from today
+          const { data: closedTrades } = await supabase
+            .from('trade_entries' as any)
+            .select('pnl_amount')
+            .eq('account_id', selectedAccount)
+            .eq('status', 'closed')
+            .gte('exit_date', todayStart)
+            .lte('exit_date', todayEndStr);
+
+          // Calculate realized PnL (from closed trades today)
+          const realizedPnL = closedTrades
+            ? closedTrades.reduce((sum: number, trade: any) => sum + (trade.pnl_amount || 0), 0)
+            : 0;
+
+          setTodayPnL({
+            openPnL,
+            realizedPnL,
+            currency: account.currency || 'USD'
+          });
+        } else {
+          // Combined view - sum across all accounts
+          let totalOpenPnL = 0;
+          let totalRealizedPnL = 0;
+          let currency = 'USD';
+
+          for (const account of accounts) {
+            // Get open positions
+            const { data: openTrades } = await supabase
+              .from('trade_entries' as any)
+              .select('entry_price, exit_price, side, size, pnl_amount')
+              .eq('account_id', account.id)
+              .eq('status', 'open');
+
+            if (openTrades) {
+              const accountOpenPnL = openTrades.reduce((sum: number, trade: any) => {
+                if (trade.pnl_amount !== null && trade.pnl_amount !== undefined) {
+                  return sum + trade.pnl_amount;
+                }
+                if (trade.exit_price && trade.entry_price && trade.size) {
+                  const priceDiff = trade.side === 'long' 
+                    ? trade.exit_price - trade.entry_price
+                    : trade.entry_price - trade.exit_price;
+                  return sum + (priceDiff * trade.size);
+                }
+                return sum;
+              }, 0);
+              totalOpenPnL += accountOpenPnL;
+            }
+
+            // Get closed trades from today
+            const { data: closedTrades } = await supabase
+              .from('trade_entries' as any)
+              .select('pnl_amount')
+              .eq('account_id', account.id)
+              .eq('status', 'closed')
+              .gte('exit_date', todayStart)
+              .lte('exit_date', todayEndStr);
+
+            if (closedTrades) {
+              totalRealizedPnL += closedTrades.reduce(
+                (sum: number, trade: any) => sum + (trade.pnl_amount || 0),
+                0
+              );
+            }
+
+            if (account.currency) currency = account.currency;
+          }
+
+          setTodayPnL({
+            openPnL: totalOpenPnL,
+            realizedPnL: totalRealizedPnL,
+            currency
+          });
+        }
+      } catch (error) {
+        console.error('Error calculating today PnL:', error);
+      }
+    };
+
+    calculateTodayPnL();
+  }, [selectedAccount, accounts, refreshKey, supabase]);
+
   return (
     <div className="space-y-6">
       <JournalBalanceChart
@@ -838,6 +970,25 @@ function OverviewSection({
         }
         refreshKey={refreshKey}
       />
+
+      {/* Today's PnL Section */}
+      {todayPnL && (
+        <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-xl p-6 border border-slate-700">
+          <h3 className="text-lg font-semibold text-white mb-4">Today's P&L</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <StatCard
+              label="Open P&L (Unrealized)"
+              value={`${todayPnL.openPnL >= 0 ? '+' : ''}${todayPnL.openPnL.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${todayPnL.currency}`}
+              color={todayPnL.openPnL >= 0 ? 'green' : 'red'}
+            />
+            <StatCard
+              label="Realized P&L"
+              value={`${todayPnL.realizedPnL >= 0 ? '+' : ''}${todayPnL.realizedPnL.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${todayPnL.currency}`}
+              color={todayPnL.realizedPnL >= 0 ? 'green' : 'red'}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">

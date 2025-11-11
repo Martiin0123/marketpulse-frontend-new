@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import type { TradingAccount } from '@/types/journal';
 import CopyTradeLogs from './CopyTradeLogs';
+import CopyTradeAccounts from './CopyTradeAccounts';
 import {
   ProjectXSignalRClient,
   ProjectXOrderUpdate,
@@ -572,6 +573,11 @@ export default function CopyTradeSection({
           <span>New Configuration</span>
         </button>
       </div>
+
+      {/* Active Copy Trade Accounts */}
+      {configs.filter((c) => c.enabled).length > 0 && (
+        <CopyTradeAccounts refreshKey={refreshKey} />
+      )}
 
       {configs.length === 0 ? (
         <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-12 text-center">
