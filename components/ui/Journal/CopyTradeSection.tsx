@@ -374,8 +374,11 @@ export default function CopyTradeSection({
       const anyReconnecting = statuses.some((s) => s.state === 'Reconnecting');
 
       // Update per-config connection status
-      const configStatusMap: Record<string, { connected: boolean; state: string }> = {};
-      
+      const configStatusMap: Record<
+        string,
+        { connected: boolean; state: string }
+      > = {};
+
       // Map each active config to its connection status
       activeConfigs.forEach((config) => {
         // Find the connection for this config's source account
@@ -383,7 +386,7 @@ export default function CopyTradeSection({
         const connectionKey = Array.from(signalRClientsRef.current.keys()).find(
           (key) => key.includes(sourceAccountId)
         );
-        
+
         if (connectionKey) {
           const client = signalRClientsRef.current.get(connectionKey);
           if (client) {
@@ -405,7 +408,7 @@ export default function CopyTradeSection({
           };
         }
       });
-      
+
       setConfigConnectionStatus(configStatusMap);
 
       if (allConnected) {
@@ -878,8 +881,10 @@ export default function CopyTradeSection({
                               className={`h-2 w-2 rounded-full ${
                                 configConnectionStatus[config.id].connected
                                   ? 'bg-green-500 shadow-lg shadow-green-500/50'
-                                  : configConnectionStatus[config.id].state === 'Connecting' ||
-                                      configConnectionStatus[config.id].state === 'Reconnecting'
+                                  : configConnectionStatus[config.id].state ===
+                                        'Connecting' ||
+                                      configConnectionStatus[config.id]
+                                        .state === 'Reconnecting'
                                     ? 'bg-yellow-500 shadow-lg shadow-yellow-500/50'
                                     : 'bg-red-500 shadow-lg shadow-red-500/50'
                               }`}
@@ -892,16 +897,20 @@ export default function CopyTradeSection({
                             className={`text-xs font-medium ${
                               configConnectionStatus[config.id].connected
                                 ? 'text-green-400'
-                                : configConnectionStatus[config.id].state === 'Connecting' ||
-                                    configConnectionStatus[config.id].state === 'Reconnecting'
+                                : configConnectionStatus[config.id].state ===
+                                      'Connecting' ||
+                                    configConnectionStatus[config.id].state ===
+                                      'Reconnecting'
                                   ? 'text-yellow-400'
                                   : 'text-red-400'
                             }`}
                           >
                             {configConnectionStatus[config.id].connected
                               ? 'Connected'
-                              : configConnectionStatus[config.id].state === 'Connecting' ||
-                                  configConnectionStatus[config.id].state === 'Reconnecting'
+                              : configConnectionStatus[config.id].state ===
+                                    'Connecting' ||
+                                  configConnectionStatus[config.id].state ===
+                                    'Reconnecting'
                                 ? 'Connecting...'
                                 : 'Disconnected'}
                           </span>
@@ -934,7 +943,13 @@ export default function CopyTradeSection({
                                     </th>
                                   )}
                                   <th className="px-6 py-3 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">
+                                    Today's P&L
+                                  </th>
+                                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">
                                     Total P&L
+                                  </th>
+                                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">
+                                    Total Balance
                                   </th>
                                 </tr>
                               </thead>
@@ -975,6 +990,34 @@ export default function CopyTradeSection({
                                   <td className="px-6 py-4 text-right">
                                     <span
                                       className={`text-sm font-bold ${
+                                        configStats[config.id].sourceStats
+                                          .todayPnL.openPnL +
+                                          configStats[config.id].sourceStats
+                                            .todayPnL.realizedPnL >=
+                                        0
+                                          ? 'text-green-400'
+                                          : 'text-red-400'
+                                      }`}
+                                    >
+                                      {configStats[config.id].sourceStats
+                                        .todayPnL.openPnL +
+                                        configStats[config.id].sourceStats
+                                          .todayPnL.realizedPnL >=
+                                      0
+                                        ? '+'
+                                        : ''}
+                                      {(
+                                        configStats[config.id].sourceStats
+                                          .todayPnL.openPnL +
+                                        configStats[config.id].sourceStats
+                                          .todayPnL.realizedPnL
+                                      ).toFixed(2)}{' '}
+                                      {sourceAccount?.currency || 'USD'}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 text-right">
+                                    <span
+                                      className={`text-sm font-bold ${
                                         configStats[config.id].sourceStats.stats
                                           .totalPnL >= 0
                                           ? 'text-green-400'
@@ -994,6 +1037,20 @@ export default function CopyTradeSection({
                                           maximumFractionDigits: 2
                                         }
                                       )}{' '}
+                                      {sourceAccount?.currency || 'USD'}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 text-right">
+                                    <span className="text-sm font-medium text-white">
+                                      {(
+                                        configStats[config.id].sourceStats
+                                          .initialBalance +
+                                        configStats[config.id].sourceStats.stats
+                                          .totalPnL
+                                      ).toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2
+                                      })}{' '}
                                       {sourceAccount?.currency || 'USD'}
                                     </span>
                                   </td>
@@ -1035,6 +1092,34 @@ export default function CopyTradeSection({
                                   <td className="px-6 py-4 text-right">
                                     <span
                                       className={`text-sm font-bold ${
+                                        configStats[config.id].destStats
+                                          .todayPnL.openPnL +
+                                          configStats[config.id].destStats
+                                            .todayPnL.realizedPnL >=
+                                        0
+                                          ? 'text-green-400'
+                                          : 'text-red-400'
+                                      }`}
+                                    >
+                                      {configStats[config.id].destStats
+                                        .todayPnL.openPnL +
+                                        configStats[config.id].destStats
+                                          .todayPnL.realizedPnL >=
+                                      0
+                                        ? '+'
+                                        : ''}
+                                      {(
+                                        configStats[config.id].destStats
+                                          .todayPnL.openPnL +
+                                        configStats[config.id].destStats
+                                          .todayPnL.realizedPnL
+                                      ).toFixed(2)}{' '}
+                                      {destAccount?.currency || 'USD'}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 text-right">
+                                    <span
+                                      className={`text-sm font-bold ${
                                         configStats[config.id].destStats.stats
                                           .totalPnL >= 0
                                           ? 'text-green-400'
@@ -1054,6 +1139,20 @@ export default function CopyTradeSection({
                                           maximumFractionDigits: 2
                                         }
                                       )}{' '}
+                                      {destAccount?.currency || 'USD'}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 text-right">
+                                    <span className="text-sm font-medium text-white">
+                                      {(
+                                        configStats[config.id].destStats
+                                          .initialBalance +
+                                        configStats[config.id].destStats.stats
+                                          .totalPnL
+                                      ).toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2
+                                      })}{' '}
                                       {destAccount?.currency || 'USD'}
                                     </span>
                                   </td>
