@@ -897,20 +897,13 @@ export default function CopyTradeSection({
                                   <th className="px-4 py-2 text-left text-xs font-medium text-slate-300 uppercase">
                                     Account
                                   </th>
-                                  <th className="px-4 py-2 text-right text-xs font-medium text-slate-300 uppercase">
-                                    Today's P&L
-                                  </th>
+                                  {config.enabled && (
+                                    <th className="px-4 py-2 text-right text-xs font-medium text-slate-300 uppercase">
+                                      Open P&L
+                                    </th>
+                                  )}
                                   <th className="px-4 py-2 text-right text-xs font-medium text-slate-300 uppercase">
                                     Total P&L
-                                  </th>
-                                  <th className="px-4 py-2 text-right text-xs font-medium text-slate-300 uppercase">
-                                    Profit
-                                  </th>
-                                  <th className="px-4 py-2 text-right text-xs font-medium text-slate-300 uppercase">
-                                    Win Rate
-                                  </th>
-                                  <th className="px-4 py-2 text-right text-xs font-medium text-slate-300 uppercase">
-                                    Total RR
                                   </th>
                                 </tr>
                               </thead>
@@ -925,56 +918,29 @@ export default function CopyTradeSection({
                                       Source
                                     </div>
                                   </td>
-                                  <td className="px-4 py-3 text-right">
-                                    <div
-                                      className={`text-sm font-bold ${
-                                        configStats[config.id].sourceStats
-                                          .todayPnL.openPnL +
+                                  {config.enabled && (
+                                    <td className="px-4 py-3 text-right">
+                                      <span
+                                        className={`text-sm font-bold ${
                                           configStats[config.id].sourceStats
-                                            .todayPnL.realizedPnL >=
-                                        0
-                                          ? 'text-green-400'
-                                          : 'text-red-400'
-                                      }`}
-                                    >
-                                      {configStats[config.id].sourceStats
-                                        .todayPnL.openPnL +
-                                        configStats[config.id].sourceStats
-                                          .todayPnL.realizedPnL >=
-                                      0
-                                        ? '+'
-                                        : ''}
-                                      {(
-                                        configStats[config.id].sourceStats
-                                          .todayPnL.openPnL +
-                                        configStats[config.id].sourceStats
-                                          .todayPnL.realizedPnL
-                                      ).toFixed(2)}{' '}
-                                      {sourceAccount?.currency || 'USD'}
-                                    </div>
-                                    <div className="text-xs text-slate-500 mt-1">
-                                      O:{' '}
-                                      {configStats[config.id].sourceStats
-                                        .todayPnL.openPnL >= 0
-                                        ? '+'
-                                        : ''}
-                                      {configStats[
-                                        config.id
-                                      ].sourceStats.todayPnL.openPnL.toFixed(
-                                        2
-                                      )}{' '}
-                                      | R:{' '}
-                                      {configStats[config.id].sourceStats
-                                        .todayPnL.realizedPnL >= 0
-                                        ? '+'
-                                        : ''}
-                                      {configStats[
-                                        config.id
-                                      ].sourceStats.todayPnL.realizedPnL.toFixed(
-                                        2
-                                      )}
-                                    </div>
-                                  </td>
+                                            .todayPnL.openPnL >= 0
+                                            ? 'text-green-400'
+                                            : 'text-red-400'
+                                        }`}
+                                      >
+                                        {configStats[config.id].sourceStats
+                                          .todayPnL.openPnL >= 0
+                                          ? '+'
+                                          : ''}
+                                        {configStats[
+                                          config.id
+                                        ].sourceStats.todayPnL.openPnL.toFixed(
+                                          2
+                                        )}{' '}
+                                        {sourceAccount?.currency || 'USD'}
+                                      </span>
+                                    </td>
+                                  )}
                                   <td className="px-4 py-3 text-right">
                                     <span
                                       className={`text-sm font-bold ${
@@ -1000,49 +966,6 @@ export default function CopyTradeSection({
                                       {sourceAccount?.currency || 'USD'}
                                     </span>
                                   </td>
-                                  <td className="px-4 py-3 text-right">
-                                    <span
-                                      className={`text-sm font-medium ${
-                                        configStats[config.id].sourceStats.stats
-                                          .totalPnL >= 0
-                                          ? 'text-green-400'
-                                          : 'text-red-400'
-                                      }`}
-                                    >
-                                      {configStats[config.id].sourceStats
-                                        .initialBalance > 0
-                                        ? `${configStats[config.id].sourceStats.stats.totalPnL >= 0 ? '+' : ''}${((configStats[config.id].sourceStats.stats.totalPnL / configStats[config.id].sourceStats.initialBalance) * 100).toFixed(2)}%`
-                                        : 'N/A'}
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-3 text-right">
-                                    <span className="text-sm text-slate-300">
-                                      {Math.round(
-                                        configStats[config.id].sourceStats.stats
-                                          .winRate
-                                      )}
-                                      %
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-3 text-right">
-                                    <span
-                                      className={`text-sm font-medium ${
-                                        configStats[config.id].sourceStats.stats
-                                          .totalRR >= 0
-                                          ? 'text-green-400'
-                                          : 'text-red-400'
-                                      }`}
-                                    >
-                                      {configStats[config.id].sourceStats.stats
-                                        .totalRR >= 0
-                                        ? '+'
-                                        : ''}
-                                      {configStats[
-                                        config.id
-                                      ].sourceStats.stats.totalRR.toFixed(2)}
-                                      R
-                                    </span>
-                                  </td>
                                 </tr>
 
                                 {/* Destination Account Row */}
@@ -1055,56 +978,29 @@ export default function CopyTradeSection({
                                       Destination
                                     </div>
                                   </td>
-                                  <td className="px-4 py-3 text-right">
-                                    <div
-                                      className={`text-sm font-bold ${
-                                        configStats[config.id].destStats
-                                          .todayPnL.openPnL +
+                                  {config.enabled && (
+                                    <td className="px-4 py-3 text-right">
+                                      <span
+                                        className={`text-sm font-bold ${
                                           configStats[config.id].destStats
-                                            .todayPnL.realizedPnL >=
-                                        0
-                                          ? 'text-green-400'
-                                          : 'text-red-400'
-                                      }`}
-                                    >
-                                      {configStats[config.id].destStats.todayPnL
-                                        .openPnL +
-                                        configStats[config.id].destStats
-                                          .todayPnL.realizedPnL >=
-                                      0
-                                        ? '+'
-                                        : ''}
-                                      {(
-                                        configStats[config.id].destStats
-                                          .todayPnL.openPnL +
-                                        configStats[config.id].destStats
-                                          .todayPnL.realizedPnL
-                                      ).toFixed(2)}{' '}
-                                      {destAccount?.currency || 'USD'}
-                                    </div>
-                                    <div className="text-xs text-slate-500 mt-1">
-                                      O:{' '}
-                                      {configStats[config.id].destStats.todayPnL
-                                        .openPnL >= 0
-                                        ? '+'
-                                        : ''}
-                                      {configStats[
-                                        config.id
-                                      ].destStats.todayPnL.openPnL.toFixed(
-                                        2
-                                      )}{' '}
-                                      | R:{' '}
-                                      {configStats[config.id].destStats.todayPnL
-                                        .realizedPnL >= 0
-                                        ? '+'
-                                        : ''}
-                                      {configStats[
-                                        config.id
-                                      ].destStats.todayPnL.realizedPnL.toFixed(
-                                        2
-                                      )}
-                                    </div>
-                                  </td>
+                                            .todayPnL.openPnL >= 0
+                                            ? 'text-green-400'
+                                            : 'text-red-400'
+                                        }`}
+                                      >
+                                        {configStats[config.id].destStats
+                                          .todayPnL.openPnL >= 0
+                                          ? '+'
+                                          : ''}
+                                        {configStats[
+                                          config.id
+                                        ].destStats.todayPnL.openPnL.toFixed(
+                                          2
+                                        )}{' '}
+                                        {destAccount?.currency || 'USD'}
+                                      </span>
+                                    </td>
+                                  )}
                                   <td className="px-4 py-3 text-right">
                                     <span
                                       className={`text-sm font-bold ${
@@ -1128,49 +1024,6 @@ export default function CopyTradeSection({
                                         }
                                       )}{' '}
                                       {destAccount?.currency || 'USD'}
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-3 text-right">
-                                    <span
-                                      className={`text-sm font-medium ${
-                                        configStats[config.id].destStats.stats
-                                          .totalPnL >= 0
-                                          ? 'text-green-400'
-                                          : 'text-red-400'
-                                      }`}
-                                    >
-                                      {configStats[config.id].destStats
-                                        .initialBalance > 0
-                                        ? `${configStats[config.id].destStats.stats.totalPnL >= 0 ? '+' : ''}${((configStats[config.id].destStats.stats.totalPnL / configStats[config.id].destStats.initialBalance) * 100).toFixed(2)}%`
-                                        : 'N/A'}
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-3 text-right">
-                                    <span className="text-sm text-slate-300">
-                                      {Math.round(
-                                        configStats[config.id].destStats.stats
-                                          .winRate
-                                      )}
-                                      %
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-3 text-right">
-                                    <span
-                                      className={`text-sm font-medium ${
-                                        configStats[config.id].destStats.stats
-                                          .totalRR >= 0
-                                          ? 'text-green-400'
-                                          : 'text-red-400'
-                                      }`}
-                                    >
-                                      {configStats[config.id].destStats.stats
-                                        .totalRR >= 0
-                                        ? '+'
-                                        : ''}
-                                      {configStats[
-                                        config.id
-                                      ].destStats.stats.totalRR.toFixed(2)}
-                                      R
                                     </span>
                                   </td>
                                 </tr>

@@ -134,7 +134,7 @@ export default function JournalSidebar({
     try {
       // Get all broker connections for all accounts
       const accountIds = accounts.map((acc) => acc.id);
-      
+
       if (accountIds.length === 0) {
         setSyncStatus({ success: 0, errors: 0, total: 0 });
         setIsSyncing(false);
@@ -186,10 +186,7 @@ export default function JournalSidebar({
           }
         } catch (error) {
           errorCount++;
-          console.error(
-            `Error syncing connection ${connection.id}:`,
-            error
-          );
+          console.error(`Error syncing connection ${connection.id}:`, error);
         }
       }
 
