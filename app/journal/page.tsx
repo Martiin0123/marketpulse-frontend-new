@@ -848,7 +848,9 @@ function OverviewSection({
           // Get open positions (status = 'open')
           const { data: openTrades } = await supabase
             .from('trade_entries' as any)
-            .select('entry_price, exit_price, side, size, pnl_amount, pnl_percentage')
+            .select(
+              'entry_price, exit_price, side, size, pnl_amount, pnl_percentage'
+            )
             .eq('account_id', selectedAccount)
             .eq('status', 'open');
 
@@ -863,10 +865,11 @@ function OverviewSection({
               }
               // Otherwise, if exit_price exists (partial exit), calculate from that
               if (trade.exit_price && trade.entry_price && trade.size) {
-                const priceDiff = trade.side === 'long' 
-                  ? trade.exit_price - trade.entry_price
-                  : trade.entry_price - trade.exit_price;
-                return sum + (priceDiff * trade.size);
+                const priceDiff =
+                  trade.side === 'long'
+                    ? trade.exit_price - trade.entry_price
+                    : trade.entry_price - trade.exit_price;
+                return sum + priceDiff * trade.size;
               }
               return sum;
             }, 0);
@@ -883,7 +886,10 @@ function OverviewSection({
 
           // Calculate realized PnL (from closed trades today)
           const realizedPnL = closedTrades
-            ? closedTrades.reduce((sum: number, trade: any) => sum + (trade.pnl_amount || 0), 0)
+            ? closedTrades.reduce(
+                (sum: number, trade: any) => sum + (trade.pnl_amount || 0),
+                0
+              )
             : 0;
 
           setTodayPnL({
@@ -906,18 +912,25 @@ function OverviewSection({
               .eq('status', 'open');
 
             if (openTrades) {
-              const accountOpenPnL = openTrades.reduce((sum: number, trade: any) => {
-                if (trade.pnl_amount !== null && trade.pnl_amount !== undefined) {
-                  return sum + trade.pnl_amount;
-                }
-                if (trade.exit_price && trade.entry_price && trade.size) {
-                  const priceDiff = trade.side === 'long' 
-                    ? trade.exit_price - trade.entry_price
-                    : trade.entry_price - trade.exit_price;
-                  return sum + (priceDiff * trade.size);
-                }
-                return sum;
-              }, 0);
+              const accountOpenPnL = openTrades.reduce(
+                (sum: number, trade: any) => {
+                  if (
+                    trade.pnl_amount !== null &&
+                    trade.pnl_amount !== undefined
+                  ) {
+                    return sum + trade.pnl_amount;
+                  }
+                  if (trade.exit_price && trade.entry_price && trade.size) {
+                    const priceDiff =
+                      trade.side === 'long'
+                        ? trade.exit_price - trade.entry_price
+                        : trade.entry_price - trade.exit_price;
+                    return sum + priceDiff * trade.size;
+                  }
+                  return sum;
+                },
+                0
+              );
               totalOpenPnL += accountOpenPnL;
             }
 

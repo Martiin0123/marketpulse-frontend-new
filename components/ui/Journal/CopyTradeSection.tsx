@@ -580,20 +580,36 @@ export default function CopyTradeSection({
       )}
 
       {configs.length === 0 ? (
-        <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-12 text-center">
-          <p className="text-slate-400 mb-4">
-            No copy trade configurations yet
-          </p>
-          <p className="text-sm text-slate-500 mb-6">
-            Create a configuration to automatically copy trades from one account
-            to another
-          </p>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-          >
-            Create First Configuration
-          </button>
+        <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-6">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center space-x-3 mb-3">
+                <h3 className="text-lg font-semibold text-white">
+                  No Copy Trade Configurations
+                </h3>
+                <span className="px-2 py-1 rounded text-xs font-medium bg-slate-600/50 text-slate-400">
+                  Inactive
+                </span>
+              </div>
+              <div className="space-y-2 text-sm text-slate-400">
+                <p>
+                  Create a configuration to automatically copy trades from one account to another
+                </p>
+                <p className="text-slate-500">
+                  Set up your first configuration to begin copying trades in real-time with customizable multipliers
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2 ml-4">
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+              >
+                <PlusIcon className="h-5 w-5" />
+                <span>Create Configuration</span>
+              </button>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="space-y-3">
@@ -613,6 +629,21 @@ export default function CopyTradeSection({
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center space-x-3 mb-3">
+                      <button
+                        onClick={() => handleToggleEnabled(config)}
+                        className={`p-2 rounded-lg transition-colors ${
+                          config.enabled
+                            ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
+                            : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                        }`}
+                        title={config.enabled ? 'Pause' : 'Resume'}
+                      >
+                        {config.enabled ? (
+                          <PauseIcon className="h-5 w-5" />
+                        ) : (
+                          <PlayIcon className="h-5 w-5" />
+                        )}
+                      </button>
                       <h3 className="text-lg font-semibold text-white">
                         {sourceAccount?.name || 'Unknown'} →{' '}
                         {destAccount?.name || 'Unknown'}
@@ -650,21 +681,6 @@ export default function CopyTradeSection({
                     </div>
                   </div>
                   <div className="flex items-center space-x-2 ml-4">
-                    <button
-                      onClick={() => handleToggleEnabled(config)}
-                      className={`p-2 rounded-lg transition-colors ${
-                        config.enabled
-                          ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
-                          : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                      }`}
-                      title={config.enabled ? 'Pause' : 'Resume'}
-                    >
-                      {config.enabled ? (
-                        <PauseIcon className="h-5 w-5" />
-                      ) : (
-                        <PlayIcon className="h-5 w-5" />
-                      )}
-                    </button>
                     <button
                       onClick={() => openEditModal(config)}
                       className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"

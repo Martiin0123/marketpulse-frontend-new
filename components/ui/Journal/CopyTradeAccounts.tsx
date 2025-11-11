@@ -9,6 +9,7 @@ interface CopyTradeAccount {
   id: string;
   name: string;
   currency: string;
+  initialBalance: number;
   sourceAccountId: string;
   sourceAccountName: string;
   multiplier: number;
@@ -44,7 +45,7 @@ export default function CopyTradeAccounts({ refreshKey = 0 }: CopyTradeAccountsP
       // Get all active copy trade configs
       const { data: configs, error: configError } = await supabase
         .from('copy_trade_configs' as any)
-        .select('*, source_account:trading_accounts!copy_trade_configs_source_account_id_fkey(id, name), destination_account:trading_accounts!copy_trade_configs_destination_account_id_fkey(id, name, currency)')
+        .select('*, source_account:trading_accounts!copy_trade_configs_source_account_id_fkey(id, name), destination_account:trading_accounts!copy_trade_configs_destination_account_id_fkey(id, name, currency, initial_balance)')
         .eq('user_id', user.id)
         .eq('enabled', true);
 
@@ -75,6 +76,7 @@ export default function CopyTradeAccounts({ refreshKey = 0 }: CopyTradeAccountsP
             id: destinationAccountId,
             name: config.destination_account?.name || 'Unknown',
             currency: config.destination_account?.currency || 'USD',
+            initialBalance: config.destination_account?.initial_balance || 0,
             sourceAccountId: sourceAccountId,
             sourceAccountName: config.source_account?.name || 'Unknown',
             multiplier: config.multiplier,
@@ -360,6 +362,9 @@ export default function CopyTradeAccounts({ refreshKey = 0 }: CopyTradeAccountsP
                   Total P&L
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">
+                  Profit
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">
                   Win Rate
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">
@@ -426,6 +431,17 @@ export default function CopyTradeAccounts({ refreshKey = 0 }: CopyTradeAccountsP
                           maximumFractionDigits: 2
                         })}{' '}
                         {account.currency}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <span
+                        className={`text-sm font-medium ${
+                          account.stats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'
+                        }`}
+                      >
+                        {account.initialBalance > 0
+                          ? `${account.stats.totalPnL >= 0 ? '+' : ''}${((account.stats.totalPnL / account.initialBalance) * 100).toFixed(2)}%`
+                          : 'N/A'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
