@@ -371,18 +371,74 @@ export default function CopyTradeSection({
       const anyConnecting = statuses.some(
         (s) => s.state === 'Connecting' || s.state === 'Reconnecting'
       );
+      const anyReconnecting = statuses.some((s) => s.state === 'Reconnecting');
 
-      setConnectionStatus({
-        connected: allConnected,
-        state: allConnected
-          ? 'Connected'
-          : anyConnecting
-            ? 'Connecting'
-            : clients.length > 0
-              ? 'Disconnected'
-              : 'No Active Configs',
-        activeConnections: connectedCount
+      // Update per-config connection status
+      const configStatusMap: Record<string, { connected: boolean; state: string }> = {};
+      
+      // Map each active config to its connection status
+      activeConfigs.forEach((config) => {
+        // Find the connection for this config's source account
+        const sourceAccountId = config.source_account_id;
+        const connectionKey = Array.from(signalRClientsRef.current.keys()).find(
+          (key) => key.includes(sourceAccountId)
+        );
+        
+        if (connectionKey) {
+          const client = signalRClientsRef.current.get(connectionKey);
+          if (client) {
+            const status = client.getConnectionStatus();
+            configStatusMap[config.id] = {
+              connected: status.connected,
+              state: status.state || 'Disconnected'
+            };
+          } else {
+            configStatusMap[config.id] = {
+              connected: false,
+              state: 'Disconnected'
+            };
+          }
+        } else {
+          configStatusMap[config.id] = {
+            connected: false,
+            state: 'Disconnected'
+          };
+        }
       });
+      
+      setConfigConnectionStatus(configStatusMap);
+
+      if (allConnected) {
+        setConnectionStatus({
+          connected: true,
+          state: 'Connected',
+          activeConnections: connectedCount
+        });
+      } else if (anyReconnecting) {
+        setConnectionStatus({
+          connected: false,
+          state: 'Reconnecting',
+          activeConnections: connectedCount
+        });
+      } else if (anyConnecting) {
+        setConnectionStatus({
+          connected: false,
+          state: 'Connecting',
+          activeConnections: connectedCount
+        });
+      } else if (clients.length === 0) {
+        setConnectionStatus({
+          connected: false,
+          state: 'No Active Configs',
+          activeConnections: 0
+        });
+      } else {
+        setConnectionStatus({
+          connected: false,
+          state: 'Disconnected',
+          activeConnections: connectedCount
+        });
+      }
     };
 
     setupSignalRConnections().catch((error) => {
@@ -814,6 +870,43 @@ export default function CopyTradeSection({
                       >
                         {config.enabled ? 'Active' : 'Paused'}
                       </span>
+                      {/* Connection Status Indicator */}
+                      {config.enabled && configConnectionStatus[config.id] && (
+                        <div className="flex items-center gap-2 ml-auto">
+                          <div className="relative">
+                            <div
+                              className={`h-2 w-2 rounded-full ${
+                                configConnectionStatus[config.id].connected
+                                  ? 'bg-green-500 shadow-lg shadow-green-500/50'
+                                  : configConnectionStatus[config.id].state === 'Connecting' ||
+                                      configConnectionStatus[config.id].state === 'Reconnecting'
+                                    ? 'bg-yellow-500 shadow-lg shadow-yellow-500/50'
+                                    : 'bg-red-500 shadow-lg shadow-red-500/50'
+                              }`}
+                            />
+                            {configConnectionStatus[config.id].connected && (
+                              <div className="absolute inset-0 h-2 w-2 rounded-full bg-green-500 animate-ping opacity-75" />
+                            )}
+                          </div>
+                          <span
+                            className={`text-xs font-medium ${
+                              configConnectionStatus[config.id].connected
+                                ? 'text-green-400'
+                                : configConnectionStatus[config.id].state === 'Connecting' ||
+                                    configConnectionStatus[config.id].state === 'Reconnecting'
+                                  ? 'text-yellow-400'
+                                  : 'text-red-400'
+                            }`}
+                          >
+                            {configConnectionStatus[config.id].connected
+                              ? 'Connected'
+                              : configConnectionStatus[config.id].state === 'Connecting' ||
+                                  configConnectionStatus[config.id].state === 'Reconnecting'
+                                ? 'Connecting...'
+                                : 'Disconnected'}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-3">
                       <div className="flex items-center space-x-4 text-sm text-slate-400">
