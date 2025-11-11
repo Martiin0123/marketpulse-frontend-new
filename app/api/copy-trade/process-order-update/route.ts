@@ -189,7 +189,7 @@ export async function POST(request: NextRequest) {
     // Use .limit(1) instead of .maybeSingle() to avoid errors when multiple logs exist
     const { data: existingLogs } = await adminSupabase
       .from('copy_trade_logs' as any)
-      .select('id, order_status, order_price, order_stop_price, order_id, destination_broker_connection_id, created_at')
+      .select('id, order_status, order_price, order_stop_price, order_id, destination_broker_connection_id, created_at, source_order_id')
       .eq('source_account_id', tradingAccountId)
       .eq('source_order_id', order.id.toString())
       .order('created_at', { ascending: false })
@@ -197,21 +197,44 @@ export async function POST(request: NextRequest) {
     
     const existingLog = existingLogs && existingLogs.length > 0 ? existingLogs[0] : null;
     
-    // If multiple logs exist for this order, check if we should skip (duplicate detection)
-    if (existingLogs && existingLogs.length > 1) {
-      // Check if any of the recent logs were created in the last 5 seconds (likely duplicate)
+    // Enhanced duplicate detection: check if order was processed recently
+    if (existingLogs && existingLogs.length > 0) {
+      // Check if any log was created in the last 30 seconds (increased from 5 seconds)
+      // This prevents duplicate executions from multiple SignalR events (onOrderUpdate + onTradeUpdate)
       const recentLogs = existingLogs.filter((log: any) => {
         const logAge = new Date().getTime() - new Date(log.created_at).getTime();
-        return logAge < 5000; // 5 seconds
+        return logAge < 30000; // 30 seconds - enough time for all related events to arrive
       });
       
+      // If we have recent logs, check their status
       if (recentLogs.length > 0) {
-        return NextResponse.json({
-          executed: 0,
-          modified: 0,
-          message: 'Order already being processed (duplicate detected)'
-        });
+        // If any log is already submitted, filled, or in progress, skip this duplicate
+        const activeLogs = recentLogs.filter((log: any) => 
+          log.order_status === 'submitted' || 
+          log.order_status === 'filled' || 
+          log.order_status === 'open' ||
+          log.order_status === 'pending'
+        );
+        
+        if (activeLogs.length > 0) {
+          console.log(`⚠️ Skipping duplicate order ${order.id} - already processed ${activeLogs.length} time(s) in last 30 seconds`);
+          return NextResponse.json({
+            executed: 0,
+            modified: 0,
+            message: `Order already being processed (duplicate detected - ${activeLogs.length} recent execution(s))`
+          });
+        }
       }
+    }
+
+    // Skip if order is already filled - don't process filled orders again
+    if (existingLog && existingLog.order_status === 'filled') {
+      console.log(`⚠️ Skipping order ${order.id} - already filled`);
+      return NextResponse.json({
+        executed: 0,
+        modified: 0,
+        message: 'Order already filled'
+      });
     }
 
     // If order exists and is still active (not filled/cancelled/rejected), check if it was modified
