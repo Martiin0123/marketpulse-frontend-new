@@ -1180,7 +1180,9 @@ export default function CopyTradeSection({
                         ) : (
                           <div className="py-8 text-center">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                            <p className="text-sm text-slate-400">Loading account stats...</p>
+                            <p className="text-sm text-slate-400">
+                              Loading account stats...
+                            </p>
                           </div>
                         )}
                       </div>

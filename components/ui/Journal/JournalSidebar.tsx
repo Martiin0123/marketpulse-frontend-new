@@ -8,7 +8,8 @@ import {
   HomeIcon,
   ViewColumnsIcon,
   UserIcon,
-  DocumentDuplicateIcon
+  DocumentDuplicateIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 import {
   ChartBarIcon as ChartBarIconSolid,
@@ -22,6 +23,7 @@ import type { TradingAccount } from '@/types/journal';
 import { ShareIcon } from '@heroicons/react/24/outline';
 import { useState, useEffect, useRef } from 'react';
 import ShareButton from './ShareButton';
+import { createClient } from '@/utils/supabase/client';
 
 // Helper function to generate account hash (same as in ShareButton)
 const generateAccountHash = async (accountId: string): Promise<string> => {
@@ -95,6 +97,13 @@ export default function JournalSidebar({
 }: JournalSidebarProps) {
   const [shareAccountId, setShareAccountId] = useState<string | null>(null);
   const shareRef = useRef<HTMLDivElement>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<{
+    success: number;
+    errors: number;
+    total: number;
+  } | null>(null);
+  const supabase = createClient();
 
   // Close share dropdown when clicking outside
   useEffect(() => {
@@ -116,11 +125,130 @@ export default function JournalSidebar({
     };
   }, [shareAccountId]);
 
+  const handleSyncAll = async () => {
+    if (isSyncing) return;
+
+    setIsSyncing(true);
+    setSyncStatus(null);
+
+    try {
+      // Get all broker connections for all accounts
+      const accountIds = accounts.map((acc) => acc.id);
+      
+      if (accountIds.length === 0) {
+        setSyncStatus({ success: 0, errors: 0, total: 0 });
+        setIsSyncing(false);
+        return;
+      }
+
+      const { data: connections, error: connError } = await supabase
+        .from('broker_connections' as any)
+        .select('id, trading_account_id, broker_type, broker_account_name')
+        .in('trading_account_id', accountIds);
+
+      if (connError) {
+        console.error('Error fetching broker connections:', connError);
+        setSyncStatus({ success: 0, errors: 1, total: 0 });
+        setIsSyncing(false);
+        return;
+      }
+
+      if (!connections || connections.length === 0) {
+        setSyncStatus({ success: 0, errors: 0, total: 0 });
+        setIsSyncing(false);
+        return;
+      }
+
+      // Sync each broker connection
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const connection of connections as any[]) {
+        try {
+          const response = await fetch(
+            `/api/broker/sync?broker_connection_id=${connection.id}`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+
+          if (response.ok) {
+            successCount++;
+          } else {
+            errorCount++;
+            console.error(
+              `Failed to sync connection ${connection.id}:`,
+              await response.text()
+            );
+          }
+        } catch (error) {
+          errorCount++;
+          console.error(
+            `Error syncing connection ${connection.id}:`,
+            error
+          );
+        }
+      }
+
+      setSyncStatus({
+        success: successCount,
+        errors: errorCount,
+        total: connections.length
+      });
+
+      // Clear status after 3 seconds
+      setTimeout(() => {
+        setSyncStatus(null);
+      }, 3000);
+    } catch (error) {
+      console.error('Error syncing accounts:', error);
+      setSyncStatus({ success: 0, errors: 1, total: 0 });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   return (
     <div className="fixed left-8 top-24 w-64 bg-slate-800/95 backdrop-blur-lg border border-slate-700/50 rounded-2xl shadow-2xl flex flex-col z-40">
       <div className="p-6 border-b border-slate-700/50">
-        <h2 className="text-xl font-bold text-white">Trading Journal</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xl font-bold text-white">Trading Journal</h2>
+          <button
+            onClick={handleSyncAll}
+            disabled={isSyncing}
+            className={`p-2 rounded-lg transition-all ${
+              isSyncing
+                ? 'bg-slate-700/50 text-slate-400 cursor-not-allowed'
+                : 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 hover:text-blue-300'
+            }`}
+            title="Sync all broker accounts"
+          >
+            <ArrowPathIcon
+              className={`h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`}
+            />
+          </button>
+        </div>
         <p className="text-xs text-slate-400 mt-1">Manage your trades</p>
+        {syncStatus && (
+          <div
+            className={`mt-2 text-xs px-2 py-1 rounded ${
+              syncStatus.errors === 0
+                ? 'bg-green-500/20 text-green-400'
+                : syncStatus.success > 0
+                  ? 'bg-yellow-500/20 text-yellow-400'
+                  : 'bg-red-500/20 text-red-400'
+            }`}
+          >
+            {syncStatus.total === 0
+              ? 'No broker connections found'
+              : syncStatus.errors === 0
+                ? `✓ Synced ${syncStatus.success}/${syncStatus.total} accounts`
+                : `⚠ ${syncStatus.success}/${syncStatus.total} synced, ${syncStatus.errors} failed`}
+          </div>
+        )}
       </div>
 
       {/* Account Selection */}
