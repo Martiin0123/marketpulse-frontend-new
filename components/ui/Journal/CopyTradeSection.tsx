@@ -50,6 +50,11 @@ export default function CopyTradeSection({
     multiplier: '1.0'
   });
   const [error, setError] = useState<string | null>(null);
+  const [configStats, setConfigStats] = useState<Record<string, {
+    stats: any;
+    todayPnL: { openPnL: number; realizedPnL: number };
+    initialBalance: number;
+  }>>({});
   const [connectionStatus, setConnectionStatus] = useState<{
     connected: boolean;
     state?: string;
@@ -65,6 +70,44 @@ export default function CopyTradeSection({
   useEffect(() => {
     loadConfigs();
   }, [refreshKey]);
+
+  // Load stats for each destination account
+  useEffect(() => {
+    if (configs.length === 0) return;
+    
+    const loadStats = async () => {
+      const statsMap: Record<string, {
+        stats: any;
+        todayPnL: { openPnL: number; realizedPnL: number };
+        initialBalance: number;
+      }> = {};
+
+      for (const config of configs) {
+        const destAccount = accounts.find((acc) => acc.id === config.destination_account_id);
+        if (!destAccount) continue;
+
+        try {
+          // Calculate stats
+          const stats = await calculateAccountStats(config.destination_account_id);
+          
+          // Calculate today's PnL
+          const todayPnL = await calculateTodayPnL(config.destination_account_id);
+
+          statsMap[config.id] = {
+            stats,
+            todayPnL,
+            initialBalance: destAccount.initial_balance || 0
+          };
+        } catch (error) {
+          console.error(`Error loading stats for config ${config.id}:`, error);
+        }
+      }
+
+      setConfigStats(statsMap);
+    };
+
+    loadStats();
+  }, [configs, accounts, refreshKey]);
 
   // Real-time monitoring: Use SignalR WebSocket for instant order updates
   const signalRClientsRef = useRef<Map<string, ProjectXSignalRClient>>(
@@ -427,6 +470,125 @@ export default function CopyTradeSection({
     }
   };
 
+  const calculateAccountStats = async (accountId: string) => {
+    try {
+      const { data: trades, error } = await supabase
+        .from('trade_entries' as any)
+        .select('*')
+        .eq('account_id', accountId)
+        .eq('status', 'closed');
+
+      if (error || !trades || trades.length === 0) {
+        return {
+          totalTrades: 0,
+          winRate: 0,
+          totalRR: 0,
+          totalPnL: 0
+        };
+      }
+
+      const tradesWithData = trades.filter(
+        (trade: any) =>
+          (trade.rr !== null && trade.rr !== undefined) ||
+          (trade.pnl_amount !== null && trade.pnl_amount !== undefined)
+      );
+
+      if (tradesWithData.length === 0) {
+        return {
+          totalTrades: 0,
+          winRate: 0,
+          totalRR: 0,
+          totalPnL: 0
+        };
+      }
+
+      const totalTrades = tradesWithData.length;
+      const wins = tradesWithData.filter(
+        (trade: any) =>
+          (trade.rr !== null && trade.rr !== undefined && trade.rr > 0) ||
+          (trade.rr === null && trade.pnl_amount !== null && trade.pnl_amount > 0)
+      );
+      const winRate = totalTrades > 0 ? (wins.length / totalTrades) * 100 : 0;
+
+      const pnlValues = tradesWithData
+        .map((trade: any) => trade.pnl_amount || 0)
+        .filter((pnl: any) => pnl !== null && pnl !== undefined);
+      const totalPnL = pnlValues.length > 0 ? pnlValues.reduce((sum: number, pnl: number) => sum + pnl, 0) : 0;
+
+      const rrValues = tradesWithData
+        .map((trade: any) => trade.rr || 0)
+        .filter((rr: any) => rr !== null && rr !== undefined);
+      const totalRR = rrValues.length > 0 ? rrValues.reduce((sum: number, rr: number) => sum + rr, 0) : 0;
+
+      return {
+        totalTrades,
+        winRate,
+        totalRR,
+        totalPnL
+      };
+    } catch (error) {
+      console.error('Error calculating account stats:', error);
+      return {
+        totalTrades: 0,
+        winRate: 0,
+        totalRR: 0,
+        totalPnL: 0
+      };
+    }
+  };
+
+  const calculateTodayPnL = async (accountId: string) => {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStart = today.toISOString();
+      const todayEnd = new Date(today);
+      todayEnd.setHours(23, 59, 59, 999);
+      const todayEndStr = todayEnd.toISOString();
+
+      // Get open positions
+      const { data: openTrades } = await supabase
+        .from('trade_entries' as any)
+        .select('entry_price, exit_price, side, size, pnl_amount')
+        .eq('account_id', accountId)
+        .eq('status', 'open');
+
+      let openPnL = 0;
+      if (openTrades) {
+        openPnL = openTrades.reduce((sum: number, trade: any) => {
+          if (trade.pnl_amount !== null && trade.pnl_amount !== undefined) {
+            return sum + trade.pnl_amount;
+          }
+          if (trade.exit_price && trade.entry_price && trade.size) {
+            const priceDiff = trade.side === 'long' 
+              ? trade.exit_price - trade.entry_price
+              : trade.entry_price - trade.exit_price;
+            return sum + (priceDiff * trade.size);
+          }
+          return sum;
+        }, 0);
+      }
+
+      // Get closed trades from today
+      const { data: closedTrades } = await supabase
+        .from('trade_entries' as any)
+        .select('pnl_amount')
+        .eq('account_id', accountId)
+        .eq('status', 'closed')
+        .gte('exit_date', todayStart)
+        .lte('exit_date', todayEndStr);
+
+      const realizedPnL = closedTrades
+        ? closedTrades.reduce((sum: number, trade: any) => sum + (trade.pnl_amount || 0), 0)
+        : 0;
+
+      return { openPnL, realizedPnL };
+    } catch (error) {
+      console.error('Error calculating today PnL:', error);
+      return { openPnL: 0, realizedPnL: 0 };
+    }
+  };
+
   const handleDelete = async (configId: string) => {
     if (
       !confirm('Are you sure you want to delete this copy trade configuration?')
@@ -593,10 +755,12 @@ export default function CopyTradeSection({
               </div>
               <div className="space-y-2 text-sm text-slate-400">
                 <p>
-                  Create a configuration to automatically copy trades from one account to another
+                  Create a configuration to automatically copy trades from one
+                  account to another
                 </p>
                 <p className="text-slate-500">
-                  Set up your first configuration to begin copying trades in real-time with customizable multipliers
+                  Set up your first configuration to begin copying trades in
+                  real-time with customizable multipliers
                 </p>
               </div>
             </div>
@@ -658,8 +822,8 @@ export default function CopyTradeSection({
                         {config.enabled ? 'Active' : 'Paused'}
                       </span>
                     </div>
-                    <div className="space-y-2 text-sm text-slate-400">
-                      <div className="flex items-center space-x-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-4 text-sm text-slate-400">
                         <span>
                           <span className="text-slate-500">Source:</span>{' '}
                           {sourceAccount?.name || 'Unknown Account'}
@@ -668,16 +832,71 @@ export default function CopyTradeSection({
                           <span className="text-slate-500">Destination:</span>{' '}
                           {destAccount?.name || 'Unknown Account'}
                         </span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">Multiplier:</span>{' '}
-                        <span className="text-white font-medium">
-                          {config.multiplier}x
-                        </span>
-                        <span className="text-slate-500 ml-4">
-                          (Trades will be scaled by this factor)
+                        <span>
+                          <span className="text-slate-500">Multiplier:</span>{' '}
+                          <span className="text-white font-medium">
+                            {config.multiplier}x
+                          </span>
                         </span>
                       </div>
+                      
+                      {/* Stats Grid */}
+                      {configStats[config.id] && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-slate-700">
+                          <div>
+                            <div className="text-xs text-slate-500 mb-1">Today's P&L</div>
+                            <div className={`text-sm font-bold ${
+                              (configStats[config.id].todayPnL.openPnL + configStats[config.id].todayPnL.realizedPnL) >= 0 
+                                ? 'text-green-400' 
+                                : 'text-red-400'
+                            }`}>
+                              {(configStats[config.id].todayPnL.openPnL + configStats[config.id].todayPnL.realizedPnL) >= 0 ? '+' : ''}
+                              {(configStats[config.id].todayPnL.openPnL + configStats[config.id].todayPnL.realizedPnL).toFixed(2)} {destAccount?.currency || 'USD'}
+                            </div>
+                            <div className="text-xs text-slate-500 mt-1">
+                              Open: {configStats[config.id].todayPnL.openPnL >= 0 ? '+' : ''}
+                              {configStats[config.id].todayPnL.openPnL.toFixed(2)} | Realized: {configStats[config.id].todayPnL.realizedPnL >= 0 ? '+' : ''}
+                              {configStats[config.id].todayPnL.realizedPnL.toFixed(2)}
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="text-xs text-slate-500 mb-1">Total P&L</div>
+                            <div className={`text-sm font-bold ${
+                              configStats[config.id].stats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'
+                            }`}>
+                              {configStats[config.id].stats.totalPnL >= 0 ? '+' : ''}
+                              {configStats[config.id].stats.totalPnL.toLocaleString('en-US', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2
+                              })}{' '}
+                              {destAccount?.currency || 'USD'}
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="text-xs text-slate-500 mb-1">Profit</div>
+                            <div className={`text-sm font-bold ${
+                              configStats[config.id].stats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'
+                            }`}>
+                              {configStats[config.id].initialBalance > 0
+                                ? `${configStats[config.id].stats.totalPnL >= 0 ? '+' : ''}${((configStats[config.id].stats.totalPnL / configStats[config.id].initialBalance) * 100).toFixed(2)}%`
+                                : 'N/A'}
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="text-xs text-slate-500 mb-1">Win Rate</div>
+                            <div className="text-sm font-bold text-slate-300">
+                              {Math.round(configStats[config.id].stats.winRate)}%
+                            </div>
+                            <div className="text-xs text-slate-500 mt-1">
+                              {configStats[config.id].stats.totalTrades} trades | {configStats[config.id].stats.totalRR >= 0 ? '+' : ''}
+                              {configStats[config.id].stats.totalRR.toFixed(2)}R
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center space-x-2 ml-4">
