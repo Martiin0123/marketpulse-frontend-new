@@ -189,13 +189,33 @@ export async function POST(request: NextRequest) {
     // Use .limit(1) instead of .maybeSingle() to avoid errors when multiple logs exist
     const { data: existingLogs } = await adminSupabase
       .from('copy_trade_logs' as any)
-      .select('id, order_status, order_price, order_stop_price, order_id, destination_broker_connection_id, created_at, source_order_id')
+      .select('id, order_status, order_price, order_stop_price, order_id, destination_broker_connection_id, created_at, source_order_id, symbol, side, source_quantity')
       .eq('source_account_id', tradingAccountId)
       .eq('source_order_id', order.id.toString())
       .order('created_at', { ascending: false })
       .limit(10); // Get up to 10 to check for duplicates
     
-    const existingLog = existingLogs && existingLogs.length > 0 ? existingLogs[0] : null;
+    let existingLog = existingLogs && existingLogs.length > 0 ? existingLogs[0] : null;
+    
+    // If no log found by source_order_id, try matching by symbol + side + quantity + recent timestamp
+    // This handles cases where onTradeUpdate uses a different ID than onOrderUpdate
+    if (!existingLog && order.symbol && order.side && order.quantity) {
+      const { data: matchingLogs } = await adminSupabase
+        .from('copy_trade_logs' as any)
+        .select('id, order_status, order_price, order_stop_price, order_id, destination_broker_connection_id, created_at, source_order_id, symbol, side, source_quantity')
+        .eq('source_account_id', tradingAccountId)
+        .eq('symbol', order.symbol)
+        .eq('side', order.side)
+        .eq('source_quantity', order.quantity)
+        .gte('created_at', new Date(Date.now() - 30000).toISOString()) // Last 30 seconds
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      if (matchingLogs && matchingLogs.length > 0) {
+        existingLog = matchingLogs[0];
+        console.log(`⚠️ Found matching order by symbol/side/quantity instead of source_order_id`);
+      }
+    }
     
     // Enhanced duplicate detection: check if order was processed recently
     if (existingLogs && existingLogs.length > 0) {
@@ -222,6 +242,26 @@ export async function POST(request: NextRequest) {
             executed: 0,
             modified: 0,
             message: `Order already being processed (duplicate detected - ${activeLogs.length} recent execution(s))`
+          });
+        }
+      }
+    }
+    
+    // Also check the matched log (if found by symbol/side/quantity)
+    if (existingLog && existingLog !== existingLogs?.[0]) {
+      const logAge = new Date().getTime() - new Date(existingLog.created_at).getTime();
+      if (logAge < 30000) {
+        const isActive = existingLog.order_status === 'submitted' || 
+                        existingLog.order_status === 'filled' || 
+                        existingLog.order_status === 'open' ||
+                        existingLog.order_status === 'pending';
+        
+        if (isActive) {
+          console.log(`⚠️ Skipping duplicate order (matched by symbol/side/quantity) - already processed`);
+          return NextResponse.json({
+            executed: 0,
+            modified: 0,
+            message: 'Order already being processed (duplicate detected by symbol/side/quantity)'
           });
         }
       }
