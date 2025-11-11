@@ -888,38 +888,38 @@ export default function CopyTradeSection({
                       </div>
 
                       {/* Accounts Table - Show for both active and paused configs */}
-                      <div className="pt-3 border-t border-slate-700">
+                      <div className="pt-4 border-t border-slate-700/50">
                         {configStats[config.id] ? (
-                          <div className="overflow-x-auto">
+                          <div className="overflow-x-auto rounded-lg border border-slate-700/50">
                             <table className="w-full">
-                              <thead className="bg-slate-700/30">
+                              <thead className="bg-slate-700/50">
                                 <tr>
-                                  <th className="px-4 py-2 text-left text-xs font-medium text-slate-300 uppercase">
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
                                     Account
                                   </th>
                                   {config.enabled && (
-                                    <th className="px-4 py-2 text-right text-xs font-medium text-slate-300 uppercase">
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">
                                       Open P&L
                                     </th>
                                   )}
-                                  <th className="px-4 py-2 text-right text-xs font-medium text-slate-300 uppercase">
+                                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">
                                     Total P&L
                                   </th>
                                 </tr>
                               </thead>
-                              <tbody className="divide-y divide-slate-700">
+                              <tbody className="divide-y divide-slate-700/50 bg-slate-800/30">
                                 {/* Source Account Row */}
-                                <tr className="hover:bg-slate-700/20">
-                                  <td className="px-4 py-3">
+                                <tr className="hover:bg-slate-700/30 transition-colors">
+                                  <td className="px-6 py-4">
                                     <div className="text-sm font-medium text-white">
                                       {sourceAccount?.name || 'Unknown'}
                                     </div>
-                                    <div className="text-xs text-slate-400">
+                                    <div className="text-xs text-slate-400 mt-0.5">
                                       Source
                                     </div>
                                   </td>
                                   {config.enabled && (
-                                    <td className="px-4 py-3 text-right">
+                                    <td className="px-6 py-4 text-right">
                                       <span
                                         className={`text-sm font-bold ${
                                           configStats[config.id].sourceStats
@@ -941,7 +941,7 @@ export default function CopyTradeSection({
                                       </span>
                                     </td>
                                   )}
-                                  <td className="px-4 py-3 text-right">
+                                  <td className="px-6 py-4 text-right">
                                     <span
                                       className={`text-sm font-bold ${
                                         configStats[config.id].sourceStats.stats
@@ -969,17 +969,17 @@ export default function CopyTradeSection({
                                 </tr>
 
                                 {/* Destination Account Row */}
-                                <tr className="hover:bg-slate-700/20">
-                                  <td className="px-4 py-3">
+                                <tr className="hover:bg-slate-700/30 transition-colors">
+                                  <td className="px-6 py-4">
                                     <div className="text-sm font-medium text-white">
                                       {destAccount?.name || 'Unknown'}
                                     </div>
-                                    <div className="text-xs text-slate-400">
+                                    <div className="text-xs text-slate-400 mt-0.5">
                                       Destination
                                     </div>
                                   </td>
                                   {config.enabled && (
-                                    <td className="px-4 py-3 text-right">
+                                    <td className="px-6 py-4 text-right">
                                       <span
                                         className={`text-sm font-bold ${
                                           configStats[config.id].destStats
@@ -1001,7 +1001,7 @@ export default function CopyTradeSection({
                                       </span>
                                     </td>
                                   )}
-                                  <td className="px-4 py-3 text-right">
+                                  <td className="px-6 py-4 text-right">
                                     <span
                                       className={`text-sm font-bold ${
                                         configStats[config.id].destStats.stats
