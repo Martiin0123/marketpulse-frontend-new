@@ -50,11 +50,16 @@ export default function CopyTradeSection({
     multiplier: '1.0'
   });
   const [error, setError] = useState<string | null>(null);
-  const [configStats, setConfigStats] = useState<Record<string, {
-    stats: any;
-    todayPnL: { openPnL: number; realizedPnL: number };
-    initialBalance: number;
-  }>>({});
+  const [configStats, setConfigStats] = useState<
+    Record<
+      string,
+      {
+        stats: any;
+        todayPnL: { openPnL: number; realizedPnL: number };
+        initialBalance: number;
+      }
+    >
+  >({});
   const [connectionStatus, setConnectionStatus] = useState<{
     connected: boolean;
     state?: string;
@@ -74,24 +79,33 @@ export default function CopyTradeSection({
   // Load stats for each destination account
   useEffect(() => {
     if (configs.length === 0) return;
-    
+
     const loadStats = async () => {
-      const statsMap: Record<string, {
-        stats: any;
-        todayPnL: { openPnL: number; realizedPnL: number };
-        initialBalance: number;
-      }> = {};
+      const statsMap: Record<
+        string,
+        {
+          stats: any;
+          todayPnL: { openPnL: number; realizedPnL: number };
+          initialBalance: number;
+        }
+      > = {};
 
       for (const config of configs) {
-        const destAccount = accounts.find((acc) => acc.id === config.destination_account_id);
+        const destAccount = accounts.find(
+          (acc) => acc.id === config.destination_account_id
+        );
         if (!destAccount) continue;
 
         try {
           // Calculate stats
-          const stats = await calculateAccountStats(config.destination_account_id);
-          
+          const stats = await calculateAccountStats(
+            config.destination_account_id
+          );
+
           // Calculate today's PnL
-          const todayPnL = await calculateTodayPnL(config.destination_account_id);
+          const todayPnL = await calculateTodayPnL(
+            config.destination_account_id
+          );
 
           statsMap[config.id] = {
             stats,
@@ -506,19 +520,27 @@ export default function CopyTradeSection({
       const wins = tradesWithData.filter(
         (trade: any) =>
           (trade.rr !== null && trade.rr !== undefined && trade.rr > 0) ||
-          (trade.rr === null && trade.pnl_amount !== null && trade.pnl_amount > 0)
+          (trade.rr === null &&
+            trade.pnl_amount !== null &&
+            trade.pnl_amount > 0)
       );
       const winRate = totalTrades > 0 ? (wins.length / totalTrades) * 100 : 0;
 
       const pnlValues = tradesWithData
         .map((trade: any) => trade.pnl_amount || 0)
         .filter((pnl: any) => pnl !== null && pnl !== undefined);
-      const totalPnL = pnlValues.length > 0 ? pnlValues.reduce((sum: number, pnl: number) => sum + pnl, 0) : 0;
+      const totalPnL =
+        pnlValues.length > 0
+          ? pnlValues.reduce((sum: number, pnl: number) => sum + pnl, 0)
+          : 0;
 
       const rrValues = tradesWithData
         .map((trade: any) => trade.rr || 0)
         .filter((rr: any) => rr !== null && rr !== undefined);
-      const totalRR = rrValues.length > 0 ? rrValues.reduce((sum: number, rr: number) => sum + rr, 0) : 0;
+      const totalRR =
+        rrValues.length > 0
+          ? rrValues.reduce((sum: number, rr: number) => sum + rr, 0)
+          : 0;
 
       return {
         totalTrades,
@@ -560,10 +582,11 @@ export default function CopyTradeSection({
             return sum + trade.pnl_amount;
           }
           if (trade.exit_price && trade.entry_price && trade.size) {
-            const priceDiff = trade.side === 'long' 
-              ? trade.exit_price - trade.entry_price
-              : trade.entry_price - trade.exit_price;
-            return sum + (priceDiff * trade.size);
+            const priceDiff =
+              trade.side === 'long'
+                ? trade.exit_price - trade.entry_price
+                : trade.entry_price - trade.exit_price;
+            return sum + priceDiff * trade.size;
           }
           return sum;
         }, 0);
@@ -579,7 +602,10 @@ export default function CopyTradeSection({
         .lte('exit_date', todayEndStr);
 
       const realizedPnL = closedTrades
-        ? closedTrades.reduce((sum: number, trade: any) => sum + (trade.pnl_amount || 0), 0)
+        ? closedTrades.reduce(
+            (sum: number, trade: any) => sum + (trade.pnl_amount || 0),
+            0
+          )
         : 0;
 
       return { openPnL, realizedPnL };
@@ -839,59 +865,107 @@ export default function CopyTradeSection({
                           </span>
                         </span>
                       </div>
-                      
+
                       {/* Stats Grid */}
                       {configStats[config.id] && (
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-slate-700">
                           <div>
-                            <div className="text-xs text-slate-500 mb-1">Today's P&L</div>
-                            <div className={`text-sm font-bold ${
-                              (configStats[config.id].todayPnL.openPnL + configStats[config.id].todayPnL.realizedPnL) >= 0 
-                                ? 'text-green-400' 
-                                : 'text-red-400'
-                            }`}>
-                              {(configStats[config.id].todayPnL.openPnL + configStats[config.id].todayPnL.realizedPnL) >= 0 ? '+' : ''}
-                              {(configStats[config.id].todayPnL.openPnL + configStats[config.id].todayPnL.realizedPnL).toFixed(2)} {destAccount?.currency || 'USD'}
+                            <div className="text-xs text-slate-500 mb-1">
+                              Today's P&L
+                            </div>
+                            <div
+                              className={`text-sm font-bold ${
+                                configStats[config.id].todayPnL.openPnL +
+                                  configStats[config.id].todayPnL.realizedPnL >=
+                                0
+                                  ? 'text-green-400'
+                                  : 'text-red-400'
+                              }`}
+                            >
+                              {configStats[config.id].todayPnL.openPnL +
+                                configStats[config.id].todayPnL.realizedPnL >=
+                              0
+                                ? '+'
+                                : ''}
+                              {(
+                                configStats[config.id].todayPnL.openPnL +
+                                configStats[config.id].todayPnL.realizedPnL
+                              ).toFixed(2)}{' '}
+                              {destAccount?.currency || 'USD'}
                             </div>
                             <div className="text-xs text-slate-500 mt-1">
-                              Open: {configStats[config.id].todayPnL.openPnL >= 0 ? '+' : ''}
-                              {configStats[config.id].todayPnL.openPnL.toFixed(2)} | Realized: {configStats[config.id].todayPnL.realizedPnL >= 0 ? '+' : ''}
-                              {configStats[config.id].todayPnL.realizedPnL.toFixed(2)}
+                              Open:{' '}
+                              {configStats[config.id].todayPnL.openPnL >= 0
+                                ? '+'
+                                : ''}
+                              {configStats[config.id].todayPnL.openPnL.toFixed(
+                                2
+                              )}{' '}
+                              | Realized:{' '}
+                              {configStats[config.id].todayPnL.realizedPnL >= 0
+                                ? '+'
+                                : ''}
+                              {configStats[
+                                config.id
+                              ].todayPnL.realizedPnL.toFixed(2)}
                             </div>
                           </div>
-                          
+
                           <div>
-                            <div className="text-xs text-slate-500 mb-1">Total P&L</div>
-                            <div className={`text-sm font-bold ${
-                              configStats[config.id].stats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'
-                            }`}>
-                              {configStats[config.id].stats.totalPnL >= 0 ? '+' : ''}
-                              {configStats[config.id].stats.totalPnL.toLocaleString('en-US', {
+                            <div className="text-xs text-slate-500 mb-1">
+                              Total P&L
+                            </div>
+                            <div
+                              className={`text-sm font-bold ${
+                                configStats[config.id].stats.totalPnL >= 0
+                                  ? 'text-green-400'
+                                  : 'text-red-400'
+                              }`}
+                            >
+                              {configStats[config.id].stats.totalPnL >= 0
+                                ? '+'
+                                : ''}
+                              {configStats[
+                                config.id
+                              ].stats.totalPnL.toLocaleString('en-US', {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2
                               })}{' '}
                               {destAccount?.currency || 'USD'}
                             </div>
                           </div>
-                          
+
                           <div>
-                            <div className="text-xs text-slate-500 mb-1">Profit</div>
-                            <div className={`text-sm font-bold ${
-                              configStats[config.id].stats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'
-                            }`}>
+                            <div className="text-xs text-slate-500 mb-1">
+                              Profit
+                            </div>
+                            <div
+                              className={`text-sm font-bold ${
+                                configStats[config.id].stats.totalPnL >= 0
+                                  ? 'text-green-400'
+                                  : 'text-red-400'
+                              }`}
+                            >
                               {configStats[config.id].initialBalance > 0
                                 ? `${configStats[config.id].stats.totalPnL >= 0 ? '+' : ''}${((configStats[config.id].stats.totalPnL / configStats[config.id].initialBalance) * 100).toFixed(2)}%`
                                 : 'N/A'}
                             </div>
                           </div>
-                          
+
                           <div>
-                            <div className="text-xs text-slate-500 mb-1">Win Rate</div>
+                            <div className="text-xs text-slate-500 mb-1">
+                              Win Rate
+                            </div>
                             <div className="text-sm font-bold text-slate-300">
-                              {Math.round(configStats[config.id].stats.winRate)}%
+                              {Math.round(configStats[config.id].stats.winRate)}
+                              %
                             </div>
                             <div className="text-xs text-slate-500 mt-1">
-                              {configStats[config.id].stats.totalTrades} trades | {configStats[config.id].stats.totalRR >= 0 ? '+' : ''}
+                              {configStats[config.id].stats.totalTrades} trades
+                              |{' '}
+                              {configStats[config.id].stats.totalRR >= 0
+                                ? '+'
+                                : ''}
                               {configStats[config.id].stats.totalRR.toFixed(2)}R
                             </div>
                           </div>
